@@ -274,6 +274,12 @@ class RadarResearchWorkbench:
                 latest[key] = max(revision(value[0]) for value in revisions)
         for row in signals:
             row.update(RadarResearchWorkbench._import_source_tx(con, row))
+            from .megion_radar_import import read_megion_source_metadata_tx
+
+            try:
+                row.update(read_megion_source_metadata_tx(con, row))
+            except RadarValidationError:
+                raise RadarWorkbenchConflict("official permit source receipt is invalid") from None
             passport = con.execute(
                 "SELECT * FROM radar_source_passports WHERE passport_id=?", (row["passport_id"],)
             ).fetchone()
@@ -304,7 +310,8 @@ class RadarResearchWorkbench:
             )
             if not _time(passport["valid_from_utc"]) <= _time(now) <= approval_end:
                 reasons.append("SOURCE_APPROVAL_EXPIRED")
-            if _time(now) - _time(row["observed_at_utc"]) > timedelta(days=row["max_age_days"]):
+            source_date = row.get("source_publication_at_utc") or row["observed_at_utc"]
+            if _time(now) - _time(source_date) > timedelta(days=row["max_age_days"]):
                 reasons.append("SOURCE_DATA_STALE")
             row["source_available"] = not any(value != "SOURCE_DATA_STALE" for value in reasons)
             row["freshness_reasons"] = reasons
@@ -357,8 +364,16 @@ class RadarResearchWorkbench:
         return {
             "object_id": object_id,
             "project_id": obj["radar_project_id"],
-            "title": obj["creation_title"],
-            "address": display.get("ADDRESS", ""),
+            "title": next(
+                (row["public_fields"]["title"] for row in reversed(current)
+                 if row.get("public_fields", {}).get("title")),
+                obj["creation_title"],
+            ),
+            "address": next(
+                (row["public_fields"]["address"] for row in reversed(current)
+                 if row.get("public_fields", {}).get("address")),
+                display.get("ADDRESS", ""),
+            ),
             "latitude": latitude,
             "longitude": longitude,
             "updated_at_utc": max(

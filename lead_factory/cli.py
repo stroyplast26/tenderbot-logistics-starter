@@ -112,12 +112,23 @@ def _parser() -> argparse.ArgumentParser:
     radar_import.add_argument("--actor", required=True)
     radar_import.add_argument("--passport", required=True)
     radar_import.add_argument("--file", required=True, help="local bounded JSON file")
+    megion_import = sub.add_parser(
+        "import-megion", help="transform a supplied official Megion permit CSV locally"
+    )
+    megion_import.add_argument("--workspace-db", required=True)
+    megion_import.add_argument("--actor", required=True)
+    megion_import.add_argument("--passport", required=True)
+    megion_import.add_argument("--file", required=True, help="local official CSV snapshot")
+    megion_import.add_argument("--source-url", required=True, help="original official CSV URL")
+    megion_import.add_argument("--published-at", required=True, help="publication date as YYYY-MM-DDT00:00:00Z")
+    megion_import.add_argument("--since-year", type=int, default=2026)
+    megion_import.add_argument("--fetch-receipt-ref", default="")
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
-    if args.command in {"serve-radar", "import-radar"}:
+    if args.command in {"serve-radar", "import-radar", "import-megion"}:
         return _radar_command(args)
     store = FactoryStore(args.db)
     if args.command == "init":
@@ -193,6 +204,20 @@ def _radar_command(args: argparse.Namespace) -> int:
     try:
         # Validate the launch identity before creating any database.
         RadarResearchWorkbench(store, actor=args.actor)
+        if args.command == "import-megion":
+            from .megion_radar_import import MegionRadarImporter
+
+            if not database.is_file():
+                raise ValueError("workspace database with an approved source passport is required")
+            with Path(args.file).open("rb") as source:
+                blob = source.read(2 * 1024 * 1024 + 1)
+            result = MegionRadarImporter(store).import_bytes(
+                blob, passport_id=args.passport, actor=args.actor,
+                source_url=args.source_url, published_at_utc=args.published_at,
+                since_year=args.since_year, fetch_receipt_ref=args.fetch_receipt_ref,
+            )
+            print(json.dumps(asdict(result), ensure_ascii=False, indent=2))
+            return 0
         if args.command == "import-radar":
             if not database.is_file():
                 raise ValueError("workspace database with an approved source passport is required")

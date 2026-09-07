@@ -11,6 +11,7 @@ const ACTIONS = {NONE: "Работа завершена", CALLBACK: "Перез�
 const ALLOWED = {NO_ANSWER: ["CALLBACK"], CALLBACK: ["CALLBACK"], NEEDS_RESEARCH: ["RESEARCH", "VERIFY_NEED"], RFQ_REPORTED: ["PREPARE_QUOTE"], QUOTE_REPORTED: ["FOLLOW_UP"], RESEARCH_COMPLETE: ["NONE"], NOT_RELEVANT: ["NONE"], DO_NOT_CONTACT: ["NONE"]};
 const STATES = {OPEN: "Назначено", ACKNOWLEDGED: "Принято", IN_PROGRESS: "В работе", COMPLETED: "Завершено", CLOSED: "Закрыто"};
 const LABELS = {TITLE: "Название", OFFICE: "Офисное здание", SCHOOL: "Школа", HOTEL: "Гостиница", ENTRANCE_GROUPS: "Входные группы", FACADE: "Фасад", WINDOWS: "Окна", STAGE: "Стадия строительства", DEMAND: "Предполагаемая потребность", ALUMINIUM_DEMAND: "Предполагаемая потребность", ADDRESS: "Адрес", ENCLOSING_STRUCTURES_APPROACHING: "Приближаются ограждающие конструкции", CONSTRUCTION: "Строительство", DESIGN: "Проектирование", GENERAL_CONTRACTOR: "Генеральный подрядчик", DEVELOPER: "Застройщик", DESIGNER: "Проектировщик", WINDOW_AND_FACADE: "Окна и фасады", MEDIUM: "Средний объём", UNKNOWN: "Неизвестно", D14: "В пределах 14 дней", D30: "В пределах 30 дней", D90: "В пределах 90 дней"};
+Object.assign(LABELS, {PERMIT_ISSUED: "Выдано разрешение · текущая стадия не установлена"});
 let session, items = [], total = 0, offset = 0, selected = null, dossier = null, selectionRequest = 0, queueRequest = 0, saving = false;
 const PAGE_SIZE = 100;
 const el = (tag, text, className) => { const node = document.createElement(tag); if (text !== undefined) node.textContent = String(text); if (className) node.className = className; return node; };
@@ -65,7 +66,11 @@ async function selectObject(id) {
 function sourceCaption(row) {
   const reasons = {SOURCE_PASSPORT_SUPERSEDED: "разрешение источника заменено", SOURCE_PASSPORT_INACTIVE: "источник не разрешён", SOURCE_APPROVAL_EXPIRED: "срок разрешения источника истёк", SOURCE_DATA_STALE: "сведения устарели"};
   const status = (row.freshness_reasons || []).map(reason => reasons[reason] || "источник требует проверки").join("; ");
-  return `${row.source_key || "Источник"} · ${date(row.source_date_utc || row.observed_at_utc || row.predicted_at_utc)}${row.is_current_revision === false ? " · предыдущая версия" : ""}${status ? ` · ${status}` : row.source_freshness === "STALE" || row.freshness === "STALE" ? " · устарело" : ""}`;
+  const published = row.source_publication_at_utc;
+  const isPermit = row.source_key === "megion-public-permits-31875";
+  const sourceDate = row.source_date_utc || row.observed_at_utc || row.predicted_at_utc;
+  const dated = published ? `Реестр опубликован ${published.slice(0, 10).split("-").reverse().join(".")}` : isPermit && sourceDate ? sourceDate.slice(0, 10).split("-").reverse().join(".") : date(sourceDate);
+  return `${isPermit ? "Реестр разрешений Мегиона" : row.source_key || "Источник"} · ${dated}${row.is_current_revision === false ? " · предыдущая версия" : ""}${status ? ` · ${status}` : row.source_freshness === "STALE" || row.freshness === "STALE" ? " · устарело" : ""}`;
 }
 function details(parent, row) {
   const block = el("details"); block.append(el("summary", "Происхождение записи"));
@@ -101,16 +106,28 @@ function renderDossier() {
   $("assignment-note").textContent = task?.do_not_contact ? "Зафиксирован отказ от контакта. Работа по этому объекту заблокирована. Общая блокировка адресата в каналах связи ещё не синхронизирована." : active(task) && task.assignee !== session.actor ? `Результат может сохранить исполнитель ${task.assignee}.` : task && !active(task) ? "Задача завершена, история сохранена." : "";
   $("reason").value = ""; $("result").value = "NO_ANSWER"; $("next-due").value = defaultDue(); updateActions();
   $("claims").replaceChildren();
-  for (const row of data.project_claims) $("claims").append(dataRow(label(row.claim_type), claimValue(row), row));
+  for (const row of data.project_claims) {
+    // Radar's generated identity title is not the permit's published description.
+    if (row.claim_type === "TITLE" && data.signals.some(signal => signal.radar_signal_id === row.radar_signal_id && signal.public_fields)) continue;
+    $("claims").append(dataRow(label(row.claim_type), claimValue(row), row));
+  }
   for (const row of data.predictions) $("claims").append(dataRow("Предполагаемое окно закупки", `${date(row.window_start_utc)} — ${date(row.window_end_utc)} · предполагаемый покупатель: ${row.likely_buyer_inn || "не указан"}`, row));
   for (const row of data.negative_evidence || []) $("claims").append(dataRow("Ограничение из источника", row.kind || row.negative_kind || "Требует проверки", row));
   if (!$("claims").children.length) $("claims").append(el("p", "Стадия и потребность пока не указаны.", "muted"));
   $("participants").replaceChildren();
+  const publicPermits = data.signals.filter(row => row.public_fields && row.is_current_revision);
+  for (const row of publicPermits) {
+    const fields = row.public_fields;
+    $("participants").append(dataRow("Застройщик по реестру разрешений", `${fields.developer_name} · ИНН и закупщика предстоит установить`, row));
+    $("claims").append(dataRow("Разрешение на строительство", `${fields.permit_number} · выдано ${String(fields.issued_at_utc).slice(0, 10).split("-").reverse().join(".")}`, row));
+  }
+  if (publicPermits.length) $("claims").append(el("p", "Реестр подтверждает выдачу разрешения. Текущую стройку, потребность в алюминии и сроки закупки предстоит проверить.", "warning"));
   for (const row of data.participants) $("participants").append(dataRow(label(row.role), `ИНН: ${row.company_inn} · роль указана на период ${date(row.valid_from_utc)} — ${date(row.valid_until_utc)}`, row));
-  if (!data.participants.length) $("participants").append(el("p", "Участников предстоит установить. Контакт закупщика ещё не подтверждён.", "muted"));
+  if (!data.participants.length && !publicPermits.length) $("participants").append(el("p", "Участников предстоит установить. Контакт закупщика ещё не подтверждён.", "muted"));
   $("sources").replaceChildren();
   for (const row of data.signals) {
-    const node = dataRow(row.source_key, `Получено: ${date(row.collected_at_utc)} · версия ${row.source_revision}`, row);
+    const node = dataRow(row.source_key === "megion-public-permits-31875" ? "Администрация Мегиона · разрешения на строительство" : row.source_key, `Получено: ${date(row.collected_at_utc)} · версия ${row.source_revision}`, row);
+    if (row.acquisition_label) node.append(el("p", "Загружен официальный файл. Автоматическое обновление ещё не подключено.", "muted"));
     if (row.source_url) { try { const url = new URL(row.source_url); if (url.protocol === "https:" && !url.username && !url.password) { const link = el("a", "Открыть страницу источника ↗"); link.href = url.href; link.target = "_blank"; link.rel = "noopener noreferrer"; node.append(link); } } catch { /* invalid links remain plain data */ } }
     $("sources").append(node);
   }
