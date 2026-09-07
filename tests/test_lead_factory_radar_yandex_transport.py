@@ -157,7 +157,8 @@ class YandexTransportTests(unittest.TestCase):
                 patch.dict(os.environ, {"YANDEX_SEARCH_API_KEY": KEY}), \
                 patch("lead_factory.radar_yandex_transport._now_utc", return_value=NOW):
             page = run_yandex_search(journal, policy.requests[0], folder_id=FOLDER)
-        self.assertEqual(guard.call_count, 2)
+        # Runner, legacy wrapper and direct-core fallback each retain RC1.
+        self.assertEqual(guard.call_count, 3)
         self.assertEqual(page.response_sha256, hashlib.sha256(supplied_response()).hexdigest())
         self.assertFalse(page.capture_verified)
         self.assertEqual(page.evidence_semantics, "SUPPLIED_SEARCH_RESPONSE_UNVERIFIED")
@@ -368,7 +369,8 @@ class YandexTransportTests(unittest.TestCase):
         }))
         with patch(GUARD) as guard, patch(HTTPS, return_value=connection) as factory:
             blob, correlation = _post_yandex(body, api_key=KEY, request_id="local-request-1")
-        guard.assert_called_once_with("radar.yandex.search.read")
+        guard.assert_any_call("radar.yandex.search.read")
+        self.assertEqual(guard.call_count, 2)  # Legacy wrapper and core fallback.
         factory.assert_called_once_with("searchapi.api.cloud.yandex.net", timeout=10)
         self.assertEqual(len(connection.requests), 1)
         method, path, sent, headers = connection.requests[0]

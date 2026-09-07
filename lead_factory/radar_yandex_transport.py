@@ -1,7 +1,7 @@
-"""Bounded Yandex HTTP mechanics; current fixed RC1 denies every live dispatch.
+"""Bounded Yandex HTTP mechanics; legacy entry points keep the fixed RC1 deny.
 
 Local journal commands work without credentials. A policy is a local accounting
-contract, never external authority. Only synthetic HTTP has been accepted so far.
+contract, never external authority. The separate owner pilot needs its own grant.
 """
 
 from __future__ import annotations
@@ -53,12 +53,26 @@ def _api_key() -> str:
 def _post_yandex(
     body: bytes, *, api_key: str, request_id: str,
 ) -> tuple[bytes, dict[str, str]]:
+    """Legacy entry point, still unconditionally denied by the fixed RC1."""
+    assert_external_allowed(_ACTION)
+    return _post_yandex_core(body, api_key=api_key, request_id=request_id)
+
+
+def _post_yandex_core(
+    body: bytes, *, api_key: str, request_id: str, capability: object = None,
+) -> tuple[bytes, dict[str, str]]:
     """One verified-TLS POST; no redirects, proxy discovery or retries.
 
     Ten-second socket timeouts and a watchdog bound headers and response reads.
     OS DNS resolution is outside Python's socket timeout guarantee.
     """
-    assert_external_allowed(_ACTION)
+    if capability is None:
+        # Retain the legacy boundary even when this private core is called
+        # directly. There is no flag or callback that makes this path live.
+        assert_external_allowed(_ACTION)
+    else:
+        from .radar_yandex_pilot_authority import consume_capability
+        consume_capability(capability, body, request_id)
     if (type(body) is not bytes or not 0 < len(body) <= 8192
             or not re.fullmatch(r"[A-Za-z0-9._~-]{16,512}", api_key)
             or not _SAFE_ID.fullmatch(request_id)):
