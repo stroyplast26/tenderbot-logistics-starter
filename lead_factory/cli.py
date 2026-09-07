@@ -102,11 +102,23 @@ def _parser() -> argparse.ArgumentParser:
     )
     site_server.add_argument("--host", default="127.0.0.1")
     site_server.add_argument("--port", type=int, default=8088)
+    radar_server = sub.add_parser("serve-radar", help="open the local object and manager workspace")
+    radar_server.add_argument("--workspace-db", required=True, help="explicit local Radar database")
+    radar_server.add_argument("--actor", required=True, help="fixed local operator id, e.g. manager-1")
+    radar_server.add_argument("--port", type=int, default=8766)
+    radar_server.add_argument("--demo", action="store_true", help="seed a NEW synthetic database")
+    radar_import = sub.add_parser("import-radar", help="import public facts with an approved passport")
+    radar_import.add_argument("--workspace-db", required=True)
+    radar_import.add_argument("--actor", required=True)
+    radar_import.add_argument("--passport", required=True)
+    radar_import.add_argument("--file", required=True, help="local bounded JSON file")
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
+    if args.command in {"serve-radar", "import-radar"}:
+        return _radar_command(args)
     store = FactoryStore(args.db)
     if args.command == "init":
         store.init()
@@ -165,6 +177,48 @@ def main(argv: list[str] | None = None) -> int:
             server.server_close()
         return 0
     return 2
+
+
+def _radar_command(args: argparse.Namespace) -> int:
+    from dataclasses import asdict
+
+    from .construction_radar import RadarError
+    from .radar_workbench import RadarResearchWorkbench
+    from .radar_workbench_demo import seed_demo_workspace
+    from .radar_workbench_import import RADAR_IMPORT_MAX_BYTES, RadarWorkbenchImporter
+    from .radar_workbench_server import create_radar_workbench_server
+
+    database = Path(args.workspace_db).absolute()
+    store = FactoryStore(database)
+    try:
+        # Validate the launch identity before creating any database.
+        RadarResearchWorkbench(store, actor=args.actor)
+        if args.command == "import-radar":
+            if not database.is_file():
+                raise ValueError("workspace database with an approved source passport is required")
+            with Path(args.file).open("rb") as source:
+                blob = source.read(RADAR_IMPORT_MAX_BYTES + 1)
+            result = RadarWorkbenchImporter(store).import_bytes(
+                blob, passport_id=args.passport, actor=args.actor
+            )
+            print(json.dumps(asdict(result), ensure_ascii=False, indent=2))
+            return 0
+        if not 1 <= args.port <= 65535:
+            raise ValueError("port must be between 1 and 65535")
+        if args.demo:
+            store = seed_demo_workspace(database)
+        server = create_radar_workbench_server(store, actor=args.actor, port=args.port)
+    except (OSError, ValueError, RadarError) as exc:
+        _parser().error(str(exc))
+    try:
+        print(json.dumps({"ok": True, "url": f"http://127.0.0.1:{server.server_port}",
+                          "actor": args.actor}, ensure_ascii=False), flush=True)
+        server.serve_forever()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        server.server_close()
+    return 0
 
 
 if __name__ == "__main__":

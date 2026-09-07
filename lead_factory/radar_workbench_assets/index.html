@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Объекты · TenderBot</title>
+  <link rel="stylesheet" href="/workspace.css">
+  <script src="/workspace.js" defer></script>
+</head>
+<body>
+  <header class="topbar"><a class="brand" href="/">T<span>·</span>B <small>TenderBot</small></a><span class="mode">Рабочее место менеджера</span><span id="actor" class="actor"></span></header>
+  <div id="demo" class="demo" hidden>ДЕМОНСТРАЦИЯ · Все объекты и участники вымышлены. Действия сохраняются только в этой учебной базе.</div>
+  <main>
+    <div class="page-heading"><div><p class="eyebrow">ОБЪЕКТНЫЕ ПРОДАЖИ</p><h1>От объекта к следующему шагу</h1><p class="subheading">Проверьте сведения, назначьте работу и сохраните результат.</p></div><button id="refresh" class="secondary">Обновить</button></div>
+    <div class="notice">Локальное рабочее место. Звонки выполняет менеджер; сведения об общении и запросах он фиксирует здесь. Отправка КП и синхронизация с CRM ещё не подключены.</div>
+    <p id="message" role="status" aria-live="polite"></p>
+    <div class="layout">
+      <aside class="queue card" aria-label="Очередь объектов">
+        <div class="queue-heading"><h2>Объекты</h2><span id="count" class="badge">0</span></div>
+        <label for="search">Поиск на загруженной странице</label><input id="search" type="search" placeholder="Адрес или название">
+        <label for="filter">Показать</label><select id="filter"><option value="all">Все на странице</option><option value="mine">Назначенные мне</option><option value="unassigned">Без исполнителя</option><option value="overdue">Просроченные</option><option value="stale">Сведения устарели</option><option value="review">Есть вопросы к данным</option></select>
+        <div id="object-list" class="object-list"></div>
+        <nav class="pagination" aria-label="Страницы объектов"><button id="prev" class="secondary" disabled>← Назад</button><span id="page"></span><button id="next" class="secondary" disabled>Далее →</button></nav>
+      </aside>
+      <section id="empty" class="card empty"><span class="empty-icon">↗</span><h2>Выберите объект</h2><p>Здесь появятся сведения из источников, задача менеджера и история работы.</p></section>
+      <article id="dossier" hidden>
+        <section class="card dossier-head"><p class="eyebrow">ДОСЬЕ ОБЪЕКТА</p><h2 id="object-title"></h2><p id="address"></p><div id="object-badges" class="badges"></div><p id="coordinates" class="muted"></p></section>
+        <section class="card"><div class="section-heading"><h3>Работа менеджера</h3><span id="task-state" class="badge"></span></div><div id="current-task"></div>
+          <form id="assign-form" class="form-grid"><label>Исполнитель <input id="assignee" required maxlength="128" placeholder="manager-1" autocomplete="off"></label><label>Срок первого / текущего шага <input id="assign-due" type="datetime-local" required></label><button id="assign-button" type="submit">Назначить</button></form>
+          <form id="result-form" hidden>
+            <hr><h4>Результат работы</h4><div class="form-grid"><label>Что произошло <select id="result"><option value="NO_ANSWER">Не удалось связаться</option><option value="CALLBACK">Договорились перезвонить</option><option value="NEEDS_RESEARCH">Нужны дополнительные сведения</option><option value="RFQ_REPORTED">Получен запрос расчёта</option><option value="QUOTE_REPORTED">Подготовлено КП</option><option value="RESEARCH_COMPLETE">Исследование завершено</option><option value="NOT_RELEVANT">Объект не подходит</option><option value="DO_NOT_CONTACT">Попросили больше не связываться</option></select></label><label>Следующий шаг <select id="next-action"></select></label><label id="next-date-label">Когда выполнить <input id="next-due" type="datetime-local" required></label></div>
+            <label>Краткий итог и договорённость <textarea id="reason" required maxlength="1000" rows="3" placeholder="Что выяснили, что нужно подготовить и о чём договорились"></textarea></label>
+            <p class="muted">Запись сохранится от вашего имени. Запрос расчёта и КП отмечаются со слов менеджера; документы здесь не проверяются.</p><p id="terminal-warning" class="warning" hidden></p><button type="submit">Сохранить результат</button>
+          </form><p id="assignment-note" class="muted"></p>
+        </section>
+        <section class="card"><div class="section-heading"><h3>Что известно об объекте</h3><span class="badge">Сведения источников</span></div><p class="muted">Потребность в алюминии и сроки закупки требуют проверки. Уверенность источника не равна вероятности продажи.</p><div id="claims"></div></section>
+        <section class="card"><h3>Участники и роли</h3><div id="participants"></div></section>
+        <section class="card"><h3>Источники и вопросы к данным</h3><div id="sources"></div><div id="reviews"></div></section>
+        <section class="card"><h3>История работы</h3><ol id="history" class="history"></ol></section>
+      </article>
+    </div>
+  </main>
+  <footer>Сначала проверяем факты. Затем выбираем предложение и следующий шаг.</footer>
+</body>
+</html>
