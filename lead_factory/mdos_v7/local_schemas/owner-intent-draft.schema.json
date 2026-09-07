@@ -1,0 +1,405 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://alumkomplekt-rf.ru/schemas/mdos/v7/delivery/owner-intent-draft.schema.json",
+  "title": "MDOS v7.1 local non-authoritative owner intent draft",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "schema_version",
+    "record_type",
+    "status",
+    "authority_capability",
+    "contract_binding",
+    "g2_profile_binding",
+    "source",
+    "commercial_intent",
+    "proposed_first_cell",
+    "shadow_capacity",
+    "human_actor_assignments",
+    "payment_intent",
+    "bitrix_contract_milestone",
+    "unresolved_inputs",
+    "privacy_boundary",
+    "authority_effect",
+    "seal"
+  ],
+  "properties": {
+    "$schema": {
+      "const": "https://alumkomplekt-rf.ru/schemas/mdos/v7/delivery/owner-intent-draft.schema.json"
+    },
+    "schema_version": {"const": "1.0.0"},
+    "record_type": {"const": "OWNER_INTENT_DRAFT"},
+    "status": {"const": "CAPTURED_NOT_RATIFIED"},
+    "authority_capability": {"const": "NONE"},
+    "contract_binding": {"$ref": "#/$defs/contract_binding"},
+    "g2_profile_binding": {"$ref": "#/$defs/g2_profile_binding"},
+    "source": {"$ref": "#/$defs/source"},
+    "commercial_intent": {"$ref": "#/$defs/commercial_intent"},
+    "proposed_first_cell": {"$ref": "#/$defs/proposed_first_cell"},
+    "shadow_capacity": {"$ref": "#/$defs/shadow_capacity"},
+    "human_actor_assignments": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 1,
+      "items": {"$ref": "#/$defs/human_actor_assignment"}
+    },
+    "payment_intent": {"$ref": "#/$defs/payment_intent"},
+    "bitrix_contract_milestone": {"$ref": "#/$defs/bitrix_contract_milestone"},
+    "unresolved_inputs": {
+      "const": [
+        "OWNER_CONFIRM_EXACT_BEACHHEAD_CELL",
+        "OPERATING_CAPACITY_AND_SLA_EVIDENCE",
+        "OFFER_PRICE_MARGIN_AND_PROMISE_ARTIFACTS",
+        "LEGAL_BOUNDARY_AND_CONSENT_ARTIFACTS",
+        "BANK_API_PROVIDER_FORMAT_AND_CREDENTIAL_PATH",
+        "BITRIX_CONTRACT_SIGNED_EXACT_STAGE_CODE",
+        "DISTINCT_RATIFICATION_SIGNERS_AND_KEYS"
+      ]
+    },
+    "privacy_boundary": {"$ref": "#/$defs/privacy_boundary"},
+    "authority_effect": {"$ref": "#/$defs/authority_effect"},
+    "seal": {"$ref": "#/$defs/seal"}
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "contract_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract_id",
+        "package_version",
+        "package_root_sha256",
+        "manifest_sha256",
+        "manifest_status",
+        "active_beachhead_profile",
+        "ratification"
+      ],
+      "properties": {
+        "contract_id": {"const": "AK-MDOS-V7"},
+        "package_version": {"const": "7.1.0-rc.1"},
+        "package_root_sha256": {
+          "const": "d4da97bd47ed1bf76a52826a852e3a158611d18adf32a901b814a864e862d97e"
+        },
+        "manifest_sha256": {"$ref": "#/$defs/sha256"},
+        "manifest_status": {"const": "RELEASE_CANDIDATE_FOR_OWNER_RATIFICATION"},
+        "active_beachhead_profile": {"type": "null"},
+        "ratification": {"type": "null"}
+      }
+    },
+    "g2_profile_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile_file_ref",
+        "profile_set_id",
+        "profile_id",
+        "normative_motion",
+        "profile_file_sha256",
+        "profile_set_sha256",
+        "profile_sha256"
+      ],
+      "properties": {
+        "profile_file_ref": {
+          "const": "docs/market_demand_os_v7_delivery/g2-motion-profiles.json"
+        },
+        "profile_set_id": {
+          "const": "AK-MDOS-V7-G2-NEAR-MONEY-SHADOW-2026-08-25"
+        },
+        "profile_id": {"const": "G2-MOTION-EXISTING-WINBACK"},
+        "normative_motion": {"const": "EXISTING_ACCOUNT_EXPANSION"},
+        "profile_file_sha256": {
+          "const": "b5584e86adaade926d4ae8e3cff40ed73550e25575598a5abd5ce9fc079b1b8f"
+        },
+        "profile_set_sha256": {
+          "const": "eb132626212f168eadfa34afad99aaf8ab389e0e9cfee663f87e742dc2fa77e9"
+        },
+        "profile_sha256": {
+          "const": "323a0bb8eac8e2fb332eb152a258118916097cfe3fe2b29067c424ea863de09a"
+        }
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_kind",
+        "source_ref",
+        "capture_class",
+        "raw_message_retained",
+        "raw_pii_retained",
+        "owner_signature_present"
+      ],
+      "properties": {
+        "source_kind": {"const": "OWNER_CHAT_ASSERTION"},
+        "source_ref": {"const": "OWNER_INPUT_ROUND_2026_08_26_01"},
+        "capture_class": {"const": "SEMANTIC_NON_PII_ONLY"},
+        "raw_message_retained": {"const": false},
+        "raw_pii_retained": {"const": false},
+        "owner_signature_present": {"const": false}
+      }
+    },
+    "commercial_intent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "intent_class",
+        "motion_ids",
+        "geography_intent",
+        "geography_eligibility_rule",
+        "active_all_region_beachhead",
+        "exact_beachhead_ratification_required",
+        "intent_only",
+        "execution_authority"
+      ],
+      "properties": {
+        "intent_class": {"const": "STRATEGIC_INTENT_ONLY"},
+        "motion_ids": {
+          "const": [
+            "EXISTING_ACCOUNT_EXPANSION",
+            "DEALER_AND_INSTALLER_ACTIVATION",
+            "HIGH_INTENT_INBOUND"
+          ]
+        },
+        "geography_intent": {"const": "GLOBAL_WHERE_LAWFUL_AND_FULFILLABLE"},
+        "geography_eligibility_rule": {"const": "LAWFUL_AND_CAPACITY_FEASIBLE_ONLY"},
+        "active_all_region_beachhead": {"const": false},
+        "exact_beachhead_ratification_required": {"const": true},
+        "intent_only": {"const": true},
+        "execution_authority": {"const": false}
+      }
+    },
+    "proposed_first_cell": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile_state",
+        "motion_id",
+        "product_scope_id",
+        "region_code",
+        "region_semantics",
+        "fulfilment_model_id",
+        "fulfilment_assumption_state",
+        "installation_scope",
+        "installation_required_cases_disposition",
+        "allowed_channel_ids",
+        "proposal_origin",
+        "owner_confirmation_state",
+        "active",
+        "live_eligible"
+      ],
+      "properties": {
+        "profile_state": {"const": "OWNER_PROPOSED_NOT_ACTIVE"},
+        "motion_id": {"const": "EXISTING_ACCOUNT_EXPANSION"},
+        "product_scope_id": {"const": "ALUMINIUM_WINDOWS"},
+        "region_code": {"const": "RU-MOS"},
+        "region_semantics": {"const": "MOSCOW_OBLAST_ONLY"},
+        "fulfilment_model_id": {"const": "FACTORY_DELIVERY_NO_INSTALLATION"},
+        "fulfilment_assumption_state": {
+          "const": "PROPOSED_PENDING_OWNER_CONFIRMATION"
+        },
+        "installation_scope": {"const": "EXCLUDED"},
+        "installation_required_cases_disposition": {"const": "OUT_OF_SCOPE"},
+        "allowed_channel_ids": {"const": ["FIXTURE_SHADOW"]},
+        "proposal_origin": {"const": "CONSERVATIVE_DELIVERY_DEFAULT"},
+        "owner_confirmation_state": {"const": "PENDING_EXACT_RATIFICATION"},
+        "active": {"const": false},
+        "live_eligible": {"const": false}
+      }
+    },
+    "shadow_capacity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "limit_class",
+        "scope",
+        "cohort_total_cap",
+        "daily_review_cap",
+        "max_wip",
+        "human_review_required",
+        "send_mode",
+        "production_capacity_claimed",
+        "capacity_evidence_state"
+      ],
+      "properties": {
+        "limit_class": {"const": "SHADOW_REVIEW_QUEUE_LIMITS"},
+        "scope": {"const": "FIXTURE_SHADOW_ONLY"},
+        "cohort_total_cap": {"const": 5},
+        "daily_review_cap": {"const": 1},
+        "max_wip": {"const": 1},
+        "human_review_required": {"const": true},
+        "send_mode": {"const": "NO_SEND"},
+        "production_capacity_claimed": {"const": false},
+        "capacity_evidence_state": {"const": "PENDING_OWNER_INPUT"}
+      }
+    },
+    "human_actor_assignment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "actor_ref",
+        "actor_class",
+        "owner_asserted_role_ids",
+        "candidate_role_ids",
+        "currently_handles_clients_asserted",
+        "raw_identity_retained",
+        "arbitrator",
+        "may_review_own_originated_case",
+        "policy_authority",
+        "payment_truth_authority",
+        "independent_verifier",
+        "release_authority"
+      ],
+      "properties": {
+        "actor_ref": {"const": "ACTOR_CLIENT_PARTNER_01"},
+        "actor_class": {"const": "HUMAN"},
+        "owner_asserted_role_ids": {"const": ["GOLD_REVIEWER"]},
+        "candidate_role_ids": {"const": ["SALES_OPERATOR"]},
+        "currently_handles_clients_asserted": {"const": true},
+        "raw_identity_retained": {"const": false},
+        "arbitrator": {"const": false},
+        "may_review_own_originated_case": {"const": false},
+        "policy_authority": {"const": false},
+        "payment_truth_authority": {"const": false},
+        "independent_verifier": {"const": false},
+        "release_authority": {"const": false}
+      }
+    },
+    "payment_intent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "preferred_future_source_type",
+        "format_state",
+        "provider_state",
+        "verification_method_state",
+        "accepted_payment_truth_source_types",
+        "bitrix_is_payment_truth",
+        "one_c_dependency",
+        "credentials_present",
+        "live_payment_reads_enabled"
+      ],
+      "properties": {
+        "preferred_future_source_type": {"const": "BANK_API"},
+        "format_state": {"const": "PENDING_OWNER_INPUT"},
+        "provider_state": {"const": "UNKNOWN"},
+        "verification_method_state": {"const": "UNKNOWN"},
+        "accepted_payment_truth_source_types": {
+          "const": ["BANK_API", "PAYMENT_PROVIDER", "SIGNED_BANK_STATEMENT"]
+        },
+        "bitrix_is_payment_truth": {"const": false},
+        "one_c_dependency": {"const": "NONE"},
+        "credentials_present": {"const": false},
+        "live_payment_reads_enabled": {"const": false}
+      }
+    },
+    "bitrix_contract_milestone": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_system_role",
+        "source_event",
+        "application_status",
+        "exact_stage_code",
+        "stage_mapping_state",
+        "payment_status",
+        "payment_truth_effect",
+        "creates_payment_proof",
+        "changes_order_paid_state",
+        "canonical_kpi_eligible",
+        "live_read_performed",
+        "live_write_performed"
+      ],
+      "properties": {
+        "source_system_role": {"const": "PROJECTION_ONLY"},
+        "source_event": {"const": "CONTRACT_SIGNED"},
+        "application_status": {"const": "CONTRACT_SIGNED_AWAITING_PAYMENT"},
+        "exact_stage_code": {"const": "UNKNOWN"},
+        "stage_mapping_state": {"const": "PENDING_OWNER_INPUT"},
+        "payment_status": {"const": "NOT_PROVEN"},
+        "payment_truth_effect": {"const": "NONE"},
+        "creates_payment_proof": {"const": false},
+        "changes_order_paid_state": {"const": false},
+        "canonical_kpi_eligible": {"const": false},
+        "live_read_performed": {"const": false},
+        "live_write_performed": {"const": false}
+      }
+    },
+    "privacy_boundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "data_class",
+        "opaque_human_references_only",
+        "raw_person_names_present",
+        "raw_contact_data_present",
+        "raw_request_text_present",
+        "raw_chat_content_present",
+        "analytics_contains_pii",
+        "evidence_contains_pii"
+      ],
+      "properties": {
+        "data_class": {"const": "NON_PII_OWNER_INTENT"},
+        "opaque_human_references_only": {"const": true},
+        "raw_person_names_present": {"const": false},
+        "raw_contact_data_present": {"const": false},
+        "raw_request_text_present": {"const": false},
+        "raw_chat_content_present": {"const": false},
+        "analytics_contains_pii": {"const": false},
+        "evidence_contains_pii": {"const": false}
+      }
+    },
+    "authority_effect": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "external_reads_enabled",
+        "external_writers_enabled",
+        "contact_enabled",
+        "spend_enabled",
+        "live_bitrix_reads_enabled",
+        "live_bitrix_writes_enabled",
+        "live_routing_enabled",
+        "payment_state_mutation_enabled",
+        "order_state_mutation_enabled",
+        "permit_decision_issued",
+        "gold_acceptance_created",
+        "manifest_mutation_enabled",
+        "freeze_mutation_enabled",
+        "ratifies_beachhead",
+        "authorizes_live"
+      ],
+      "properties": {
+        "external_reads_enabled": {"const": false},
+        "external_writers_enabled": {"const": false},
+        "contact_enabled": {"const": false},
+        "spend_enabled": {"const": false},
+        "live_bitrix_reads_enabled": {"const": false},
+        "live_bitrix_writes_enabled": {"const": false},
+        "live_routing_enabled": {"const": false},
+        "payment_state_mutation_enabled": {"const": false},
+        "order_state_mutation_enabled": {"const": false},
+        "permit_decision_issued": {"const": false},
+        "gold_acceptance_created": {"const": false},
+        "manifest_mutation_enabled": {"const": false},
+        "freeze_mutation_enabled": {"const": false},
+        "ratifies_beachhead": {"const": false},
+        "authorizes_live": {"const": false}
+      }
+    },
+    "seal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["algorithm", "canonicalization", "scope", "content_sha256"],
+      "properties": {
+        "algorithm": {"const": "SHA256"},
+        "canonicalization": {"const": "MDOS_CANONICAL_JSON_V1"},
+        "scope": {"const": "ALL_TOP_LEVEL_FIELDS_EXCEPT_SEAL"},
+        "content_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    }
+  }
+}

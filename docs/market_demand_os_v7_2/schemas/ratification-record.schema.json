@@ -1,0 +1,129 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://alumkomplekt-rf.ru/schemas/mdos/v7.2/ratification-record.schema.json",
+  "title": "MDOS v7.2 RatificationRecord",
+  "$comment": "Exact candidate/root/beachhead/artifact binding, approval time and separation of duties are enforced by lead_factory.mdos_v7.successor_semantics.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "record_type",
+    "contract_id",
+    "package_version",
+    "package_root_sha256",
+    "ratified_candidate_manifest_sha256",
+    "ratification_binding_sha256",
+    "active_beachhead_profile_id",
+    "normative_artifacts",
+    "approvals",
+    "independent_verification_binding_sha256",
+    "independent_verification_ref",
+    "ratified_at_utc"
+  ],
+  "properties": {
+    "schema_version": {"const": "1.0.0"},
+    "record_type": {"const": "RATIFICATION_RECORD"},
+    "contract_id": {"const": "AK-MDOS-V7"},
+    "package_version": {"const": "7.2.0-rc.2"},
+    "package_root_sha256": {"$ref": "#/$defs/digest"},
+    "ratified_candidate_manifest_sha256": {"$ref": "#/$defs/digest"},
+    "ratification_binding_sha256": {"$ref": "#/$defs/digest"},
+    "active_beachhead_profile_id": {"$ref": "#/$defs/id"},
+    "normative_artifacts": {"$ref": "#/$defs/normative_artifacts"},
+    "approvals": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["BusinessOwner", "ContractAuthority", "PrivacyLegalOwner", "IndependentEvidenceVerifier"],
+      "properties": {
+        "BusinessOwner": {
+          "allOf": [
+            {"$ref": "#/$defs/approval"},
+            {"properties": {"role": {"const": "BusinessOwner"}}}
+          ]
+        },
+        "ContractAuthority": {
+          "allOf": [
+            {"$ref": "#/$defs/approval"},
+            {"properties": {"role": {"const": "ContractAuthority"}}}
+          ]
+        },
+        "PrivacyLegalOwner": {
+          "allOf": [
+            {"$ref": "#/$defs/approval"},
+            {"properties": {"role": {"const": "PrivacyLegalOwner"}}}
+          ]
+        },
+        "IndependentEvidenceVerifier": {
+          "allOf": [
+            {"$ref": "#/$defs/approval"},
+            {"properties": {"role": {"const": "IndependentEvidenceVerifier"}}}
+          ]
+        }
+      }
+    },
+    "independent_verification_binding_sha256": {"$ref": "#/$defs/digest"},
+    "independent_verification_ref": {"$ref": "#/$defs/sealed_ref"},
+    "ratified_at_utc": {"$ref": "#/$defs/utc"}
+  },
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,159}$"},
+    "digest": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "ref": {"type": "string", "pattern": "^[A-Za-z][A-Za-z0-9+.-]*://[^\\s]+$"},
+    "utc": {"type": "string", "format": "date-time", "pattern": "Z$"},
+    "sealed_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["uri", "sha256"],
+      "properties": {
+        "uri": {"$ref": "#/$defs/ref"},
+        "sha256": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "normative_artifacts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "target_profile",
+        "motions",
+        "economics",
+        "owner_capacity",
+        "payment_truth",
+        "consent_policy",
+        "source_permits",
+        "promises",
+        "initial_release_evidence"
+      ],
+      "properties": {
+        "target_profile": {"$ref": "#/$defs/sealed_ref"},
+        "motions": {"$ref": "#/$defs/sealed_ref"},
+        "economics": {"$ref": "#/$defs/sealed_ref"},
+        "owner_capacity": {"$ref": "#/$defs/sealed_ref"},
+        "payment_truth": {"$ref": "#/$defs/sealed_ref"},
+        "consent_policy": {"$ref": "#/$defs/sealed_ref"},
+        "source_permits": {"$ref": "#/$defs/sealed_ref"},
+        "promises": {"$ref": "#/$defs/sealed_ref"},
+        "initial_release_evidence": {"$ref": "#/$defs/sealed_ref"}
+      }
+    },
+    "approval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "role",
+        "actor_ref",
+        "key_id",
+        "signed_binding_sha256",
+        "signature_ref",
+        "approved_at_utc"
+      ],
+      "properties": {
+        "role": {"type": "string"},
+        "actor_ref": {"$ref": "#/$defs/id"},
+        "key_id": {"$ref": "#/$defs/id"},
+        "signed_binding_sha256": {"$ref": "#/$defs/digest"},
+        "signature_ref": {"$ref": "#/$defs/sealed_ref"},
+        "approved_at_utc": {"$ref": "#/$defs/utc"}
+      }
+    }
+  }
+}

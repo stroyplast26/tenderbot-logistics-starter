@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://alumkomplekt-rf.ru/schemas/mdos/v7.2/analysis-draft.schema.json",
+  "title": "MDOS v7.2 AnalysisDraft",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "record_type",
+    "call_session_id",
+    "draft_id",
+    "processing_mode",
+    "data_policy_id",
+    "transcript_set_sha256",
+    "analysis_sha256",
+    "prompt_version",
+    "model_id",
+    "confidence_bps",
+    "proposed_commercial_disposition",
+    "proposed_next_action",
+    "proposed_next_action_at_utc",
+    "flags",
+    "evidence_spans_sha256",
+    "authoritative",
+    "evidence_ref"
+  ],
+  "properties": {
+    "schema_version": {"const": "1.0.0"},
+    "record_type": {"const": "ANALYSIS_DRAFT"},
+    "call_session_id": {"$ref": "#/$defs/id"},
+    "draft_id": {"$ref": "#/$defs/id"},
+    "processing_mode": {"enum": ["DETERMINISTIC", "MANUAL", "LOCAL_MODEL"]},
+    "data_policy_id": {"$ref": "#/$defs/id"},
+    "transcript_set_sha256": {"$ref": "#/$defs/digest"},
+    "analysis_sha256": {"$ref": "#/$defs/digest"},
+    "prompt_version": {"$ref": "#/$defs/id"},
+    "model_id": {"$ref": "#/$defs/id"},
+    "confidence_bps": {"type": "integer", "minimum": 0, "maximum": 10000},
+    "proposed_commercial_disposition": {"$ref": "#/$defs/id"},
+    "proposed_next_action": {"$ref": "#/$defs/id"},
+    "proposed_next_action_at_utc": {
+      "oneOf": [{"const": ""}, {"$ref": "#/$defs/utc"}]
+    },
+    "flags": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/id"}},
+    "evidence_spans_sha256": {"$ref": "#/$defs/digest"},
+    "authoritative": {"const": false},
+    "evidence_ref": {"$ref": "#/$defs/evidence"}
+  },
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,159}$"},
+    "digest": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "evidence": {"type": "string", "pattern": "^evidence://[A-Za-z0-9][A-Za-z0-9._:/-]{0,2028}$"},
+    "utc": {"type": "string", "format": "date-time", "pattern": "Z$"}
+  }
+}

@@ -1,0 +1,5 @@
+-r requirements-report.txt
+
+# Optional Python wrapper. The native Tesseract engine and rus/eng language
+# data must be installed separately before OCR can be enabled.
+pytesseract==0.3.13

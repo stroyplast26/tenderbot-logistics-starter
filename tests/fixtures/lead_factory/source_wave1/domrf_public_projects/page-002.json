@@ -1,0 +1,35 @@
+{
+  "fixture_page_version": "wave1-fixture-page-v1",
+  "provider": "DOMRF_PUBLIC_PROJECTS",
+  "product_code": "DOMRF_PUBLIC_PROJECTS",
+  "source_id": "wave1:domrf_public_projects",
+  "contract_version": "wave1-business-public-v1",
+  "mapping_version": "domrf_public_projects-draft-mapping-v1",
+  "receipt_key": "domrf-public-page-002",
+  "page_sequence": 2,
+  "cursor_before": {
+    "position": 25,
+    "opaque_value": "fixture_domrf_public_page_2"
+  },
+  "next_cursor": null,
+  "has_more": false,
+  "received_at_utc": "2026-08-20T05:59:00Z",
+  "upstream_receipt_sha256": "3232323232323232323232323232323232323232323232323232323232323232",
+  "cost_minor": 0,
+  "records": [
+    {
+      "project_id": "domrf-synthetic-002",
+      "revision": "1",
+      "published_at": "2026-08-16T10:00:00Z",
+      "updated_at": "2026-08-20T05:20:00Z",
+      "developer_name": "АО СИНТЕТИЧЕСКИЙ ЗАСТРОЙЩИК Е",
+      "developer_inn": "1600000006",
+      "region_code": "16",
+      "project_name": "Синтетический общественный объект с витражами",
+      "project_state": "DESIGN",
+      "budget_minor": 2750000000,
+      "currency_code": "RUB",
+      "planned_tender_at": "2026-11-01T10:00:00Z"
+    }
+  ]
+}

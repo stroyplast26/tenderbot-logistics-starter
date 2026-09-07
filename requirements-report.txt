@@ -1,0 +1,4 @@
+-r requirements.txt
+
+# Required by scripts/build_market_demand_os_report_docx.py.
+Pillow>=12,<13

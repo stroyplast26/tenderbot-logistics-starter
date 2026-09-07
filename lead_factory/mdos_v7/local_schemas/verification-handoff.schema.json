@@ -1,0 +1,489 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://alumkomplekt-rf.ru/schemas/mdos/v7/delivery/verification-handoff.schema.json",
+  "title": "Market Demand OS v7.1 local independent-verifier handoff",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "schema_version",
+    "handoff_kind",
+    "classification",
+    "status",
+    "snapshot_at_utc",
+    "owner_preflight_state",
+    "open_p0_nonclaim_count",
+    "prerequisites_satisfied",
+    "production_release_eligible",
+    "package_binding",
+    "authority",
+    "scope",
+    "traceability",
+    "p0_nonclaims",
+    "separation_of_duties",
+    "privacy",
+    "claims",
+    "effects",
+    "limitations",
+    "bundle_sha256"
+  ],
+  "properties": {
+    "$schema": {
+      "const": "https://alumkomplekt-rf.ru/schemas/mdos/v7/delivery/verification-handoff.schema.json"
+    },
+    "schema_version": {"const": "1.0.0"},
+    "handoff_kind": {"const": "INDEPENDENT_EVIDENCE_VERIFIER_HANDOFF"},
+    "classification": {
+      "const": "LOCAL_UNSIGNED_VERIFICATION_HANDOFF_NON_AUTHORITY"
+    },
+    "status": {
+      "enum": ["DRAFT_BINDING_PENDING", "READY_FOR_INDEPENDENT_REVIEW"]
+    },
+    "snapshot_at_utc": {
+      "oneOf": [{"type": "null"}, {"$ref": "#/$defs/utcTimestamp"}]
+    },
+    "owner_preflight_state": {"const": "NOT_RATIFIED"},
+    "open_p0_nonclaim_count": {"const": 36},
+    "prerequisites_satisfied": {"const": false},
+    "production_release_eligible": {"const": false},
+    "package_binding": {"$ref": "#/$defs/packageBinding"},
+    "authority": {"$ref": "#/$defs/authority"},
+    "scope": {"$ref": "#/$defs/scope"},
+    "traceability": {"$ref": "#/$defs/traceability"},
+    "p0_nonclaims": {"$ref": "#/$defs/p0Nonclaims"},
+    "separation_of_duties": {"$ref": "#/$defs/separationOfDuties"},
+    "privacy": {"$ref": "#/$defs/privacy"},
+    "claims": {"$ref": "#/$defs/claims"},
+    "effects": {"$ref": "#/$defs/effects"},
+    "limitations": {
+      "const": [
+        "LOCAL_HANDOFF_ONLY_NO_AUTHORITY",
+        "ARTIFACT_HASHES_ARE_IMPLEMENTATION_TEAM_OBSERVATIONS",
+        "INDEPENDENT_VERIFIER_IDENTITY_KEY_SIGNATURE_NOT_PRESENT",
+        "OWNER_RATIFICATION_AND_LIVE_PREREQUISITES_NOT_SATISFIED",
+        "NORMATIVE_P0_COMPLETION_NOT_CLAIMED"
+      ]
+    },
+    "bundle_sha256": {"$ref": "#/$defs/sha256"}
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {"status": {"const": "DRAFT_BINDING_PENDING"}},
+        "required": ["status"]
+      },
+      "then": {"properties": {"snapshot_at_utc": {"type": "null"}}}
+    },
+    {
+      "if": {
+        "properties": {"status": {"const": "READY_FOR_INDEPENDENT_REVIEW"}},
+        "required": ["status"]
+      },
+      "then": {"properties": {"snapshot_at_utc": {"$ref": "#/$defs/utcTimestamp"}}}
+    }
+  ],
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "utcTimestamp": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]+)?Z$"
+    },
+    "packageBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract_id",
+        "package_version",
+        "package_root_sha256",
+        "active_beachhead_profile",
+        "ratification"
+      ],
+      "properties": {
+        "contract_id": {"const": "AK-MDOS-V7"},
+        "package_version": {"const": "7.1.0-rc.1"},
+        "package_root_sha256": {
+          "const": "d4da97bd47ed1bf76a52826a852e3a158611d18adf32a901b814a864e862d97e"
+        },
+        "active_beachhead_profile": {"type": "null"},
+        "ratification": {"type": "null"}
+      }
+    },
+    "authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "external_reads_enabled",
+        "external_writers_enabled",
+        "contact_enabled",
+        "spend_enabled",
+        "pc10_enabled",
+        "live_bitrix_writes_enabled",
+        "authority_mutation_allowed",
+        "external_effects_allowed"
+      ],
+      "properties": {
+        "external_reads_enabled": {"const": false},
+        "external_writers_enabled": {"const": false},
+        "contact_enabled": {"const": false},
+        "spend_enabled": {"const": false},
+        "pc10_enabled": {"const": false},
+        "live_bitrix_writes_enabled": {"const": false},
+        "authority_mutation_allowed": {"const": false},
+        "external_effects_allowed": {"const": false}
+      }
+    },
+    "artifactRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": {"type": "string", "minLength": 1, "maxLength": 300},
+        "sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "profileRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["profile_id", "profile_sha256"],
+      "properties": {
+        "profile_id": {
+          "enum": [
+            "G2-MOTION-EXISTING-WINBACK",
+            "G2-MOTION-DEALER-BENCHMARK-RFQ",
+            "G2-MOTION-HIGH-INTENT-INBOUND"
+          ]
+        },
+        "profile_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "profileArtifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "file_sha256",
+        "profile_set_id",
+        "profile_set_sha256",
+        "profiles"
+      ],
+      "properties": {
+        "path": {
+          "const": "docs/market_demand_os_v7_delivery/g2-motion-profiles.json"
+        },
+        "file_sha256": {"$ref": "#/$defs/sha256"},
+        "profile_set_id": {
+          "const": "AK-MDOS-V7-G2-NEAR-MONEY-SHADOW-2026-08-25"
+        },
+        "profile_set_sha256": {"$ref": "#/$defs/sha256"},
+        "profiles": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/profileRef"}
+        }
+      }
+    },
+    "reportArtifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["artifact_id", "path", "sha256"],
+      "properties": {
+        "artifact_id": {
+          "enum": [
+            "G0_SUPPRESSION",
+            "G1_SHADOW",
+            "G1_SPLIT_PAYMENT",
+            "G2_INBOUND_ATTRIBUTION",
+            "G2_MANUAL_EGRESS",
+            "G2_MOTION_PREFLIGHT",
+            "G2_OUTBOX",
+            "G2_OWNER_PREFLIGHT",
+            "TEST_SUMMARY"
+          ]
+        },
+        "path": {
+          "enum": [
+            "reports/market_demand_os_v7/g0-suppression-evidence.json",
+            "reports/market_demand_os_v7/g1-shadow-evidence.json",
+            "reports/market_demand_os_v7/g1-split-payment-shadow-evidence.json",
+            "reports/market_demand_os_v7/g2-inbound-attribution-shadow-evidence.json",
+            "reports/market_demand_os_v7/g2-manual-egress-evidence.json",
+            "reports/market_demand_os_v7/g2-motion-preflight-evidence.json",
+            "reports/market_demand_os_v7/g2-outbox-evidence.json",
+            "reports/market_demand_os_v7/g2-owner-preflight-evidence.json",
+            "reports/market_demand_os_v7/test-summary.json"
+          ]
+        },
+        "sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["profile_artifact", "overlay_artifact", "report_artifacts"],
+      "properties": {
+        "profile_artifact": {"$ref": "#/$defs/profileArtifact"},
+        "overlay_artifact": {
+          "allOf": [
+            {"$ref": "#/$defs/artifactRef"},
+            {
+              "properties": {
+                "path": {
+                  "const": "docs/market_demand_os_v7_delivery/implementation-trace-overlay.json"
+                }
+              }
+            }
+          ]
+        },
+        "report_artifacts": {
+          "type": "array",
+          "minItems": 9,
+          "maxItems": 9,
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/reportArtifact"}
+        }
+      }
+    },
+    "traceability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "requirement_refs",
+        "acceptance_refs",
+        "design_refs",
+        "code_refs",
+        "test_refs",
+        "evidence_refs"
+      ],
+      "properties": {
+        "requirement_refs": {
+          "const": [
+            "MDOS-ASR-001",
+            "MDOS-ASR-002",
+            "MDOS-ASR-003",
+            "MDOS-ASR-004",
+            "MDOS-GOV-001",
+            "MDOS-GOV-002",
+            "MDOS-GOV-003",
+            "MDOS-GOV-004",
+            "MDOS-GOV-005",
+            "MDOS-REL-001",
+            "MDOS-REL-002",
+            "MDOS-TRC-001",
+            "MDOS-TRC-002",
+            "MDOS-TRC-003",
+            "MDOS-TRC-004",
+            "MDOS-TRC-005"
+          ]
+        },
+        "acceptance_refs": {
+          "const": [
+            "AT-ASR-01",
+            "AT-ASR-02",
+            "AT-ASR-03",
+            "AT-ASR-04",
+            "AT-ASR-05",
+            "AT-ASR-06",
+            "AT-ASR-07",
+            "AT-ASR-08",
+            "AT-ASR-09",
+            "AT-ASR-10",
+            "AT-ASR-11",
+            "AT-ASR-12",
+            "AT-ASR-13",
+            "AT-ASR-14"
+          ]
+        },
+        "design_refs": {
+          "const": [
+            "DESIGN:docs/market_demand_os_v7/APP-MDOS-DELIVERY-ASSURANCE.md",
+            "DESIGN:docs/market_demand_os_v7/CONTRACT.md"
+          ]
+        },
+        "code_refs": {
+          "const": [
+            "CODE:lead_factory/mdos_v7/verification_handoff.py",
+            "CODE:lead_factory/mdos_v7/local_schemas/verification-handoff.schema.json",
+            "CODE:lead_factory/mdos_v7/templates/verification-handoff.unsigned.json",
+            "CODE:scripts/run_mdos_v7_verification_handoff.py"
+          ]
+        },
+        "test_refs": {
+          "const": ["TEST:tests/test_mdos_v7_verification_handoff.py"]
+        },
+        "evidence_refs": {
+          "type": "array",
+          "minItems": 11,
+          "maxItems": 11,
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1, "maxLength": 350}
+        }
+      }
+    },
+    "p0Nonclaims": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "normative_p0_count",
+        "requirement_ids",
+        "all_p0_implemented",
+        "all_p0_tested",
+        "all_p0_evidenced",
+        "all_p0_independently_verified",
+        "normative_completion_claimed"
+      ],
+      "properties": {
+        "normative_p0_count": {"const": 36},
+        "requirement_ids": {
+          "const": [
+            "MDOS-ASR-001",
+            "MDOS-ASR-002",
+            "MDOS-ASR-003",
+            "MDOS-ASR-004",
+            "MDOS-AUT-001",
+            "MDOS-AUT-002",
+            "MDOS-AUT-003",
+            "MDOS-AUT-004",
+            "MDOS-AUT-005",
+            "MDOS-BCH-001",
+            "MDOS-BCH-002",
+            "MDOS-BCH-003",
+            "MDOS-BCH-004",
+            "MDOS-BCH-005",
+            "MDOS-GOV-001",
+            "MDOS-GOV-002",
+            "MDOS-GOV-003",
+            "MDOS-GOV-004",
+            "MDOS-GOV-005",
+            "MDOS-LGL-001",
+            "MDOS-LGL-002",
+            "MDOS-LGL-003",
+            "MDOS-REL-001",
+            "MDOS-REL-002",
+            "MDOS-SEC-001",
+            "MDOS-SEC-002",
+            "MDOS-SEC-003",
+            "MDOS-TRC-001",
+            "MDOS-TRC-002",
+            "MDOS-TRC-003",
+            "MDOS-TRC-004",
+            "MDOS-TRC-005",
+            "MDOS-TRU-001",
+            "MDOS-TRU-002",
+            "MDOS-TRU-003",
+            "MDOS-TRU-004"
+          ]
+        },
+        "all_p0_implemented": {"const": false},
+        "all_p0_tested": {"const": false},
+        "all_p0_evidenced": {"const": false},
+        "all_p0_independently_verified": {"const": false},
+        "normative_completion_claimed": {"const": false}
+      }
+    },
+    "separationOfDuties": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["implementer", "future_independent_verifier"],
+      "properties": {
+        "implementer": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["role", "identity_ref", "assertion", "may_verify"],
+          "properties": {
+            "role": {"const": "ImplementationTeam"},
+            "identity_ref": {"const": "LOCAL_IMPLEMENTATION_TEAM"},
+            "assertion": {"const": "PREPARED_NOT_VERIFIED"},
+            "may_verify": {"const": false}
+          }
+        },
+        "future_independent_verifier": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "required_role",
+            "must_be_distinct_from_implementer",
+            "identity_ref",
+            "public_key_fingerprint_sha256",
+            "signature_algorithm",
+            "signature_b64",
+            "signed_bundle_sha256",
+            "verification_status"
+          ],
+          "properties": {
+            "required_role": {"const": "IndependentEvidenceVerifier"},
+            "must_be_distinct_from_implementer": {"const": true},
+            "identity_ref": {"type": "null"},
+            "public_key_fingerprint_sha256": {"type": "null"},
+            "signature_algorithm": {"type": "null"},
+            "signature_b64": {"type": "null"},
+            "signed_bundle_sha256": {"type": "null"},
+            "verification_status": {"const": "NOT_PRESENT"}
+          }
+        }
+      }
+    },
+    "privacy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "artifact_contents_included",
+        "raw_payloads_included",
+        "raw_pii_included",
+        "request_text_included",
+        "credentials_or_secrets_included",
+        "only_paths_and_sha256"
+      ],
+      "properties": {
+        "artifact_contents_included": {"const": false},
+        "raw_payloads_included": {"const": false},
+        "raw_pii_included": {"const": false},
+        "request_text_included": {"const": false},
+        "credentials_or_secrets_included": {"const": false},
+        "only_paths_and_sha256": {"const": true}
+      }
+    },
+    "claims": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "independent_verification",
+        "verified",
+        "normative_status_promoted",
+        "live_authority_granted",
+        "owner_ratification_present",
+        "prerequisites_satisfied"
+      ],
+      "properties": {
+        "independent_verification": {"const": false},
+        "verified": {"const": false},
+        "normative_status_promoted": {"const": false},
+        "live_authority_granted": {"const": false},
+        "owner_ratification_present": {"const": false},
+        "prerequisites_satisfied": {"const": false}
+      }
+    },
+    "effects": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "external_effect_count",
+        "external_read_count",
+        "external_write_count",
+        "contact_count",
+        "spend_count",
+        "live_bitrix_write_count"
+      ],
+      "properties": {
+        "external_effect_count": {"const": 0},
+        "external_read_count": {"const": 0},
+        "external_write_count": {"const": 0},
+        "contact_count": {"const": 0},
+        "spend_count": {"const": 0},
+        "live_bitrix_write_count": {"const": 0}
+      }
+    }
+  }
+}

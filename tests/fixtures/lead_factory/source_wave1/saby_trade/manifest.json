@@ -1,0 +1,18 @@
+{
+  "fixture_manifest_version": "wave1-fixture-manifest-v1",
+  "provider": "SABY_TRADE",
+  "product_code": "SABY_TRADE",
+  "source_id": "wave1:saby_trade",
+  "contract_version": "wave1-business-public-v1",
+  "mapping_version": "saby_trade-draft-mapping-v1",
+  "pages": [
+    {
+      "receipt_key": "saby-trade-page-001",
+      "content_sha256": "761db7c441a6cc1be6853601408cac5652267c2d0bd9694871094d60b31d4cb3"
+    },
+    {
+      "receipt_key": "saby-trade-page-002",
+      "content_sha256": "bf954abcf532bbfaa2695f62cd0250125fbb1ec2931a26bf11fc886d41c5a076"
+    }
+  ]
+}

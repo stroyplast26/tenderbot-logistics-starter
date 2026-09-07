@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://alumkomplekt-rf.ru/schemas/mdos/v7/outcome-event.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "outcome_event_id", "outcome_type", "demand_unit_id", "account_id", "motion", "event_time", "recorded_at", "source_system", "authoritative_class", "distinct_order_id", "payment_proof_ref", "amount", "currency", "reconciliation_state", "payload_sha256"],
+  "properties": {
+    "schema_version": {"const": "1.1.0"},
+    "outcome_event_id": {"type": "string"},
+    "outcome_type": {"enum": ["RFQ_RECEIVED", "READY_PACKAGE", "ESTIMATE_ACCEPTED", "PROPOSAL_ACCEPTED", "CLEARED_PAYMENT", "FULFILLED", "CLAIM", "REWORK", "REFUND", "REPEAT_PAYMENT", "LOST", "NO_DECISION", "SUPPLIER_SELECTED", "CANCELLED"]},
+    "demand_unit_id": {"type": "string"},
+    "account_id": {"type": "string"},
+    "motion": {"type": "string"},
+    "event_time": {"type": "string", "format": "date-time"},
+    "recorded_at": {"type": "string", "format": "date-time"},
+    "source_system": {"type": "string"},
+    "authoritative_class": {"enum": ["BANK_API", "PAYMENT_PROVIDER", "SIGNED_BANK_STATEMENT", "ORDER_REGISTRY", "FULFILMENT_LEDGER", "SOURCE_OBSERVATION", "CRM_PROJECTION", "HUMAN_ADJUDICATION"]},
+    "distinct_order_id": {"type": "string"},
+    "payment_proof_ref": {"type": ["string", "null"]},
+    "amount": {"type": "number"},
+    "cost": {"type": ["number", "null"]},
+    "contribution_margin": {"type": ["number", "null"]},
+    "currency": {"type": "string", "pattern": "^[A-Z]{3}$"},
+    "original_source_ref": {"type": ["string", "null"]},
+    "latest_source_ref": {"type": ["string", "null"]},
+    "influence_refs": {"type": "array", "items": {"type": "string"}},
+    "action_assignment_refs": {"type": "array", "items": {"type": "string"}},
+    "routing_ref": {"type": ["string", "null"]},
+    "reconciliation_state": {"enum": ["UNRECONCILED", "RECONCILED", "CONFLICTED", "REVOKED"]},
+    "payload_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"outcome_type": {"enum": ["CLEARED_PAYMENT", "REPEAT_PAYMENT"]}}, "required": ["outcome_type"]},
+      "then": {
+        "properties": {
+          "authoritative_class": {"enum": ["BANK_API", "PAYMENT_PROVIDER", "SIGNED_BANK_STATEMENT"]},
+          "payment_proof_ref": {"type": "string", "minLength": 1},
+          "reconciliation_state": {"const": "RECONCILED"},
+          "amount": {"type": "number", "exclusiveMinimum": 0}
+        }
+      }
+    }
+  ]
+}

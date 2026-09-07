@@ -1,0 +1,35 @@
+{
+  "fixture_page_version": "wave1-fixture-page-v1",
+  "provider": "TENDERPLAN",
+  "product_code": "TENDERPLAN",
+  "source_id": "wave1:tenderplan",
+  "contract_version": "wave1-business-public-v1",
+  "mapping_version": "tenderplan-draft-mapping-v1",
+  "receipt_key": "tenderplan-page-002",
+  "page_sequence": 2,
+  "cursor_before": {
+    "position": 100,
+    "opaque_value": "fixture_tenderplan_page_2"
+  },
+  "next_cursor": null,
+  "has_more": false,
+  "received_at_utc": "2026-08-20T05:59:00Z",
+  "upstream_receipt_sha256": "1212121212121212121212121212121212121212121212121212121212121212",
+  "cost_minor": 0,
+  "records": [
+    {
+      "tender_id": "tp-synthetic-002",
+      "version": "3",
+      "published_at": "2026-08-18T09:00:00Z",
+      "updated_at": "2026-08-20T05:30:00Z",
+      "customer_name": "АО СИНТЕТИЧЕСКИЙ ЗАКАЗЧИК Б",
+      "customer_inn": "7800000002",
+      "region": "78",
+      "name": "Синтетическая закупка фасадных систем",
+      "stage": "UPDATED",
+      "amount_kopecks": 240000000,
+      "currency": "RUB",
+      "submission_deadline": "2026-09-02T10:00:00Z"
+    }
+  ]
+}

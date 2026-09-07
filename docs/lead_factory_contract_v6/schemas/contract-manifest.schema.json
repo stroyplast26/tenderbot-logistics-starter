@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://alumkomplekt.local/lead-factory/v6/contract-manifest.schema.json",
+  "title": "Lead Factory Contract Package Manifest v1.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema", "schema_version", "contract_id", "package_version", "status",
+    "fixed_at", "package_root_sha256", "package_digest_algorithm", "supersedes",
+    "target_profile", "defaults_pending_ratification", "base_contract",
+    "normative_documents", "schemas", "policies", "registries",
+    "advisory_documents", "required_approver_roles", "ratification"
+  ],
+  "properties": {
+    "$schema": {"type": "string", "minLength": 3},
+    "schema_version": {"const": "1.1.0"},
+    "contract_id": {"const": "LF-OUTCOME-V6"},
+    "package_version": {"type": "string", "minLength": 1},
+    "status": {"enum": ["RELEASE_CANDIDATE_FOR_OWNER_RATIFICATION", "RATIFIED", "SUPERSEDED", "REVOKED"]},
+    "fixed_at": {"type": "string", "format": "date"},
+    "package_root_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "package_digest_algorithm": {"const": "sha256(canonical-json(sorted(path,sha256)))"},
+    "supersedes": {
+      "type": "object", "additionalProperties": false,
+      "required": ["package_version", "status"],
+      "properties": {
+        "package_version": {"type": "string"},
+        "status": {"const": "SUPERSEDED_DRAFT"}
+      }
+    },
+    "target_profile": {"type": "object"},
+    "defaults_pending_ratification": {"type": "object"},
+    "base_contract": {
+      "type": "object", "additionalProperties": false,
+      "required": ["path", "revision", "role", "sha256", "import_map"],
+      "properties": {
+        "path": {"type": "string"},
+        "revision": {"type": "string"},
+        "role": {"const": "HASH_LOCKED_IMPORTED_SAFETY_KERNEL"},
+        "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "import_map": {"type": "string"}
+      }
+    },
+    "normative_documents": {"$ref": "#/$defs/artifactList"},
+    "schemas": {"$ref": "#/$defs/artifactList"},
+    "policies": {"$ref": "#/$defs/artifactList"},
+    "registries": {"$ref": "#/$defs/artifactList"},
+    "advisory_documents": {"$ref": "#/$defs/artifactList"},
+    "required_approver_roles": {
+      "type": "array", "minItems": 2, "uniqueItems": true,
+      "items": {"type": "string", "minLength": 2}
+    },
+    "ratification": {"type": ["object", "null"]}
+  },
+  "$defs": {
+    "artifactList": {
+      "type": "array",
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["id", "path", "version", "sha256"],
+        "properties": {
+          "id": {"type": "string", "minLength": 2},
+          "path": {"type": "string", "minLength": 3},
+          "version": {"type": "string", "minLength": 1},
+          "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
+        }
+      }
+    }
+  }
+}
+

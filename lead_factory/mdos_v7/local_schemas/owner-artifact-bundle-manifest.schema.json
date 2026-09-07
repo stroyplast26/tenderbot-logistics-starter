@@ -1,0 +1,138 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://alumkomplekt-rf.ru/schemas/mdos/v7/delivery/owner-artifact-bundle-manifest.schema.json",
+  "title": "MDOS v7.1 local owner artifact bundle manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "schema_version",
+    "record_type",
+    "bundle_id",
+    "bundle_version",
+    "packet_signed_content_sha256",
+    "package_root_sha256",
+    "target_profile_id",
+    "target_profile_sha256",
+    "entries"
+  ],
+  "properties": {
+    "$schema": {
+      "const": "https://alumkomplekt-rf.ru/schemas/mdos/v7/delivery/owner-artifact-bundle-manifest.schema.json"
+    },
+    "schema_version": {"const": "1.0.0"},
+    "record_type": {"const": "OWNER_ARTIFACT_BUNDLE_MANIFEST"},
+    "bundle_id": {"$ref": "#/$defs/opaque_id"},
+    "bundle_version": {"$ref": "#/$defs/version"},
+    "packet_signed_content_sha256": {"$ref": "#/$defs/sha256"},
+    "package_root_sha256": {
+      "const": "d4da97bd47ed1bf76a52826a852e3a158611d18adf32a901b814a864e862d97e"
+    },
+    "target_profile_id": {"const": "GDO10"},
+    "target_profile_sha256": {"$ref": "#/$defs/sha256"},
+    "entries": {
+      "type": "array",
+      "minItems": 18,
+      "maxItems": 18,
+      "items": {"$ref": "#/$defs/entry"}
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "opaque_id": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]+$"
+    },
+    "version": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+    },
+    "relative_path": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 240,
+      "pattern": "^(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.\\.?(?:/|$))[A-Za-z0-9][A-Za-z0-9._/-]*$"
+    },
+    "artifact_schema_uri": {
+      "type": "string",
+      "format": "uri",
+      "maxLength": 240,
+      "pattern": "^https://alumkomplekt-rf\\.ru/schemas/mdos/v7/owner-artifacts/[a-z0-9][a-z0-9._/-]*\\.schema\\.json$"
+    },
+    "binding_path": {
+      "enum": [
+        "payload.beachhead.icp_profile",
+        "payload.beachhead.exclusions_profile",
+        "payload.offer.promise_registry",
+        "payload.offer.pricing_model",
+        "payload.offer.price_list",
+        "payload.offer.public_claims",
+        "payload.capacity.evidence",
+        "payload.legal_boundary.legal_policy",
+        "payload.legal_boundary.consent_policy",
+        "payload.legal_boundary.suppression_policy",
+        "payload.legal_boundary.retention_policy",
+        "payload.legal_boundary.transfer_policy",
+        "payload.website_form_boundary.form_schema",
+        "payload.website_form_boundary.lawful_basis_document",
+        "payload.website_form_boundary.privacy_notice",
+        "payload.website_form_boundary.attribution_contract",
+        "payload.payment_truth_format.format_contract",
+        "payload.manual_egress_control.test_evidence"
+      ]
+    },
+    "artifact_class": {
+      "enum": [
+        "ICP_PROFILE",
+        "EXCLUSIONS_PROFILE",
+        "PROMISE_REGISTRY",
+        "PRICING_MODEL",
+        "PRICE_LIST",
+        "PUBLIC_CLAIMS",
+        "CAPACITY_EVIDENCE",
+        "LEGAL_POLICY",
+        "CONSENT_POLICY",
+        "SUPPRESSION_POLICY",
+        "RETENTION_POLICY",
+        "TRANSFER_POLICY",
+        "WEBSITE_FORM_SCHEMA",
+        "LAWFUL_BASIS_DOCUMENT",
+        "PRIVACY_NOTICE",
+        "ATTRIBUTION_CONTRACT",
+        "PAYMENT_FORMAT_CONTRACT",
+        "MANUAL_EGRESS_TEST_EVIDENCE"
+      ]
+    },
+    "entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "packet_binding_path",
+        "artifact_id",
+        "version",
+        "artifact_class",
+        "media_type",
+        "artifact_schema_uri",
+        "envelope_path",
+        "envelope_sha256"
+      ],
+      "properties": {
+        "packet_binding_path": {"$ref": "#/$defs/binding_path"},
+        "artifact_id": {"$ref": "#/$defs/opaque_id"},
+        "version": {"$ref": "#/$defs/version"},
+        "artifact_class": {"$ref": "#/$defs/artifact_class"},
+        "media_type": {"const": "application/json"},
+        "artifact_schema_uri": {"$ref": "#/$defs/artifact_schema_uri"},
+        "envelope_path": {"$ref": "#/$defs/relative_path"},
+        "envelope_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    }
+  }
+}

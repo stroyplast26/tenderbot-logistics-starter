@@ -1,0 +1,38 @@
+{
+  "fixture_page_version": "wave1-fixture-page-v1",
+  "provider": "DOMRF_PUBLIC_PROJECTS",
+  "product_code": "DOMRF_PUBLIC_PROJECTS",
+  "source_id": "wave1:domrf_public_projects",
+  "contract_version": "wave1-business-public-v1",
+  "mapping_version": "domrf_public_projects-draft-mapping-v1",
+  "receipt_key": "domrf-public-page-001",
+  "page_sequence": 1,
+  "cursor_before": {
+    "position": 0,
+    "opaque_value": ""
+  },
+  "next_cursor": {
+    "position": 25,
+    "opaque_value": "fixture_domrf_public_page_2"
+  },
+  "has_more": true,
+  "received_at_utc": "2026-08-20T05:58:00Z",
+  "upstream_receipt_sha256": "3131313131313131313131313131313131313131313131313131313131313131",
+  "cost_minor": 0,
+  "records": [
+    {
+      "project_id": "domrf-synthetic-001",
+      "revision": "4",
+      "published_at": "2026-08-17T08:00:00Z",
+      "updated_at": "2026-08-20T04:00:00Z",
+      "developer_name": "ООО СИНТЕТИЧЕСКИЙ ЗАСТРОЙЩИК Д",
+      "developer_inn": "2300000005",
+      "region_code": "23",
+      "project_name": "Синтетический жилой комплекс с фасадным остеклением",
+      "project_state": "PLANNED",
+      "budget_minor": 5100000000,
+      "currency_code": "RUB",
+      "planned_tender_at": "2026-10-15T09:00:00Z"
+    }
+  ]
+}

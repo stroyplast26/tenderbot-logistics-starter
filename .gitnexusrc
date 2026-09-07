@@ -1,0 +1,6 @@
+{
+  "defaultBranch": "main",
+  "name": "TenderBot",
+  "pdg": true,
+  "maxFileSize": "2048"
+}

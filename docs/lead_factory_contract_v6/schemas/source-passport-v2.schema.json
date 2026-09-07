@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://alumkomplekt.local/lead-factory/v6/source-passport-v2.schema.json",
+  "title": "Lead Factory Source Passport v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "source_id", "provider", "product_code", "acquisition_mode", "passport_version",
+    "lifecycle", "owner_role", "permitted_funnels", "record_kinds", "data_classes",
+    "purpose", "legal", "contract", "runtime", "reliability", "quality_economics"
+  ],
+  "properties": {
+    "source_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{3,127}$"},
+    "provider": {"type": "string", "minLength": 2, "maxLength": 120},
+    "product_code": {"type": "string", "minLength": 1, "maxLength": 120},
+    "acquisition_mode": {"enum": ["OFFLINE_FIXTURE", "MANUAL_EXPORT", "API", "WEBHOOK", "EMAIL", "PERMITTED_BROWSER", "PARTNER_FEED"]},
+    "passport_version": {"type": "string", "minLength": 1, "maxLength": 64},
+    "lifecycle": {"enum": ["DRAFT", "OFFLINE_ELIGIBLE", "CANARY_ELIGIBLE", "ACTIVE", "PAUSED", "REVOKED", "EXPIRED"]},
+    "owner_role": {"type": "string", "minLength": 2, "maxLength": 80},
+    "permitted_funnels": {
+      "type": "array", "minItems": 1, "uniqueItems": true,
+      "items": {"enum": ["DEALER_ACQUISITION", "END_CUSTOMER_ROUTING", "PROJECT_TENDER"]}
+    },
+    "record_kinds": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 2}},
+    "data_classes": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 2}},
+    "purpose": {"type": "string", "minLength": 8, "maxLength": 500},
+    "legal": {
+      "type": "object", "additionalProperties": false,
+      "required": ["decision", "authority_ref", "terms_url", "terms_sha256", "valid_from_utc", "valid_until_utc", "retention_days", "personal_data_rules"],
+      "properties": {
+        "decision": {"enum": ["NOT_APPROVED", "APPROVED", "REJECTED"]},
+        "authority_ref": {"type": "string", "minLength": 2},
+        "terms_url": {"type": "string", "minLength": 1},
+        "terms_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "valid_from_utc": {"type": "string", "format": "date-time"},
+        "valid_until_utc": {"type": "string", "format": "date-time"},
+        "retention_days": {"type": "integer", "minimum": 0, "maximum": 3650},
+        "personal_data_rules": {"type": "string", "minLength": 2, "maxLength": 1000}
+      }
+    },
+    "contract": {
+      "type": "object", "additionalProperties": false,
+      "required": ["stable_external_id", "timestamp_semantics", "revision_semantics", "schema_id", "mapping_id", "mapping_sha256", "evidence_recipe", "dedupe_policy_version"],
+      "properties": {
+        "stable_external_id": {"type": "string", "minLength": 2},
+        "timestamp_semantics": {"type": "string", "minLength": 2},
+        "revision_semantics": {"type": "string", "minLength": 2},
+        "schema_id": {"type": "string", "minLength": 2},
+        "mapping_id": {"type": "string", "minLength": 2},
+        "mapping_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "evidence_recipe": {"type": "string", "minLength": 2},
+        "dedupe_policy_version": {"type": "string", "minLength": 1}
+      }
+    },
+    "runtime": {
+      "type": "object", "additionalProperties": false,
+      "required": ["auth_reference", "cursor_strategy", "rate_limit", "record_limit", "byte_limit", "cost_limit_minor", "freshness_hours", "read_epoch", "stop_authority"],
+      "properties": {
+        "auth_reference": {"type": ["string", "null"], "maxLength": 200},
+        "cursor_strategy": {"type": "string", "minLength": 2},
+        "rate_limit": {"type": "integer", "minimum": 0},
+        "record_limit": {"type": "integer", "minimum": 0},
+        "byte_limit": {"type": "integer", "minimum": 0},
+        "cost_limit_minor": {"type": "integer", "minimum": 0},
+        "freshness_hours": {"type": "integer", "minimum": 1},
+        "read_epoch": {"type": "integer", "minimum": 0},
+        "stop_authority": {"type": "string", "minLength": 2}
+      }
+    },
+    "reliability": {
+      "type": "object", "additionalProperties": false,
+      "required": ["idempotency", "reconciliation", "fallback", "failure_modes", "sla"],
+      "properties": {
+        "idempotency": {"type": "string", "minLength": 2},
+        "reconciliation": {"type": "string", "minLength": 2},
+        "fallback": {"type": "string", "minLength": 2},
+        "failure_modes": {"type": "array", "items": {"type": "string", "minLength": 2}},
+        "sla": {"type": "string", "minLength": 2}
+      }
+    },
+    "quality_economics": {
+      "type": "object", "additionalProperties": false,
+      "required": ["quality_profile_version", "overlap_policy_version", "stop_rule_version", "scale_rule_version"],
+      "properties": {
+        "quality_profile_version": {"type": "string", "minLength": 1},
+        "overlap_policy_version": {"type": "string", "minLength": 1},
+        "stop_rule_version": {"type": "string", "minLength": 1},
+        "scale_rule_version": {"type": "string", "minLength": 1}
+      }
+    }
+  }
+}
+

@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://alumkomplekt.local/lead-factory/v6/rbac-sod-policy.schema.json",
+  "title": "Lead Factory RBAC and Separation of Duties Policy v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["policy_id", "policy_version", "default_decision", "roles", "actions", "hard_conflicts", "break_glass"],
+  "properties": {
+    "policy_id": {"type": "string", "minLength": 4},
+    "policy_version": {"type": "string", "minLength": 1},
+    "default_decision": {"const": "DENY"},
+    "roles": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 2}},
+    "actions": {
+      "type": "array", "minItems": 1,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["action", "proposer_roles", "approver_roles", "minimum_distinct_approvers", "proposer_cannot_be_sole_approver", "waivable"],
+        "properties": {
+          "action": {"type": "string", "pattern": "^[A-Z][A-Z0-9_]{2,79}$"},
+          "proposer_roles": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string"}},
+          "approver_roles": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string"}},
+          "minimum_distinct_approvers": {"type": "integer", "minimum": 1, "maximum": 5},
+          "proposer_cannot_be_sole_approver": {"type": "boolean"},
+          "waivable": {"type": "boolean"}
+        }
+      }
+    },
+    "hard_conflicts": {
+      "type": "array", "uniqueItems": true,
+      "items": {
+        "type": "array", "minItems": 2, "maxItems": 2, "uniqueItems": true,
+        "items": {"type": "string", "minLength": 2}
+      }
+    },
+    "break_glass": {
+      "type": "object", "additionalProperties": false,
+      "required": ["minimum_distinct_approvers", "maximum_ttl_minutes", "non_overridable_actions", "incident_required"],
+      "properties": {
+        "minimum_distinct_approvers": {"type": "integer", "minimum": 2},
+        "maximum_ttl_minutes": {"type": "integer", "minimum": 1, "maximum": 1440},
+        "non_overridable_actions": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
+        "incident_required": {"const": true}
+      }
+    }
+  }
+}
+

@@ -1,0 +1,161 @@
+{
+  "$schema": "https://alumkomplekt-rf.ru/schemas/mdos/v7/delivery/owner-intent-draft.schema.json",
+  "schema_version": "1.0.0",
+  "record_type": "OWNER_INTENT_DRAFT",
+  "status": "CAPTURED_NOT_RATIFIED",
+  "authority_capability": "NONE",
+  "contract_binding": {
+    "contract_id": "AK-MDOS-V7",
+    "package_version": "7.1.0-rc.1",
+    "package_root_sha256": "d4da97bd47ed1bf76a52826a852e3a158611d18adf32a901b814a864e862d97e",
+    "manifest_sha256": "83b984df37ad8d8b1903cd07934de0d3ee9117b9c659538afb9b919dc0cccbf9",
+    "manifest_status": "RELEASE_CANDIDATE_FOR_OWNER_RATIFICATION",
+    "active_beachhead_profile": null,
+    "ratification": null
+  },
+  "g2_profile_binding": {
+    "profile_file_ref": "docs/market_demand_os_v7_delivery/g2-motion-profiles.json",
+    "profile_set_id": "AK-MDOS-V7-G2-NEAR-MONEY-SHADOW-2026-08-25",
+    "profile_id": "G2-MOTION-EXISTING-WINBACK",
+    "normative_motion": "EXISTING_ACCOUNT_EXPANSION",
+    "profile_file_sha256": "b5584e86adaade926d4ae8e3cff40ed73550e25575598a5abd5ce9fc079b1b8f",
+    "profile_set_sha256": "eb132626212f168eadfa34afad99aaf8ab389e0e9cfee663f87e742dc2fa77e9",
+    "profile_sha256": "323a0bb8eac8e2fb332eb152a258118916097cfe3fe2b29067c424ea863de09a"
+  },
+  "source": {
+    "source_kind": "OWNER_CHAT_ASSERTION",
+    "source_ref": "OWNER_INPUT_ROUND_2026_08_26_01",
+    "capture_class": "SEMANTIC_NON_PII_ONLY",
+    "raw_message_retained": false,
+    "raw_pii_retained": false,
+    "owner_signature_present": false
+  },
+  "commercial_intent": {
+    "intent_class": "STRATEGIC_INTENT_ONLY",
+    "motion_ids": [
+      "EXISTING_ACCOUNT_EXPANSION",
+      "DEALER_AND_INSTALLER_ACTIVATION",
+      "HIGH_INTENT_INBOUND"
+    ],
+    "geography_intent": "GLOBAL_WHERE_LAWFUL_AND_FULFILLABLE",
+    "geography_eligibility_rule": "LAWFUL_AND_CAPACITY_FEASIBLE_ONLY",
+    "active_all_region_beachhead": false,
+    "exact_beachhead_ratification_required": true,
+    "intent_only": true,
+    "execution_authority": false
+  },
+  "proposed_first_cell": {
+    "profile_state": "OWNER_PROPOSED_NOT_ACTIVE",
+    "motion_id": "EXISTING_ACCOUNT_EXPANSION",
+    "product_scope_id": "ALUMINIUM_WINDOWS",
+    "region_code": "RU-MOS",
+    "region_semantics": "MOSCOW_OBLAST_ONLY",
+    "fulfilment_model_id": "FACTORY_DELIVERY_NO_INSTALLATION",
+    "fulfilment_assumption_state": "PROPOSED_PENDING_OWNER_CONFIRMATION",
+    "installation_scope": "EXCLUDED",
+    "installation_required_cases_disposition": "OUT_OF_SCOPE",
+    "allowed_channel_ids": ["FIXTURE_SHADOW"],
+    "proposal_origin": "CONSERVATIVE_DELIVERY_DEFAULT",
+    "owner_confirmation_state": "PENDING_EXACT_RATIFICATION",
+    "active": false,
+    "live_eligible": false
+  },
+  "shadow_capacity": {
+    "limit_class": "SHADOW_REVIEW_QUEUE_LIMITS",
+    "scope": "FIXTURE_SHADOW_ONLY",
+    "cohort_total_cap": 5,
+    "daily_review_cap": 1,
+    "max_wip": 1,
+    "human_review_required": true,
+    "send_mode": "NO_SEND",
+    "production_capacity_claimed": false,
+    "capacity_evidence_state": "PENDING_OWNER_INPUT"
+  },
+  "human_actor_assignments": [
+    {
+      "actor_ref": "ACTOR_CLIENT_PARTNER_01",
+      "actor_class": "HUMAN",
+      "owner_asserted_role_ids": ["GOLD_REVIEWER"],
+      "candidate_role_ids": ["SALES_OPERATOR"],
+      "currently_handles_clients_asserted": true,
+      "raw_identity_retained": false,
+      "arbitrator": false,
+      "may_review_own_originated_case": false,
+      "policy_authority": false,
+      "payment_truth_authority": false,
+      "independent_verifier": false,
+      "release_authority": false
+    }
+  ],
+  "payment_intent": {
+    "preferred_future_source_type": "BANK_API",
+    "format_state": "PENDING_OWNER_INPUT",
+    "provider_state": "UNKNOWN",
+    "verification_method_state": "UNKNOWN",
+    "accepted_payment_truth_source_types": [
+      "BANK_API",
+      "PAYMENT_PROVIDER",
+      "SIGNED_BANK_STATEMENT"
+    ],
+    "bitrix_is_payment_truth": false,
+    "one_c_dependency": "NONE",
+    "credentials_present": false,
+    "live_payment_reads_enabled": false
+  },
+  "bitrix_contract_milestone": {
+    "source_system_role": "PROJECTION_ONLY",
+    "source_event": "CONTRACT_SIGNED",
+    "application_status": "CONTRACT_SIGNED_AWAITING_PAYMENT",
+    "exact_stage_code": "UNKNOWN",
+    "stage_mapping_state": "PENDING_OWNER_INPUT",
+    "payment_status": "NOT_PROVEN",
+    "payment_truth_effect": "NONE",
+    "creates_payment_proof": false,
+    "changes_order_paid_state": false,
+    "canonical_kpi_eligible": false,
+    "live_read_performed": false,
+    "live_write_performed": false
+  },
+  "unresolved_inputs": [
+    "OWNER_CONFIRM_EXACT_BEACHHEAD_CELL",
+    "OPERATING_CAPACITY_AND_SLA_EVIDENCE",
+    "OFFER_PRICE_MARGIN_AND_PROMISE_ARTIFACTS",
+    "LEGAL_BOUNDARY_AND_CONSENT_ARTIFACTS",
+    "BANK_API_PROVIDER_FORMAT_AND_CREDENTIAL_PATH",
+    "BITRIX_CONTRACT_SIGNED_EXACT_STAGE_CODE",
+    "DISTINCT_RATIFICATION_SIGNERS_AND_KEYS"
+  ],
+  "privacy_boundary": {
+    "data_class": "NON_PII_OWNER_INTENT",
+    "opaque_human_references_only": true,
+    "raw_person_names_present": false,
+    "raw_contact_data_present": false,
+    "raw_request_text_present": false,
+    "raw_chat_content_present": false,
+    "analytics_contains_pii": false,
+    "evidence_contains_pii": false
+  },
+  "authority_effect": {
+    "external_reads_enabled": false,
+    "external_writers_enabled": false,
+    "contact_enabled": false,
+    "spend_enabled": false,
+    "live_bitrix_reads_enabled": false,
+    "live_bitrix_writes_enabled": false,
+    "live_routing_enabled": false,
+    "payment_state_mutation_enabled": false,
+    "order_state_mutation_enabled": false,
+    "permit_decision_issued": false,
+    "gold_acceptance_created": false,
+    "manifest_mutation_enabled": false,
+    "freeze_mutation_enabled": false,
+    "ratifies_beachhead": false,
+    "authorizes_live": false
+  },
+  "seal": {
+    "algorithm": "SHA256",
+    "canonicalization": "MDOS_CANONICAL_JSON_V1",
+    "scope": "ALL_TOP_LEVEL_FIELDS_EXCEPT_SEAL",
+    "content_sha256": "588c72880b78ec0d0a48cfc7d1e6c8fac597759cb97c3ad5f9465a7d24a23cfe"
+  }
+}

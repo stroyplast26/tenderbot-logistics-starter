@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://alumkomplekt-rf.ru/schemas/mdos/v7/payment-proof.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "payment_proof_id", "authoritative_class", "provider", "provider_event_id", "canonical_account_id", "distinct_order_id", "payer_identity_ref", "recipient_identity_ref", "amount", "currency", "value_at", "source_artifact_sha256", "reconciliation_state", "verified_by", "verified_at"],
+  "properties": {
+    "schema_version": {"const": "1.0.0"},
+    "payment_proof_id": {"type": "string", "minLength": 1},
+    "authoritative_class": {"enum": ["BANK_API", "PAYMENT_PROVIDER", "SIGNED_BANK_STATEMENT"]},
+    "provider": {"type": "string", "minLength": 1},
+    "provider_event_id": {"type": "string", "minLength": 1},
+    "canonical_account_id": {"type": "string", "minLength": 1},
+    "distinct_order_id": {"type": "string", "minLength": 1},
+    "payer_identity_ref": {"type": "string", "minLength": 1},
+    "recipient_identity_ref": {"type": "string", "minLength": 1},
+    "amount": {"type": "number", "exclusiveMinimum": 0},
+    "currency": {"type": "string", "pattern": "^[A-Z]{3}$"},
+    "value_at": {"type": "string", "format": "date-time"},
+    "source_artifact_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "reconciliation_state": {"const": "RECONCILED"},
+    "verified_by": {"type": "string", "minLength": 1},
+    "verified_at": {"type": "string", "format": "date-time"}
+  }
+}

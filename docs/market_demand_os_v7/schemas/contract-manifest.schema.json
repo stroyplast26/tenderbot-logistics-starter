@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://alumkomplekt-rf.ru/schemas/mdos/v7/contract-manifest.schema.json",
+  "title": "MDOS v7 contract manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["$schema", "schema_version", "contract_id", "package_version", "status", "fixed_at", "package_root_sha256", "target_profiles", "active_beachhead_profile", "defaults_pending_ratification", "normative_documents", "schemas", "registries", "advisory_documents", "required_approver_roles", "ratification"],
+  "properties": {
+    "$schema": {"const": "schemas/contract-manifest.schema.json"},
+    "schema_version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+    "contract_id": {"const": "AK-MDOS-V7"},
+    "package_version": {"type": "string"},
+    "status": {"enum": ["RELEASE_CANDIDATE_FOR_OWNER_RATIFICATION", "RATIFIED", "SUPERSEDED", "REVOKED"]},
+    "fixed_at": {"type": "string", "format": "date"},
+    "package_root_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "package_digest_algorithm": {"type": "string"},
+    "supersedes": {"type": "object", "additionalProperties": false, "required": ["id", "version", "role"], "properties": {"id": {"type": "string"}, "version": {"type": "string"}, "role": {"type": "string"}, "manifest_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"}}},
+    "target_profiles": {"type": "array", "minItems": 2, "items": {"type": "object", "additionalProperties": false, "required": ["id", "unit", "status"], "properties": {"id": {"type": "string"}, "unit": {"type": "string"}, "status": {"enum": ["ACTIVE_EVALUATION_TARGET", "SEPARATE_NOT_ACTIVE", "PROVEN", "REVOKED"]}, "target_per_workday": {"type": "integer", "minimum": 1}, "evaluation_workdays": {"type": "integer", "minimum": 1}, "minimum_total": {"type": "integer", "minimum": 1}}}},
+    "active_beachhead_profile": {"type": ["string", "null"]},
+    "defaults_pending_ratification": {"type": "object", "additionalProperties": false, "required": ["external_reads_enabled", "external_writers_enabled", "contact_enabled", "spend_enabled", "pc10_enabled"], "properties": {"external_reads_enabled": {"const": false}, "external_writers_enabled": {"const": false}, "contact_enabled": {"const": false}, "spend_enabled": {"const": false}, "pc10_enabled": {"const": false}}},
+    "normative_documents": {"$ref": "#/$defs/artifacts"},
+    "schemas": {"$ref": "#/$defs/artifacts"},
+    "registries": {"$ref": "#/$defs/artifacts"},
+    "advisory_documents": {"$ref": "#/$defs/artifacts"},
+    "required_approver_roles": {"type": "array", "minItems": 3, "uniqueItems": true, "items": {"type": "string"}},
+    "ratification": {"type": ["object", "null"]}
+  },
+  "$defs": {
+    "artifacts": {"type": "array", "minItems": 1, "items": {"type": "object", "additionalProperties": false, "required": ["id", "path", "version", "sha256"], "properties": {"id": {"type": "string"}, "path": {"type": "string"}, "version": {"type": "string"}, "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"}}}}
+  }
+}

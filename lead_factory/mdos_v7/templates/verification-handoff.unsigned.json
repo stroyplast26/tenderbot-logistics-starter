@@ -1,0 +1,260 @@
+{
+  "$schema": "https://alumkomplekt-rf.ru/schemas/mdos/v7/delivery/verification-handoff.schema.json",
+  "schema_version": "1.0.0",
+  "handoff_kind": "INDEPENDENT_EVIDENCE_VERIFIER_HANDOFF",
+  "classification": "LOCAL_UNSIGNED_VERIFICATION_HANDOFF_NON_AUTHORITY",
+  "status": "DRAFT_BINDING_PENDING",
+  "snapshot_at_utc": null,
+  "owner_preflight_state": "NOT_RATIFIED",
+  "open_p0_nonclaim_count": 36,
+  "prerequisites_satisfied": false,
+  "production_release_eligible": false,
+  "package_binding": {
+    "contract_id": "AK-MDOS-V7",
+    "package_version": "7.1.0-rc.1",
+    "package_root_sha256": "d4da97bd47ed1bf76a52826a852e3a158611d18adf32a901b814a864e862d97e",
+    "active_beachhead_profile": null,
+    "ratification": null
+  },
+  "authority": {
+    "external_reads_enabled": false,
+    "external_writers_enabled": false,
+    "contact_enabled": false,
+    "spend_enabled": false,
+    "pc10_enabled": false,
+    "live_bitrix_writes_enabled": false,
+    "authority_mutation_allowed": false,
+    "external_effects_allowed": false
+  },
+  "scope": {
+    "profile_artifact": {
+      "path": "docs/market_demand_os_v7_delivery/g2-motion-profiles.json",
+      "file_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "profile_set_id": "AK-MDOS-V7-G2-NEAR-MONEY-SHADOW-2026-08-25",
+      "profile_set_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "profiles": [
+        {
+          "profile_id": "G2-MOTION-DEALER-BENCHMARK-RFQ",
+          "profile_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+        },
+        {
+          "profile_id": "G2-MOTION-EXISTING-WINBACK",
+          "profile_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+        },
+        {
+          "profile_id": "G2-MOTION-HIGH-INTENT-INBOUND",
+          "profile_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+        }
+      ]
+    },
+    "overlay_artifact": {
+      "path": "docs/market_demand_os_v7_delivery/implementation-trace-overlay.json",
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "report_artifacts": [
+      {
+        "artifact_id": "G0_SUPPRESSION",
+        "path": "reports/market_demand_os_v7/g0-suppression-evidence.json",
+        "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      {
+        "artifact_id": "G1_SHADOW",
+        "path": "reports/market_demand_os_v7/g1-shadow-evidence.json",
+        "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      {
+        "artifact_id": "G1_SPLIT_PAYMENT",
+        "path": "reports/market_demand_os_v7/g1-split-payment-shadow-evidence.json",
+        "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      {
+        "artifact_id": "G2_INBOUND_ATTRIBUTION",
+        "path": "reports/market_demand_os_v7/g2-inbound-attribution-shadow-evidence.json",
+        "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      {
+        "artifact_id": "G2_MANUAL_EGRESS",
+        "path": "reports/market_demand_os_v7/g2-manual-egress-evidence.json",
+        "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      {
+        "artifact_id": "G2_MOTION_PREFLIGHT",
+        "path": "reports/market_demand_os_v7/g2-motion-preflight-evidence.json",
+        "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      {
+        "artifact_id": "G2_OUTBOX",
+        "path": "reports/market_demand_os_v7/g2-outbox-evidence.json",
+        "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      {
+        "artifact_id": "G2_OWNER_PREFLIGHT",
+        "path": "reports/market_demand_os_v7/g2-owner-preflight-evidence.json",
+        "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      {
+        "artifact_id": "TEST_SUMMARY",
+        "path": "reports/market_demand_os_v7/test-summary.json",
+        "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+      }
+    ]
+  },
+  "traceability": {
+    "requirement_refs": [
+      "MDOS-ASR-001",
+      "MDOS-ASR-002",
+      "MDOS-ASR-003",
+      "MDOS-ASR-004",
+      "MDOS-GOV-001",
+      "MDOS-GOV-002",
+      "MDOS-GOV-003",
+      "MDOS-GOV-004",
+      "MDOS-GOV-005",
+      "MDOS-REL-001",
+      "MDOS-REL-002",
+      "MDOS-TRC-001",
+      "MDOS-TRC-002",
+      "MDOS-TRC-003",
+      "MDOS-TRC-004",
+      "MDOS-TRC-005"
+    ],
+    "acceptance_refs": [
+      "AT-ASR-01",
+      "AT-ASR-02",
+      "AT-ASR-03",
+      "AT-ASR-04",
+      "AT-ASR-05",
+      "AT-ASR-06",
+      "AT-ASR-07",
+      "AT-ASR-08",
+      "AT-ASR-09",
+      "AT-ASR-10",
+      "AT-ASR-11",
+      "AT-ASR-12",
+      "AT-ASR-13",
+      "AT-ASR-14"
+    ],
+    "design_refs": [
+      "DESIGN:docs/market_demand_os_v7/APP-MDOS-DELIVERY-ASSURANCE.md",
+      "DESIGN:docs/market_demand_os_v7/CONTRACT.md"
+    ],
+    "code_refs": [
+      "CODE:lead_factory/mdos_v7/verification_handoff.py",
+      "CODE:lead_factory/mdos_v7/local_schemas/verification-handoff.schema.json",
+      "CODE:lead_factory/mdos_v7/templates/verification-handoff.unsigned.json",
+      "CODE:scripts/run_mdos_v7_verification_handoff.py"
+    ],
+    "test_refs": [
+      "TEST:tests/test_mdos_v7_verification_handoff.py"
+    ],
+    "evidence_refs": [
+      "EVIDENCE:docs/market_demand_os_v7_delivery/g2-motion-profiles.json",
+      "EVIDENCE:docs/market_demand_os_v7_delivery/implementation-trace-overlay.json",
+      "EVIDENCE:reports/market_demand_os_v7/g0-suppression-evidence.json",
+      "EVIDENCE:reports/market_demand_os_v7/g1-shadow-evidence.json",
+      "EVIDENCE:reports/market_demand_os_v7/g1-split-payment-shadow-evidence.json",
+      "EVIDENCE:reports/market_demand_os_v7/g2-inbound-attribution-shadow-evidence.json",
+      "EVIDENCE:reports/market_demand_os_v7/g2-manual-egress-evidence.json",
+      "EVIDENCE:reports/market_demand_os_v7/g2-motion-preflight-evidence.json",
+      "EVIDENCE:reports/market_demand_os_v7/g2-outbox-evidence.json",
+      "EVIDENCE:reports/market_demand_os_v7/g2-owner-preflight-evidence.json",
+      "EVIDENCE:reports/market_demand_os_v7/test-summary.json"
+    ]
+  },
+  "p0_nonclaims": {
+    "normative_p0_count": 36,
+    "requirement_ids": [
+      "MDOS-ASR-001",
+      "MDOS-ASR-002",
+      "MDOS-ASR-003",
+      "MDOS-ASR-004",
+      "MDOS-AUT-001",
+      "MDOS-AUT-002",
+      "MDOS-AUT-003",
+      "MDOS-AUT-004",
+      "MDOS-AUT-005",
+      "MDOS-BCH-001",
+      "MDOS-BCH-002",
+      "MDOS-BCH-003",
+      "MDOS-BCH-004",
+      "MDOS-BCH-005",
+      "MDOS-GOV-001",
+      "MDOS-GOV-002",
+      "MDOS-GOV-003",
+      "MDOS-GOV-004",
+      "MDOS-GOV-005",
+      "MDOS-LGL-001",
+      "MDOS-LGL-002",
+      "MDOS-LGL-003",
+      "MDOS-REL-001",
+      "MDOS-REL-002",
+      "MDOS-SEC-001",
+      "MDOS-SEC-002",
+      "MDOS-SEC-003",
+      "MDOS-TRC-001",
+      "MDOS-TRC-002",
+      "MDOS-TRC-003",
+      "MDOS-TRC-004",
+      "MDOS-TRC-005",
+      "MDOS-TRU-001",
+      "MDOS-TRU-002",
+      "MDOS-TRU-003",
+      "MDOS-TRU-004"
+    ],
+    "all_p0_implemented": false,
+    "all_p0_tested": false,
+    "all_p0_evidenced": false,
+    "all_p0_independently_verified": false,
+    "normative_completion_claimed": false
+  },
+  "separation_of_duties": {
+    "implementer": {
+      "role": "ImplementationTeam",
+      "identity_ref": "LOCAL_IMPLEMENTATION_TEAM",
+      "assertion": "PREPARED_NOT_VERIFIED",
+      "may_verify": false
+    },
+    "future_independent_verifier": {
+      "required_role": "IndependentEvidenceVerifier",
+      "must_be_distinct_from_implementer": true,
+      "identity_ref": null,
+      "public_key_fingerprint_sha256": null,
+      "signature_algorithm": null,
+      "signature_b64": null,
+      "signed_bundle_sha256": null,
+      "verification_status": "NOT_PRESENT"
+    }
+  },
+  "privacy": {
+    "artifact_contents_included": false,
+    "raw_payloads_included": false,
+    "raw_pii_included": false,
+    "request_text_included": false,
+    "credentials_or_secrets_included": false,
+    "only_paths_and_sha256": true
+  },
+  "claims": {
+    "independent_verification": false,
+    "verified": false,
+    "normative_status_promoted": false,
+    "live_authority_granted": false,
+    "owner_ratification_present": false,
+    "prerequisites_satisfied": false
+  },
+  "effects": {
+    "external_effect_count": 0,
+    "external_read_count": 0,
+    "external_write_count": 0,
+    "contact_count": 0,
+    "spend_count": 0,
+    "live_bitrix_write_count": 0
+  },
+  "limitations": [
+    "LOCAL_HANDOFF_ONLY_NO_AUTHORITY",
+    "ARTIFACT_HASHES_ARE_IMPLEMENTATION_TEAM_OBSERVATIONS",
+    "INDEPENDENT_VERIFIER_IDENTITY_KEY_SIGNATURE_NOT_PRESENT",
+    "OWNER_RATIFICATION_AND_LIVE_PREREQUISITES_NOT_SATISFIED",
+    "NORMATIVE_P0_COMPLETION_NOT_CLAIMED"
+  ],
+  "bundle_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+}

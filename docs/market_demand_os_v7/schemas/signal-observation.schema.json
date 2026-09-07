@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://alumkomplekt-rf.ru/schemas/mdos/v7/signal-observation.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "event_id", "event_type", "producer", "source_id", "source_role", "event_time", "observed_time", "payload_sha256", "data_class", "purpose", "idempotency_key", "trace_id", "evidence_uri"],
+  "properties": {
+    "schema_version": {"const": "1.0.0"},
+    "event_id": {"type": "string", "minLength": 1},
+    "event_type": {"type": "string", "minLength": 1},
+    "producer": {"type": "string", "minLength": 1},
+    "source_id": {"type": "string", "minLength": 1},
+    "source_role": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"enum": ["DISCOVERY", "TRIGGER", "INTENT", "RFQ", "OUTCOME", "EVIDENCE_SUPPORT"]}},
+    "subject_refs": {"type": "array", "items": {"type": "string"}},
+    "event_time": {"type": "string", "format": "date-time"},
+    "observed_time": {"type": "string", "format": "date-time"},
+    "source_revision": {"type": "string"},
+    "payload_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "data_class": {"type": "string"},
+    "purpose": {"type": "string"},
+    "idempotency_key": {"type": "string"},
+    "trace_id": {"type": "string"},
+    "correlation_id": {"type": "string"},
+    "causation_id": {"type": "string"},
+    "evidence_uri": {"type": "string"},
+    "retention_until": {"type": "string", "format": "date-time"}
+  }
+}

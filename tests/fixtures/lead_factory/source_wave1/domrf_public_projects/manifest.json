@@ -1,0 +1,18 @@
+{
+  "fixture_manifest_version": "wave1-fixture-manifest-v1",
+  "provider": "DOMRF_PUBLIC_PROJECTS",
+  "product_code": "DOMRF_PUBLIC_PROJECTS",
+  "source_id": "wave1:domrf_public_projects",
+  "contract_version": "wave1-business-public-v1",
+  "mapping_version": "domrf_public_projects-draft-mapping-v1",
+  "pages": [
+    {
+      "receipt_key": "domrf-public-page-001",
+      "content_sha256": "9e1b75e5cec0c02df6ecfdb8b65fd4c3d31ccebb0b2446a986e5b4d77d62ade0"
+    },
+    {
+      "receipt_key": "domrf-public-page-002",
+      "content_sha256": "2437b4de43b44f9506d1ec4165fdc60a7bee132f5170e71ff5eaffdc1eb69e41"
+    }
+  ]
+}

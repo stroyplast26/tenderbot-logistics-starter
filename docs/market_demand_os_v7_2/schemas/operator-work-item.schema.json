@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://alumkomplekt-rf.ru/schemas/mdos/v7.2/operator-work-item.schema.json",
+  "title": "MDOS v7.2 OperatorWorkItem",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "record_type",
+    "work_item_id",
+    "lf_task_id",
+    "lf_opportunity_id",
+    "actor_id",
+    "objective_code",
+    "allowed_channel",
+    "due_at_utc",
+    "policy_ref",
+    "permit_ref",
+    "permit_state",
+    "stop_conditions",
+    "work_item_version",
+    "created_at_utc",
+    "evidence_ref"
+  ],
+  "properties": {
+    "schema_version": {"const": "1.0.0"},
+    "record_type": {"const": "OPERATOR_WORK_ITEM"},
+    "work_item_id": {"$ref": "#/$defs/id"},
+    "lf_task_id": {"$ref": "#/$defs/id"},
+    "lf_opportunity_id": {"$ref": "#/$defs/id"},
+    "actor_id": {"$ref": "#/$defs/id"},
+    "objective_code": {"$ref": "#/$defs/id"},
+    "allowed_channel": {
+      "enum": ["FIXTURE_SHADOW", "PHONE_INTERNAL_TEST", "PHONE_CLIENT"]
+    },
+    "due_at_utc": {"$ref": "#/$defs/utc"},
+    "policy_ref": {"$ref": "#/$defs/ref"},
+    "permit_ref": {"$ref": "#/$defs/ref"},
+    "permit_state": {
+      "enum": ["NOT_REQUIRED_FIXTURE", "PENDING", "GRANTED", "REVOKED"]
+    },
+    "stop_conditions": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/id"}
+    },
+    "work_item_version": {"type": "integer", "minimum": 1},
+    "created_at_utc": {"$ref": "#/$defs/utc"},
+    "evidence_ref": {"$ref": "#/$defs/evidence"}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"allowed_channel": {"const": "PHONE_CLIENT"}}},
+      "then": {"properties": {"permit_state": {"const": "GRANTED"}}}
+    }
+  ],
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,159}$"},
+    "ref": {"type": "string", "pattern": "^[A-Za-z][A-Za-z0-9+.-]*://[^\\s]+$"},
+    "evidence": {"type": "string", "pattern": "^evidence://[A-Za-z0-9][A-Za-z0-9._:/-]{0,2028}$"},
+    "utc": {"type": "string", "format": "date-time", "pattern": "Z$"}
+  }
+}

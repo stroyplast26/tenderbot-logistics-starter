@@ -1,0 +1,93 @@
+{
+  "policy_id": "LF-RBAC-SOD",
+  "policy_version": "1.0.0",
+  "default_decision": "DENY",
+  "roles": [
+    "BusinessOwner", "ContractAuthority", "LegalDataAuthority", "SourceAuthority",
+    "MethodOwner", "ModelRiskOwner", "ReleaseManager", "Operator", "SalesOwner",
+    "EstimatorOwner", "ProductionOwner", "SecurityIncidentOwner", "IndependentAuditor",
+    "Developer", "TestAuthor", "EvidenceVerifier", "QualityArbiter"
+  ],
+  "actions": [
+    {
+      "action": "RATIFY_CONTRACT",
+      "proposer_roles": ["ContractAuthority"],
+      "approver_roles": ["BusinessOwner", "IndependentAuditor"],
+      "minimum_distinct_approvers": 2,
+      "proposer_cannot_be_sole_approver": true,
+      "waivable": false
+    },
+    {
+      "action": "ENABLE_LIVE_SOURCE_READ",
+      "proposer_roles": ["SourceAuthority"],
+      "approver_roles": ["LegalDataAuthority", "SecurityIncidentOwner"],
+      "minimum_distinct_approvers": 2,
+      "proposer_cannot_be_sole_approver": true,
+      "waivable": false
+    },
+    {
+      "action": "ENABLE_LIVE_EXTERNAL_WRITE",
+      "proposer_roles": ["ReleaseManager"],
+      "approver_roles": ["BusinessOwner", "SecurityIncidentOwner"],
+      "minimum_distinct_approvers": 2,
+      "proposer_cannot_be_sole_approver": true,
+      "waivable": false
+    },
+    {
+      "action": "APPROVE_MASS_CONTACT_OR_SPEND",
+      "proposer_roles": ["MethodOwner"],
+      "approver_roles": ["BusinessOwner", "LegalDataAuthority"],
+      "minimum_distinct_approvers": 2,
+      "proposer_cannot_be_sole_approver": true,
+      "waivable": false
+    },
+    {
+      "action": "PROMOTE_PRODUCTION_MODEL",
+      "proposer_roles": ["ModelRiskOwner", "Developer"],
+      "approver_roles": ["ModelRiskOwner", "IndependentAuditor", "ReleaseManager"],
+      "minimum_distinct_approvers": 2,
+      "proposer_cannot_be_sole_approver": true,
+      "waivable": false
+    },
+    {
+      "action": "RELEASE_PRODUCTION",
+      "proposer_roles": ["ReleaseManager"],
+      "approver_roles": ["IndependentAuditor", "SecurityIncidentOwner", "BusinessOwner"],
+      "minimum_distinct_approvers": 2,
+      "proposer_cannot_be_sole_approver": true,
+      "waivable": false
+    },
+    {
+      "action": "RESOLVE_CRITICAL_QUALITY_CONFLICT",
+      "proposer_roles": ["QualityArbiter"],
+      "approver_roles": ["QualityArbiter", "IndependentAuditor"],
+      "minimum_distinct_approvers": 1,
+      "proposer_cannot_be_sole_approver": true,
+      "waivable": false
+    },
+    {
+      "action": "DELETE_OR_RETENTION_PURGE",
+      "proposer_roles": ["LegalDataAuthority"],
+      "approver_roles": ["LegalDataAuthority", "SecurityIncidentOwner"],
+      "minimum_distinct_approvers": 2,
+      "proposer_cannot_be_sole_approver": true,
+      "waivable": false
+    }
+  ],
+  "hard_conflicts": [
+    ["Developer", "IndependentAuditor"],
+    ["ReleaseManager", "IndependentAuditor"],
+    ["MethodOwner", "IndependentAuditor"],
+    ["SourceAuthority", "LegalDataAuthority"]
+  ],
+  "break_glass": {
+    "minimum_distinct_approvers": 2,
+    "maximum_ttl_minutes": 60,
+    "non_overridable_actions": [
+      "RATIFY_CONTRACT", "APPROVE_MASS_CONTACT_OR_SPEND",
+      "PROMOTE_PRODUCTION_MODEL", "DELETE_OR_RETENTION_PURGE"
+    ],
+    "incident_required": true
+  }
+}
+

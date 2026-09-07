@@ -1,0 +1,18 @@
+{
+  "fixture_manifest_version": "wave1-fixture-manifest-v1",
+  "provider": "TENDERPLAN",
+  "product_code": "TENDERPLAN",
+  "source_id": "wave1:tenderplan",
+  "contract_version": "wave1-business-public-v1",
+  "mapping_version": "tenderplan-draft-mapping-v1",
+  "pages": [
+    {
+      "receipt_key": "tenderplan-page-001",
+      "content_sha256": "bdae7f2dfa82f59d0552fcdf7e3b8ed5b2c35acf8c1b313e45800f46826ae84e"
+    },
+    {
+      "receipt_key": "tenderplan-page-002",
+      "content_sha256": "3c74d3735fca807c0a095f3477dca78a029ba658ce87cedcde0d9716f12f0c25"
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://alumkomplekt-rf.ru/schemas/mdos/v7/demand-assessment.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "assessment_id", "demand_unit_id", "as_of", "model_release_id", "axes", "competing_risks", "decision_zone", "missing_evidence", "evidence_claim_ids", "calibration_slice", "expires_at"],
+  "properties": {
+    "schema_version": {"const": "1.0.0"},
+    "assessment_id": {"type": "string"},
+    "demand_unit_id": {"type": "string"},
+    "as_of": {"type": "string", "format": "date-time"},
+    "model_release_id": {"type": "string"},
+    "axes": {"type": "object", "additionalProperties": false, "required": ["need_fit", "buying_group_completeness", "intent", "supplier_openness", "artifact_readiness", "lawful_reachability", "capacity_fit", "expected_contribution", "negative_risk", "epistemic_uncertainty"], "properties": {"need_fit": {"type": "number", "minimum": 0, "maximum": 1}, "buying_group_completeness": {"type": "number", "minimum": 0, "maximum": 1}, "intent": {"type": "number", "minimum": 0, "maximum": 1}, "supplier_openness": {"type": "number", "minimum": 0, "maximum": 1}, "artifact_readiness": {"type": "number", "minimum": 0, "maximum": 1}, "lawful_reachability": {"type": "number", "minimum": 0, "maximum": 1}, "capacity_fit": {"type": "number", "minimum": 0, "maximum": 1}, "expected_contribution": {"type": "number"}, "negative_risk": {"type": "number", "minimum": 0, "maximum": 1}, "epistemic_uncertainty": {"type": "number", "minimum": 0, "maximum": 1}}},
+    "competing_risks": {"type": "object", "additionalProperties": false, "required": ["RFQ", "PAID", "LOST", "SUPPLIER_SELECTED", "CANCELLED", "NO_DECISION"], "properties": {"RFQ": {"type": "number", "minimum": 0, "maximum": 1}, "PAID": {"type": "number", "minimum": 0, "maximum": 1}, "LOST": {"type": "number", "minimum": 0, "maximum": 1}, "SUPPLIER_SELECTED": {"type": "number", "minimum": 0, "maximum": 1}, "CANCELLED": {"type": "number", "minimum": 0, "maximum": 1}, "NO_DECISION": {"type": "number", "minimum": 0, "maximum": 1}}},
+    "decision_zone": {"enum": ["AUTO_NEGATIVE", "RESEARCH", "HUMAN_REVIEW", "ELIGIBLE_FOR_GOLD_REVIEW"]},
+    "missing_evidence": {"type": "array", "items": {"type": "string"}},
+    "evidence_claim_ids": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+    "calibration_slice": {"type": "string"},
+    "calibration_evidence_ref": {"type": ["string", "null"]},
+    "expires_at": {"type": "string", "format": "date-time"}
+  }
+}

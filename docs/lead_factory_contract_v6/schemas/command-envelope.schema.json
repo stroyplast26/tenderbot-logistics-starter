@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://alumkomplekt.local/lead-factory/v6/command-envelope.schema.json",
+  "title": "Lead Factory Command Envelope v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "command_id", "command_type", "schema_version", "aggregate_type",
+    "aggregate_id", "expected_version", "actor_id", "actor_role",
+    "authority_ref", "idempotency_key", "correlation_id", "causation_id",
+    "issued_at_utc", "expires_at_utc", "contract_version", "policy_version",
+    "payload", "payload_sha256", "evidence_refs"
+  ],
+  "properties": {
+    "command_id": {"type": "string", "minLength": 8, "maxLength": 160},
+    "command_type": {"type": "string", "pattern": "^[A-Z][A-Z0-9_]{2,79}$"},
+    "schema_version": {"type": "string", "pattern": "^[A-Za-z0-9._-]{1,64}$"},
+    "aggregate_type": {"type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_]{1,79}$"},
+    "aggregate_id": {"type": "string", "minLength": 4, "maxLength": 160},
+    "expected_version": {"type": "integer", "minimum": 0},
+    "actor_id": {"type": "string", "minLength": 2, "maxLength": 160},
+    "actor_role": {"type": "string", "minLength": 2, "maxLength": 80},
+    "authority_ref": {"type": "string", "minLength": 2, "maxLength": 240},
+    "idempotency_key": {"type": "string", "minLength": 8, "maxLength": 240},
+    "correlation_id": {"type": "string", "minLength": 4, "maxLength": 160},
+    "causation_id": {"type": "string", "minLength": 4, "maxLength": 160},
+    "issued_at_utc": {"type": "string", "format": "date-time"},
+    "expires_at_utc": {"type": "string", "format": "date-time"},
+    "contract_version": {"type": "string", "minLength": 1, "maxLength": 64},
+    "policy_version": {"type": "string", "minLength": 1, "maxLength": 64},
+    "method_version": {"type": ["string", "null"], "maxLength": 128},
+    "model_version": {"type": ["string", "null"], "maxLength": 128},
+    "capacity_snapshot_id": {"type": ["string", "null"], "maxLength": 160},
+    "payload": {"type": "object"},
+    "payload_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "evidence_refs": {
+      "type": "array", "uniqueItems": true,
+      "items": {"type": "string", "minLength": 3, "maxLength": 512}
+    }
+  }
+}
+

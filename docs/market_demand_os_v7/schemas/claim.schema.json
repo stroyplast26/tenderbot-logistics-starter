@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://alumkomplekt-rf.ru/schemas/mdos/v7/claim.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "claim_id", "claim_type", "subject_ref", "value", "valid_from", "recorded_at", "source_event_id", "evidence_uri", "evidence_span", "payload_sha256", "producer", "producer_version", "confidence", "authoritative_class", "purpose", "status"],
+  "properties": {
+    "schema_version": {"const": "1.0.0"},
+    "claim_id": {"type": "string"},
+    "claim_type": {"type": "string"},
+    "subject_ref": {"type": "string"},
+    "value": {},
+    "valid_from": {"type": "string", "format": "date-time"},
+    "valid_to": {"type": ["string", "null"], "format": "date-time"},
+    "recorded_at": {"type": "string", "format": "date-time"},
+    "source_event_id": {"type": "string"},
+    "evidence_uri": {"type": "string"},
+    "evidence_span": {"type": "string", "minLength": 1},
+    "payload_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "producer": {"type": "string"},
+    "producer_version": {"type": "string"},
+    "model_prompt_digest": {"type": ["string", "null"]},
+    "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+    "uncertainty": {"type": ["number", "null"], "minimum": 0},
+    "authoritative_class": {"enum": ["RAW_OBSERVATION", "INFERRED_CLAIM", "HUMAN_ADJUDICATED", "SYSTEM_OF_RECORD_FACT"]},
+    "purpose": {"type": "string"},
+    "ttl_until": {"type": ["string", "null"], "format": "date-time"},
+    "contradicts": {"type": "array", "items": {"type": "string"}},
+    "status": {"enum": ["PROPOSED", "ACCEPTED", "CONFLICTED", "REVOKED", "EXPIRED"]}
+  }
+}

@@ -1,0 +1,336 @@
+{
+  "$schema": "https://alumkomplekt-rf.ru/schemas/mdos/v7/delivery/owner-ratification-access-preflight.schema.json",
+  "schema_version": "1.0.0",
+  "record_type": "OWNER_RATIFICATION_ACCESS_PREFLIGHT",
+  "status": "NOT_RATIFIED",
+  "authority_capability": "NONE",
+  "contract_binding": {
+    "contract_id": "AK-MDOS-V7",
+    "package_version": "7.1.0-rc.1",
+    "package_root_sha256": "d4da97bd47ed1bf76a52826a852e3a158611d18adf32a901b814a864e862d97e",
+    "manifest_sha256": "83b984df37ad8d8b1903cd07934de0d3ee9117b9c659538afb9b919dc0cccbf9",
+    "manifest_status": "RELEASE_CANDIDATE_FOR_OWNER_RATIFICATION",
+    "active_beachhead_profile": null,
+    "ratification": null,
+    "target_profile_id": "GDO10",
+    "target_profile_sha256": "cbed3559550133bcfcd783158583887bbde225ce3868f4d5b3030d8e2610beb0"
+  },
+  "payload": {
+    "preflight_id": "PENDING_OWNER_INPUT",
+    "revision": 1,
+    "issued_at": "1970-01-01T00:00:00Z",
+    "valid_until": "1970-01-01T00:00:01Z",
+    "beachhead": {
+      "profile_id": "PENDING_OWNER_INPUT",
+      "profile_version": 1,
+      "profile_state": "PENDING_OWNER_INPUT",
+      "product_scope_ids": ["PENDING_OWNER_INPUT"],
+      "region_code": "PENDING_OWNER_INPUT",
+      "fulfilment_model_id": "PENDING_OWNER_INPUT",
+      "icp_profile": {
+        "artifact_id": "PENDING_OWNER_INPUT",
+        "version": "PENDING_OWNER_INPUT",
+        "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "exclusions_profile": {
+        "artifact_id": "PENDING_OWNER_INPUT",
+        "version": "PENDING_OWNER_INPUT",
+        "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "allowed_motions": [
+        "EXISTING_ACCOUNT_EXPANSION",
+        "DEALER_AND_INSTALLER_ACTIVATION",
+        "HIGH_INTENT_INBOUND"
+      ],
+      "allowed_channels": ["FIXTURE_SHADOW"],
+      "stop_conditions": ["PENDING_OWNER_INPUT"],
+      "profile_payload_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "content_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "offer": {
+      "offer_id": "PENDING_OWNER_INPUT",
+      "offer_version": "PENDING_OWNER_INPUT",
+      "promise_registry": {
+        "artifact_id": "PENDING_OWNER_INPUT",
+        "version": "PENDING_OWNER_INPUT",
+        "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "pricing_model": {
+        "artifact_id": "PENDING_OWNER_INPUT",
+        "version": "PENDING_OWNER_INPUT",
+        "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "price_list": {
+        "artifact_id": "PENDING_OWNER_INPUT",
+        "version": "PENDING_OWNER_INPUT",
+        "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "public_claims": {
+        "artifact_id": "PENDING_OWNER_INPUT",
+        "version": "PENDING_OWNER_INPUT",
+        "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "currency": "RUB",
+      "minimum_contribution_margin_bps": 0,
+      "valid_from": "1970-01-01T00:00:00Z",
+      "valid_until": "1970-01-01T00:00:01Z",
+      "content_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "capacity": {
+      "snapshot_id": "PENDING_OWNER_INPUT",
+      "snapshot_version": "PENDING_OWNER_INPUT",
+      "capacity_unit_id": "PENDING_OWNER_INPUT",
+      "max_wip": 1,
+      "estimator_daily_capacity": 1,
+      "production_daily_capacity": 1,
+      "fulfilment_daily_capacity": 1,
+      "p90_quote_sla_hours": 1,
+      "p90_fulfilment_sla_days": 1,
+      "observed_at": "1970-01-01T00:00:00Z",
+      "valid_until": "1970-01-01T00:00:01Z",
+      "evidence": {
+        "artifact_id": "PENDING_OWNER_INPUT",
+        "version": "PENDING_OWNER_INPUT",
+        "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "owner_role": "OperationsOwner",
+      "content_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "legal_boundary": {
+      "decision_state": "PENDING_OWNER_DECISION",
+      "jurisdiction_codes": ["PENDING"],
+      "legal_policy": {
+        "artifact_id": "PENDING_OWNER_INPUT",
+        "version": "PENDING_OWNER_INPUT",
+        "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "consent_policy": {
+        "artifact_id": "PENDING_OWNER_INPUT",
+        "version": "PENDING_OWNER_INPUT",
+        "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "suppression_policy": {
+        "artifact_id": "PENDING_OWNER_INPUT",
+        "version": "PENDING_OWNER_INPUT",
+        "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "retention_policy": {
+        "artifact_id": "PENDING_OWNER_INPUT",
+        "version": "PENDING_OWNER_INPUT",
+        "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "transfer_policy": {
+        "artifact_id": "PENDING_OWNER_INPUT",
+        "version": "PENDING_OWNER_INPUT",
+        "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "allowed_purpose_ids": ["PENDING_OWNER_INPUT"],
+      "allowed_data_classes": ["NON_PII_ATTRIBUTION"],
+      "allowed_action_classes": ["FIXTURE_SHADOW_PROCESSING"],
+      "unknown_basis_disposition": "DENY",
+      "effective_from": "1970-01-01T00:00:00Z",
+      "review_due_at": "1970-01-01T00:00:01Z",
+      "content_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "website_form_boundary": {
+      "form_id": "PENDING_OWNER_INPUT",
+      "form_version": "PENDING_OWNER_INPUT",
+      "form_schema": {
+        "artifact_id": "PENDING_OWNER_INPUT",
+        "version": "PENDING_OWNER_INPUT",
+        "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "site_origin_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "lawful_basis_state": "PENDING_OWNER_DECISION",
+      "lawful_basis_document": {
+        "artifact_id": "PENDING_OWNER_INPUT",
+        "version": "PENDING_OWNER_INPUT",
+        "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "privacy_notice": {
+        "artifact_id": "PENDING_OWNER_INPUT",
+        "version": "PENDING_OWNER_INPUT",
+        "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "consent_capture_state": "PENDING_OWNER_DECISION",
+      "private_raw_store_only": true,
+      "analytics_contains_pii": false,
+      "evidence_reports_contain_pii": false,
+      "metrika_identifiers_rule": "LAWFULLY_SUPPLIED_ONLY",
+      "attribution_contract": {
+        "artifact_id": "PENDING_OWNER_INPUT",
+        "version": "PENDING_OWNER_INPUT",
+        "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "decided_at": "1970-01-01T00:00:00Z",
+      "valid_until": "1970-01-01T00:00:01Z",
+      "content_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "payment_truth_format": {
+      "format_state": "PENDING_OWNER_INPUT",
+      "source_type": "PENDING_OWNER_INPUT",
+      "provider_fingerprint_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "format_contract": {
+        "artifact_id": "PENDING_OWNER_INPUT",
+        "version": "PENDING_OWNER_INPUT",
+        "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "verification_method": "PENDING_OWNER_INPUT",
+      "required_field_ids": [
+        "PROVIDER_EVENT_ID",
+        "PAYER_REF",
+        "RECIPIENT_REF",
+        "AMOUNT_MINOR",
+        "CURRENCY",
+        "VALUE_DATE",
+        "STATUS",
+        "SOURCE_ARTIFACT_SHA256"
+      ],
+      "deduplication_key_field_ids": [
+        "PROVIDER_FINGERPRINT_SHA256",
+        "PROVIDER_EVENT_ID"
+      ],
+      "accepted_currency_codes": ["RUB"],
+      "raw_artifact_class": "PRIVATE_PAYMENT_EVIDENCE",
+      "one_c_dependency": "NONE",
+      "verified_at": "1970-01-01T00:00:00Z",
+      "valid_until": "1970-01-01T00:00:01Z",
+      "content_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "bitrix_projection": {
+      "mapping_state": "PENDING_OWNER_INPUT",
+      "tenant_fingerprint_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "mapping_version": "PENDING_OWNER_INPUT",
+      "field_mappings": [
+        {
+          "semantic_field": "OPAQUE_CORRELATION_ID",
+          "bitrix_entity": "LEAD",
+          "bitrix_field_code": "UF_CRM_PENDING_01",
+          "data_class": "NON_PII",
+          "write_role": "PROJECTION_ONLY"
+        },
+        {
+          "semantic_field": "DEMAND_UNIT_ID",
+          "bitrix_entity": "LEAD",
+          "bitrix_field_code": "UF_CRM_PENDING_02",
+          "data_class": "NON_PII",
+          "write_role": "PROJECTION_ONLY"
+        },
+        {
+          "semantic_field": "PERMIT_DECISION_ID",
+          "bitrix_entity": "LEAD",
+          "bitrix_field_code": "UF_CRM_PENDING_03",
+          "data_class": "NON_PII",
+          "write_role": "PROJECTION_ONLY"
+        },
+        {
+          "semantic_field": "ORIGIN_CHANNEL",
+          "bitrix_entity": "LEAD",
+          "bitrix_field_code": "UF_CRM_PENDING_04",
+          "data_class": "NON_PII",
+          "write_role": "PROJECTION_ONLY"
+        },
+        {
+          "semantic_field": "LANDING_PATH",
+          "bitrix_entity": "LEAD",
+          "bitrix_field_code": "UF_CRM_PENDING_05",
+          "data_class": "NON_PII",
+          "write_role": "PROJECTION_ONLY"
+        },
+        {
+          "semantic_field": "PRIOR_PATH",
+          "bitrix_entity": "LEAD",
+          "bitrix_field_code": "UF_CRM_PENDING_06",
+          "data_class": "NON_PII",
+          "write_role": "PROJECTION_ONLY"
+        },
+        {
+          "semantic_field": "REFERRER_CLASSIFICATION",
+          "bitrix_entity": "LEAD",
+          "bitrix_field_code": "UF_CRM_PENDING_07",
+          "data_class": "NON_PII",
+          "write_role": "PROJECTION_ONLY"
+        },
+        {
+          "semantic_field": "ATTRIBUTION_STATUS",
+          "bitrix_entity": "LEAD",
+          "bitrix_field_code": "UF_CRM_PENDING_08",
+          "data_class": "NON_PII",
+          "write_role": "PROJECTION_ONLY"
+        }
+      ],
+      "requested_api_scope_ids": ["PENDING_OWNER_INPUT"],
+      "access_declaration_state": "PENDING_OWNER_INPUT",
+      "secret_material_absent": true,
+      "live_probe_performed": false,
+      "source_of_truth_role": "PROJECTION_ONLY",
+      "live_writes_enabled": false,
+      "verified_at": "1970-01-01T00:00:00Z",
+      "valid_until": "1970-01-01T00:00:01Z",
+      "mapping_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "content_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "manual_egress_control": {
+      "attestation_state": "PENDING_OWNER_ATTESTATION",
+      "control_id": "PENDING_OWNER_INPUT",
+      "control_version": "PENDING_OWNER_INPUT",
+      "protected_scope": "TENDERBOT_MDOS_V7",
+      "control_types": ["APPLICATION_NETWORK_GUARD"],
+      "default_deny_enforced": false,
+      "unknown_writer_denied": false,
+      "allowlist_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "test_evidence": {
+        "artifact_id": "PENDING_OWNER_INPUT",
+        "version": "PENDING_OWNER_INPUT",
+        "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "tested_at": "1970-01-01T00:00:00Z",
+      "valid_until": "1970-01-01T00:00:01Z",
+      "content_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "separation_of_duties": {
+      "role_key_bindings": [
+        {
+          "role": "BusinessOwner",
+          "public_key_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+          "key_origin": "OWNER_SUPPLIED_OUT_OF_BAND"
+        },
+        {
+          "role": "ContractAuthority",
+          "public_key_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+          "key_origin": "OWNER_SUPPLIED_OUT_OF_BAND"
+        },
+        {
+          "role": "PrivacyLegalOwner",
+          "public_key_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+          "key_origin": "OWNER_SUPPLIED_OUT_OF_BAND"
+        },
+        {
+          "role": "IndependentEvidenceVerifier",
+          "public_key_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+          "key_origin": "OWNER_SUPPLIED_OUT_OF_BAND"
+        }
+      ],
+      "implementation_author_key_fingerprints": [
+        "0000000000000000000000000000000000000000000000000000000000000000"
+      ],
+      "all_approver_keys_must_be_distinct": true,
+      "independent_verifier_must_not_be_implementation_author": true,
+      "ai_signer_allowed": false,
+      "content_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "authority_effect": {
+      "external_reads_enabled": false,
+      "external_writers_enabled": false,
+      "contact_enabled": false,
+      "spend_enabled": false,
+      "live_bitrix_writes_enabled": false,
+      "pc10_enabled": false,
+      "mutates_manifest": false,
+      "mutates_freeze": false,
+      "authorizes_live": false
+    }
+  },
+  "payload_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "attestations": []
+}

@@ -1,0 +1,804 @@
+{
+  "schema_version": "1.1.0",
+  "overlay_id": "AK-MDOS-V7-IMPLEMENTATION-TRACE-2026-08-25",
+  "updated_at_utc": "2026-08-26T13:56:29Z",
+  "package_binding": {
+    "contract_id": "AK-MDOS-V7",
+    "package_version": "7.1.0-rc.1",
+    "package_root_sha256": "d4da97bd47ed1bf76a52826a852e3a158611d18adf32a901b814a864e862d97e"
+  },
+  "authority": {
+    "normative": false,
+    "modifies_normative_registries": false,
+    "may_promote_normative_status": false,
+    "status_ceiling": "IMPLEMENTED_NOT_INDEPENDENTLY_VERIFIED",
+    "independent_verification_present": false,
+    "production_release_eligible": false,
+    "all_36_normative_p0_claimed_complete": false
+  },
+  "verification_observation": {
+    "command": "python -m pytest -q -p no:cacheprovider tests/test_mdos_v7_bitrix_crm_claims.py tests/test_mdos_v7_owner_intent.py tests/test_mdos_v7_ratification_preflight.py tests/test_mdos_v7_owner_preflight_runner.py tests/test_mdos_v7_verification_handoff.py tests/test_mdos_v7_manual_egress_runner.py",
+    "result": "110 passed in 53.70s",
+    "ruff_relevant_result": "clean across lead_factory/mdos_v7, tests, MDOS evidence runners and all 49 inventoried Python egress boundary modules",
+    "safe_full_suite": {
+      "command": "python -m pytest -q -p no:cacheprovider",
+      "result": "1240 passed, 594 subtests passed, 4 collection warnings in 552.65s",
+      "configuration_ref": "CODE:pytest.ini",
+      "configuration_sha256": "b319efda24f799b92a6b1f8abef70d7a09b92a497b959572c1c454515ff140ae"
+    },
+    "invalid_preconfiguration_discovery": {
+      "classification": "NOT_ACCEPTANCE_EVIDENCE",
+      "result": "COLLECTION_FAILED",
+      "collection_errors": 56,
+      "external_read_attempts_observed": true,
+      "successful_external_reads_observed": 0,
+      "cause": [
+        "Legacy _diagnostics imports attempted EIS reads and failed with TLS certificate errors.",
+        "Vendored tests under outputs were collected without optional test dependencies."
+      ]
+    },
+    "evidence_catalog": [
+      {
+        "ref": "EVIDENCE:reports/market_demand_os_v7/g0-suppression-evidence.json",
+        "sha256": "76bef7507d53a4977b2642002b38f6af9bbb20bf3c17ed30b96338714e018b6b",
+        "classification": "SYNTHETIC_SHADOW_NON_CANONICAL_NON_KPI",
+        "observed": {
+          "ledger_record_count": 5,
+          "immutable_delivery_receipt_count": 23,
+          "contact_decision_effect_count": 2,
+          "external_effect_count": 0,
+          "transport_call_count": 0,
+          "exact_backup_restore": true
+        }
+      },
+      {
+        "ref": "EVIDENCE:reports/market_demand_os_v7/g1-shadow-evidence.json",
+        "sha256": "0f2cfe49202f21df782a68c3c891607282494e37e9bc79128946177e6ce3565f",
+        "classification": "SYNTHETIC_FIXTURE_NON_CANONICAL_NON_KPI",
+        "observed": {
+          "ledger_record_count": 30,
+          "immutable_delivery_receipt_count": 111,
+          "unique_replay_attempts_executed_in_final_runner": 3,
+          "bitrix_shadow_projection_count": 1,
+          "crm_contract_milestone_claim_count": 1,
+          "crm_contract_milestone_delivery_attempt_count": 3,
+          "crm_claim_read_model_status": "CONTRACT_SIGNED_AWAITING_PAYMENT",
+          "effective_application_status": "FULFILLED",
+          "commercial_truth_unchanged": true,
+          "external_effect_count": 0,
+          "exact_backup_restore": true
+        }
+      },
+      {
+        "ref": "EVIDENCE:reports/market_demand_os_v7/g1-split-payment-shadow-evidence.json",
+        "sha256": "610df6f5c9e0883624353750104d356faf787e5aa3f72ca890a357025a117172",
+        "classification": "SYNTHETIC_SHADOW_NON_CANONICAL_NON_KPI",
+        "observed": {
+          "ledger_record_count": 43,
+          "immutable_delivery_receipt_count": 163,
+          "two_distinct_installments": true,
+          "one_terminal_payment_truth": true,
+          "exact_replay_stable": true,
+          "external_effect_count": 0,
+          "exact_backup_restore": true
+        }
+      },
+      {
+        "ref": "EVIDENCE:reports/market_demand_os_v7/g2-outbox-evidence.json",
+        "sha256": "a1e3560215d4f7e418ea6a8a24f92d3fd125d63f705e49268c0037b45f7fef49",
+        "classification": "SYNTHETIC_SHADOW_NON_CANONICAL_NON_KPI",
+        "observed": {
+          "outcome": "SHADOW_COMMITTED",
+          "command_count": 1,
+          "claim_count": 1,
+          "attempt_count": 1,
+          "terminal_receipt_count": 1,
+          "unique_delivery_attempts_executed": 3,
+          "projection_effect_count": 1,
+          "external_effect_count": 0,
+          "live_bitrix_write_count": 0,
+          "transport_call_count": 0,
+          "exact_backup_restore": true
+        }
+      },
+      {
+        "ref": "EVIDENCE:reports/market_demand_os_v7/g2-inbound-attribution-shadow-evidence.json",
+        "sha256": "6b0c5c94d1e8aa7dff7208c1f10c53701d0e108716049c06dc4c9a9559ffd3b9",
+        "classification": "SYNTHETIC_SHADOW_NON_CANONICAL_NON_KPI",
+        "observed": {
+          "reconciliation_status": "RECONCILED_ATTRIBUTED",
+          "private_payload_separated": true,
+          "raw_private_values_included": false,
+          "external_effect_count": 0
+        }
+      },
+      {
+        "ref": "EVIDENCE:reports/market_demand_os_v7/g2-motion-preflight-evidence.json",
+        "sha256": "7fd0675ade007c763a54bb15ac15d34207bddc707780280601a50e0e6ab920bb",
+        "classification": "SYNTHETIC_FIXTURE_NON_CANONICAL_NON_KPI",
+        "observed": {
+          "evaluated_motion_count": 2,
+          "ready_proposal_effect_denied_count": 2,
+          "created_commercial_truth_count": 0,
+          "external_effect_count": 0
+        }
+      },
+      {
+        "ref": "EVIDENCE:reports/market_demand_os_v7/g2-owner-preflight-evidence.json",
+        "sha256": "76b7c622da7ee3caa2a6cf100f52378ede94d77a29453d08ff9689863c4faf9f",
+        "classification": "LOCAL_UNSIGNED_PREFLIGHT_NON_AUTHORITY",
+        "observed": {
+          "state": "NOT_RATIFIED",
+          "ready_for_independent_review": false,
+          "verified_role_count": 0,
+          "artifact_bytes_verified": false,
+          "artifact_resolution_present": false,
+          "owner_intent_state": "CAPTURED_NOT_RATIFIED",
+          "preferred_future_payment_source": "BANK_API",
+          "bitrix_exact_stage_code": "UNKNOWN",
+          "bitrix_payment_truth_effect": "NONE",
+          "activation_allowed": false,
+          "authority_mutation_allowed": false
+        }
+      },
+      {
+        "ref": "EVIDENCE:reports/market_demand_os_v7/g2-manual-egress-evidence.json",
+        "sha256": "5bee2b36e88e78ab736bedf6532c59dae8f57ef1f0486e19356bbe3b64b79716",
+        "classification": "LOCAL_CODE_EGRESS_INVENTORY_NON_AUTHORITY",
+        "observed": {
+          "inventoried_python_boundary_module_count": 49,
+          "manual_registry_operation_count": 40,
+          "unknown_signature_module_count": 0,
+          "external_transport_attempt_count": 0,
+          "external_effect_count": 0
+        }
+      },
+      {
+        "ref": "EVIDENCE:reports/market_demand_os_v7/test-summary.json",
+        "sha256": "93c2bccdabfdaa177e9cc658525ad281ad7ac3bf0317c5cd3cc999bd125527a7",
+        "classification": "LOCAL_TEST_EVIDENCE_NOT_INDEPENDENTLY_VERIFIED"
+      }
+    ],
+    "independent_verification": false
+  },
+  "owner_overlay_requirements": [
+    {
+      "id": "DLV-REQ-INBOUND-ATTR-001",
+      "priority": "P0_OWNER_OVERLAY",
+      "normative": false,
+      "text": "High-intent website inbound attribution must capture privacy-minimised deterministic source data, isolate PII/request text and raw lawfully supplied Metrika identifiers, expose only presence flags, retain opaque form-to-Bitrix correlation and remain shadow-only with zero external effects.",
+      "design_bindings": ["DESIGN:docs/market_demand_os_v7_delivery/g2-motion-profiles.json#/profiles/2/inbound_attribution_contract"],
+      "code_bindings": [
+        "CODE:lead_factory/mdos_v7/inbound_attribution.py#WebsiteInboundAttributionContract",
+        "CODE:lead_factory/mdos_v7/inbound_attribution.py#reconcile_attribution",
+        "CODE:lead_factory/mdos_v7/inbound_attribution.py#assert_pii_free"
+      ],
+      "test_bindings": ["TEST:tests/test_mdos_v7_inbound_attribution.py"],
+      "local_test_observation": "6 passed; Ruff clean; implementation-team observation only.",
+      "evidence_refs": ["EVIDENCE:reports/market_demand_os_v7/g2-inbound-attribution-shadow-evidence.json"],
+      "evidence_sha256": "6b0c5c94d1e8aa7dff7208c1f10c53701d0e108716049c06dc4c9a9559ffd3b9",
+      "status": "IMPLEMENTED_NOT_INDEPENDENTLY_VERIFIED"
+    },
+    {
+      "id": "DLV-REQ-OWNER-INTENT-001",
+      "priority": "P0_OWNER_OVERLAY",
+      "normative": false,
+      "text": "Owner strategic intent, proposed first shadow cell, bounded review-queue limits, future payment source and opaque human role assignments must be captured as a sealed non-authority artifact without activating a beachhead or retaining raw chat, PII or credentials.",
+      "design_bindings": [
+        "DESIGN:lead_factory/mdos_v7/local_schemas/owner-intent-draft.schema.json",
+        "DESIGN:docs/market_demand_os_v7_delivery/g2-motion-profiles.json#/profiles/0"
+      ],
+      "code_bindings": [
+        "CODE:lead_factory/mdos_v7/owner_intent.py#load_captured_owner_intent_draft",
+        "CODE:lead_factory/mdos_v7/owner_intent.py#require_captured_owner_intent",
+        "CODE:scripts/run_mdos_v7_owner_preflight.py#build_report"
+      ],
+      "test_bindings": [
+        "TEST:tests/test_mdos_v7_owner_intent.py",
+        "TEST:tests/test_mdos_v7_owner_preflight_runner.py"
+      ],
+      "local_test_observation": "Owner intent, package/profile bindings, privacy, duplicate-key, path and authority invariants are locally tested; no independent verifier.",
+      "evidence_refs": ["EVIDENCE:reports/market_demand_os_v7/g2-owner-preflight-evidence.json#/owner_intent_capture"],
+      "evidence_sha256": "76b7c622da7ee3caa2a6cf100f52378ede94d77a29453d08ff9689863c4faf9f",
+      "status": "IMPLEMENTED_NOT_INDEPENDENTLY_VERIFIED"
+    },
+    {
+      "id": "DLV-REQ-BITRIX-CONTRACT-MILESTONE-001",
+      "priority": "P0_OWNER_OVERLAY",
+      "normative": false,
+      "text": "A shadow Bitrix CONTRACT_SIGNED event may create only a non-KPI CRM projection claim and an awaiting-payment application status; exact local payment, order and fulfilment truth must outrank it and no CRM stage may create PaymentProof or a paid outcome.",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/CONTRACT.md#L91",
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DECISION-OUTCOMES.md#L40",
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-REFERENCE-ARCHITECTURE.md#L148"
+      ],
+      "code_bindings": [
+        "CODE:lead_factory/mdos_v7/bitrix_crm_claims.py#ShadowBitrixCrmClaimIntake",
+        "CODE:lead_factory/mdos_v7/store.py#MdosStore.commit_crm_outcome_claim",
+        "CODE:scripts/run_mdos_v7_g1_shadow.py"
+      ],
+      "test_bindings": [
+        "TEST:tests/test_mdos_v7_bitrix_crm_claims.py",
+        "TEST:tests/test_mdos_v7_verification_handoff.py#test_crm_contract_milestone_proof_preserves_payment_source_hierarchy"
+      ],
+      "local_test_observation": "20 CRM milestone tests pass; the broader targeted MDOS set is 159 passed; implementation-team observation only.",
+      "evidence_refs": ["EVIDENCE:reports/market_demand_os_v7/g1-shadow-evidence.json#/crm_contract_milestone_proof"],
+      "evidence_sha256": "0f2cfe49202f21df782a68c3c891607282494e37e9bc79128946177e6ce3565f",
+      "status": "IMPLEMENTED_NOT_INDEPENDENTLY_VERIFIED"
+    }
+  ],
+  "trace_sets": [
+    {
+      "trace_id": "TRACE-PACKAGE-AUTHORITY",
+      "requirement_refs": ["MDOS-GOV-001", "MDOS-GOV-003", "MDOS-TRC-003", "MDOS-TRC-004", "MDOS-REL-002"],
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/CONTRACT.md#L186",
+        "DESIGN:docs/market_demand_os_v7/CONTRACT.md#L194",
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DELIVERY-ASSURANCE.md#L36",
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DELIVERY-ASSURANCE.md#L39",
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DELIVERY-ASSURANCE.md#L151"
+      ],
+      "code_bindings": [
+        "CODE:lead_factory/mdos_v7/contracts.py#ContractRegistry.verify_package",
+        "CODE:lead_factory/mdos_v7/contracts.py#ContractRegistry.validate",
+        "CODE:lead_factory/mdos_v7/authority.py#authority_snapshot",
+        "CODE:lead_factory/mdos_v7/authority.py#assert_external_allowed"
+      ],
+      "test_bindings": [
+        "TEST:tests/test_market_demand_os_v7.py",
+        "TEST:tests/test_mdos_v7_contracts.py",
+        "TEST:tests/test_mdos_v7_legacy_freeze.py"
+      ],
+      "evidence_refs": ["EVIDENCE:reports/market_demand_os_v7/g1-shadow-evidence.json"],
+      "status": "IMPLEMENTED_NOT_INDEPENDENTLY_VERIFIED",
+      "open_gaps": ["GAP-INDEPENDENT-VERIFICATION-001"]
+    },
+    {
+      "trace_id": "TRACE-STORE-POLICY-REPLAY-CONFLICT",
+      "requirement_refs": ["MDOS-ASR-001", "MDOS-ASR-002", "MDOS-AUT-004", "MDOS-EVT-001", "MDOS-EVT-002", "MDOS-TRU-002"],
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DELIVERY-ASSURANCE.md#L8",
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DELIVERY-ASSURANCE.md#L13",
+        "DESIGN:docs/market_demand_os_v7/CONTRACT.md#L147",
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-REFERENCE-ARCHITECTURE.md#L60",
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-REFERENCE-ARCHITECTURE.md#L64",
+        "DESIGN:docs/market_demand_os_v7/CONTRACT.md#L83"
+      ],
+      "code_bindings": [
+        "CODE:lead_factory/mdos_v7/migrations/001_g0_g1.sql",
+        "CODE:lead_factory/mdos_v7/store.py#RECORD_WRITE_ROLES",
+        "CODE:lead_factory/mdos_v7/store.py#RECORD_SCHEMAS",
+        "CODE:lead_factory/mdos_v7/store.py#MdosStore._validate_domain_dependencies_tx",
+        "CODE:lead_factory/mdos_v7/store.py#MdosStore._append_domain_record",
+        "CODE:lead_factory/mdos_v7/store.py#MdosStore.record_conflict",
+        "CODE:lead_factory/mdos_v7/store.py#MdosStore.verify_integrity"
+      ],
+      "test_bindings": [
+        "TEST:tests/test_mdos_v7_store.py",
+        "TEST:tests/test_mdos_v7_g1.py#test_direct_ai_or_generic_writer_cannot_bypass_gold_store_policy",
+        "TEST:tests/test_mdos_v7_adversarial.py#test_direct_bypasses_and_fabricated_audit_rows_fail_integrity",
+        "TEST:tests/test_mdos_v7_adversarial.py#test_unresolved_conflict_blocks_until_independent_human_resolution"
+      ],
+      "evidence_refs": ["EVIDENCE:reports/market_demand_os_v7/g1-shadow-evidence.json"],
+      "status": "IMPLEMENTED_NOT_INDEPENDENTLY_VERIFIED",
+      "open_gaps": ["GAP-INDEPENDENT-VERIFICATION-001"]
+    },
+    {
+      "trace_id": "TRACE-RAW-CLAIM-IDENTITY-DEMAND",
+      "requirement_refs": ["MDOS-EVT-003", "MDOS-KG-001", "MDOS-KG-002", "MDOS-ER-001"],
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-REFERENCE-ARCHITECTURE.md#L67",
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-REFERENCE-ARCHITECTURE.md#L75",
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-REFERENCE-ARCHITECTURE.md#L79",
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DEMAND-INTELLIGENCE.md#L39"
+      ],
+      "code_bindings": [
+        "CODE:lead_factory/mdos_v7/pipeline.py#G1Pipeline.capture_signal",
+        "CODE:lead_factory/mdos_v7/pipeline.py#G1Pipeline.propose_claim",
+        "CODE:lead_factory/mdos_v7/pipeline.py#G1Pipeline.accept_claim",
+        "CODE:lead_factory/mdos_v7/pipeline.py#G1Pipeline.record_identity_decision",
+        "CODE:lead_factory/mdos_v7/pipeline.py#G1Pipeline.record_demand_unit"
+      ],
+      "test_bindings": ["TEST:tests/test_mdos_v7_g1.py#test_complete_g1_slice_is_schema_valid_non_kpi_and_replay_safe"],
+      "evidence_refs": ["EVIDENCE:reports/market_demand_os_v7/g1-shadow-evidence.json#/execution/entry_refs"],
+      "status": "IMPLEMENTED_NOT_INDEPENDENTLY_VERIFIED",
+      "open_gaps": ["GAP-INDEPENDENT-VERIFICATION-001"]
+    },
+    {
+      "trace_id": "TRACE-HUMAN-GOLD-EXACT-PERMIT-BITRIX",
+      "requirement_refs": ["MDOS-AUT-001", "MDOS-AUT-002", "MDOS-AUT-004", "MDOS-AUT-005", "MDOS-GOLD-003", "MDOS-GOLD-004", "MDOS-STO-002"],
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/CONTRACT.md#L136",
+        "DESIGN:docs/market_demand_os_v7/CONTRACT.md#L139",
+        "DESIGN:docs/market_demand_os_v7/CONTRACT.md#L147",
+        "DESIGN:docs/market_demand_os_v7/CONTRACT.md#L150",
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-COMMERCIAL-MODEL.md#L53",
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-COMMERCIAL-MODEL.md#L57",
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-REFERENCE-ARCHITECTURE.md#L141"
+      ],
+      "code_bindings": [
+        "CODE:lead_factory/mdos_v7/pipeline.py#G1Pipeline.record_human_gold_review",
+        "CODE:lead_factory/mdos_v7/pipeline.py#G1Pipeline.commit_gold_acceptance",
+        "CODE:lead_factory/mdos_v7/policy.py#PermitService.trusted_shadow_scope",
+        "CODE:lead_factory/mdos_v7/policy.py#PermitService.assert_exact",
+        "CODE:lead_factory/mdos_v7/bitrix_projection.py#ShadowBitrixProjectionAdapter.project",
+        "CODE:lead_factory/mdos_v7/projection_outbox.py#ProjectionOutbox",
+        "CODE:lead_factory/mdos_v7/store.py#MdosStore.write_bitrix_shadow_projection",
+        "CODE:lead_factory/mdos_v7/store.py#MdosStore.complete_bitrix_shadow_outbox"
+      ],
+      "test_bindings": [
+        "TEST:tests/test_mdos_v7_g1.py#test_complete_g1_slice_is_schema_valid_non_kpi_and_replay_safe",
+        "TEST:tests/test_mdos_v7_g1.py#test_expired_mismatched_and_denied_permits_call_no_bitrix_transport",
+        "TEST:tests/test_mdos_v7_adversarial.py#test_unknown_source_and_wrong_scope_permit_are_fail_closed",
+        "TEST:tests/test_mdos_v7_adversarial.py#test_projection_conflict_is_auditable_and_backup_tamper_is_rejected",
+        "TEST:tests/test_mdos_v7_projection_outbox.py"
+      ],
+      "evidence_refs": [
+        "EVIDENCE:reports/market_demand_os_v7/g1-shadow-evidence.json",
+        "EVIDENCE:reports/market_demand_os_v7/g2-outbox-evidence.json"
+      ],
+      "status": "IMPLEMENTED_NOT_INDEPENDENTLY_VERIFIED",
+      "locally_closed_gaps": ["GAP-OUTBOX-001"],
+      "open_gaps": ["GAP-INDEPENDENT-VERIFICATION-001"],
+      "open_live_gaps": ["GAP-LIVE-INTEGRATION-001", "GAP-RATIFICATION-001"],
+      "scope_limit": "Exact local shadow projection and durable outbox/readback are covered; external transport/readback, credentials and live authority are not."
+    },
+    {
+      "trace_id": "TRACE-COMMERCIAL-TRUTH-ATOMIC-ARBITRATION",
+      "requirement_refs": ["MDOS-TRU-001", "MDOS-TRU-002", "MDOS-TRU-004", "MDOS-STO-004", "MDOS-STO-005", "MDOS-OUTC-003", "MDOS-COM-001", "MDOS-COM-002", "MDOS-COM-003", "MDOS-COM-004"],
+      "acceptance_refs": ["AT-COM-06", "AT-ARC-06", "AT-ARC-11", "AT-ARC-13", "AT-DEC-03", "AT-DEC-11"],
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/CONTRACT.md#L68",
+        "DESIGN:docs/market_demand_os_v7/CONTRACT.md#L83",
+        "DESIGN:docs/market_demand_os_v7/CONTRACT.md#L91",
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-REFERENCE-ARCHITECTURE.md#L148",
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-REFERENCE-ARCHITECTURE.md#L152",
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DECISION-OUTCOMES.md#L40",
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-COMMERCIAL-MODEL.md#L237"
+      ],
+      "code_bindings": [
+        "CODE:lead_factory/mdos_v7/store.py#MdosStore._append_domain_batch",
+        "CODE:lead_factory/mdos_v7/pipeline.py#G1Pipeline.ingest_payment_observation",
+        "CODE:lead_factory/mdos_v7/pipeline.py#G1Pipeline.ingest_fulfilment_document",
+        "CODE:lead_factory/mdos_v7/pipeline.py#G1Pipeline.record_payment_and_outcome",
+        "CODE:lead_factory/mdos_v7/pipeline.py#G1Pipeline.record_fulfilment_and_outcome",
+        "CODE:lead_factory/mdos_v7/pipeline.py#G1Pipeline.record_conflict_resolution",
+        "CODE:lead_factory/mdos_v7/pipeline.py#G1Pipeline.reconcile",
+        "CODE:lead_factory/mdos_v7/bitrix_crm_claims.py#ShadowBitrixCrmClaimIntake",
+        "CODE:lead_factory/mdos_v7/store.py#MdosStore.commit_crm_outcome_claim",
+        "CODE:lead_factory/mdos_v7/split_payment_fixture.py#run_split_payment_fixture_slice",
+        "CODE:scripts/run_mdos_v7_split_payment_shadow.py",
+        "CODE:scripts/run_mdos_v7_g1_shadow.py"
+      ],
+      "test_bindings": ["TEST:tests/test_mdos_v7_g1.py", "TEST:tests/test_mdos_v7_adversarial.py", "TEST:tests/test_mdos_v7_split_payments.py", "TEST:tests/test_mdos_v7_bitrix_crm_claims.py"],
+      "evidence_refs": [
+        "EVIDENCE:reports/market_demand_os_v7/g1-shadow-evidence.json",
+        "EVIDENCE:reports/market_demand_os_v7/g1-split-payment-shadow-evidence.json"
+      ],
+      "split_payment_observation": {
+        "two_distinct_installments": true,
+        "one_terminal_payment_truth": true,
+        "ledger_record_count": 43,
+        "immutable_delivery_receipt_count": 163,
+        "exact_replay_stable": true,
+        "exact_backup_restore": true,
+        "external_effect_count": 0
+      },
+      "crm_contract_milestone_observation": {
+        "canonical_claim_count": 1,
+        "immutable_delivery_attempt_count": 3,
+        "claim_read_model_status": "CONTRACT_SIGNED_AWAITING_PAYMENT",
+        "effective_application_status": "FULFILLED",
+        "sealed_fixture_mapping_only": true,
+        "real_mapping_state": "UNKNOWN_BLOCKED",
+        "commercial_truth_unchanged": true,
+        "payment_proof_count_before": 1,
+        "payment_proof_count_after": 1,
+        "external_effect_count": 0
+      },
+      "status": "IMPLEMENTED_NOT_INDEPENDENTLY_VERIFIED",
+      "open_gaps": ["GAP-INDEPENDENT-VERIFICATION-001"],
+      "explicit_nonclaim": "The synthetic split-payment and Bitrix contract-milestone slices contribute local behavior only. AT-COM-06 remains NOT_CLAIMED, the normative acceptance registry remains SPECIFIED_NOT_IMPLEMENTED, the real Bitrix stage map is UNKNOWN and no normative status is promoted."
+    },
+    {
+      "trace_id": "TRACE-CONSENT-SUPPRESSION",
+      "requirement_refs": ["MDOS-TRU-001", "MDOS-TRU-002", "MDOS-AUT-002", "MDOS-AUT-003", "MDOS-AUT-004", "MDOS-AUT-005", "MDOS-ASR-001", "MDOS-ASR-002", "MDOS-ASR-004", "MDOS-LGL-001", "MDOS-LGL-003", "MDOS-STO-001", "MDOS-OPS-002", "MDOS-REL-001", "MDOS-REL-002", "MDOS-PRG-001"],
+      "acceptance_refs": ["AT-ASR-03", "AT-ASR-04", "AT-ARC-01", "AT-ARC-09", "AT-SRC7-04", "AT-SRC7-07"],
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/CONTRACT.md",
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DELIVERY-ASSURANCE.md",
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-SOURCE-PORTFOLIO.md"
+      ],
+      "code_bindings": [
+        "CODE:lead_factory/mdos_v7/consent_suppression.py#ConsentSuppressionService",
+        "CODE:lead_factory/mdos_v7/internal_contracts.py#InternalContractRegistry",
+        "CODE:lead_factory/mdos_v7/store.py#MdosStore._validate_domain_dependencies_tx",
+        "CODE:lead_factory/mdos_v7/suppression_fixture.py#run_g0_suppression_fixture",
+        "CODE:scripts/run_mdos_v7_g0_suppression.py"
+      ],
+      "test_bindings": ["TEST:tests/test_mdos_v7_suppression.py"],
+      "evidence_refs": ["EVIDENCE:reports/market_demand_os_v7/g0-suppression-evidence.json"],
+      "status": "IMPLEMENTED_NOT_INDEPENDENTLY_VERIFIED",
+      "locally_closed_gaps": ["GAP-SUPPRESSION-CONSENT-001"],
+      "open_gaps": ["GAP-INDEPENDENT-VERIFICATION-001"],
+      "open_live_gaps": ["GAP-LEGAL-001", "GAP-MANUAL-EGRESS-001"],
+      "scope_limit": "Append-only historical replay/revision/as-of evaluation, strict conflict arbitration, exact policy/source binding, unknown-actor denial and exact restore are local synthetic fixture evidence only."
+    },
+    {
+      "trace_id": "TRACE-BITRIX-PROJECTION-OUTBOX",
+      "requirement_refs": ["MDOS-EVT-001", "MDOS-EVT-002", "MDOS-TRU-001", "MDOS-TRU-002", "MDOS-AUT-002", "MDOS-AUT-005", "MDOS-STO-002", "MDOS-STO-003", "MDOS-STO-004", "MDOS-STO-005", "MDOS-JRN-001", "MDOS-JRN-004", "MDOS-OPS-001", "MDOS-OPS-004", "MDOS-REL-001", "MDOS-REL-002"],
+      "acceptance_refs": ["AT-ARC-01", "AT-ARC-07", "AT-ARC-13", "AT-ARC-15", "AT-ASR-08", "AT-ASR-11", "AT-ASR-12"],
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-REFERENCE-ARCHITECTURE.md",
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DELIVERY-ASSURANCE.md"
+      ],
+      "code_bindings": [
+        "CODE:lead_factory/mdos_v7/projection_outbox.py#ProjectionOutbox",
+        "CODE:lead_factory/mdos_v7/store.py#MdosStore.complete_bitrix_shadow_outbox",
+        "CODE:lead_factory/mdos_v7/bitrix_projection.py#ShadowBitrixProjectionAdapter.project"
+      ],
+      "test_bindings": ["TEST:tests/test_mdos_v7_projection_outbox.py"],
+      "evidence_refs": [
+        "EVIDENCE:reports/market_demand_os_v7/g2-outbox-evidence.json",
+        "EVIDENCE:reports/market_demand_os_v7/g1-shadow-evidence.json"
+      ],
+      "status": "IMPLEMENTED_NOT_INDEPENDENTLY_VERIFIED",
+      "locally_closed_gaps": ["GAP-OUTBOX-001"],
+      "open_gaps": ["GAP-INDEPENDENT-VERIFICATION-001"],
+      "open_live_gaps": ["GAP-LIVE-INTEGRATION-001", "GAP-RATIFICATION-001"],
+      "scope_limit": "Exact command/claim/start-window/attempt and mutually exclusive receipt-or-DLQ terminal lifecycle converge locally; no external transport/readback, credentials or live authority."
+    },
+    {
+      "trace_id": "TRACE-BACKUP-RESTORE-TAMPER",
+      "requirement_refs": ["MDOS-ASR-001", "MDOS-REL-001"],
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DELIVERY-ASSURANCE.md#L8",
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DELIVERY-ASSURANCE.md#L137"
+      ],
+      "code_bindings": [
+        "CODE:lead_factory/mdos_v7/store.py#MdosStore.verify_integrity",
+        "CODE:lead_factory/mdos_v7/store.py#MdosStore.create_backup",
+        "CODE:lead_factory/mdos_v7/store.py#MdosStore.restore_verified"
+      ],
+      "test_bindings": [
+        "TEST:tests/test_mdos_v7_store.py#test_backup_restore_preserves_verified_semantic_snapshot",
+        "TEST:tests/test_mdos_v7_adversarial.py#test_projection_conflict_is_auditable_and_backup_tamper_is_rejected",
+        "TEST:tests/test_mdos_v7_suppression.py",
+        "TEST:tests/test_mdos_v7_projection_outbox.py",
+        "TEST:tests/test_mdos_v7_split_payments.py#test_full_slice_replay_backup_restore_and_runner_evidence"
+      ],
+      "evidence_refs": [
+        "EVIDENCE:reports/market_demand_os_v7/g0-suppression-evidence.json#/backup_restore_proof",
+        "EVIDENCE:reports/market_demand_os_v7/g1-shadow-evidence.json#/backup_restore_proof",
+        "EVIDENCE:reports/market_demand_os_v7/g1-split-payment-shadow-evidence.json#/backup",
+        "EVIDENCE:reports/market_demand_os_v7/g2-outbox-evidence.json#/backup_restore_proof"
+      ],
+      "status": "IMPLEMENTED_NOT_INDEPENDENTLY_VERIFIED",
+      "open_gaps": ["GAP-INDEPENDENT-VERIFICATION-001"]
+    },
+    {
+      "trace_id": "TRACE-SAFE-TEST-DISCOVERY",
+      "requirement_refs": ["MDOS-ASR-001", "MDOS-TRC-003", "MDOS-TRC-004", "MDOS-REL-001", "MDOS-REL-002"],
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DELIVERY-ASSURANCE.md#L8",
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DELIVERY-ASSURANCE.md#L36",
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DELIVERY-ASSURANCE.md#L39",
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DELIVERY-ASSURANCE.md#L137",
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DELIVERY-ASSURANCE.md#L151"
+      ],
+      "code_bindings": ["CODE:pytest.ini"],
+      "test_bindings": [
+        "TEST:tests/",
+        "TEST:tests/test_lead_factory_cross_source_reconciliation.py",
+        "TEST:tests/test_lead_factory_legacy_canary_guard.py",
+        "TEST:tests/test_mdos_v7_split_payments.py",
+        "TEST:tests/test_mdos_v7_owner_artifacts.py",
+        "TEST:tests/test_mdos_v7_verification_handoff.py"
+      ],
+      "evidence_refs": [
+        "EVIDENCE:reports/market_demand_os_v7/test-summary.json",
+        "EVIDENCE:reports/market_demand_os_v7/g0-suppression-evidence.json",
+        "EVIDENCE:reports/market_demand_os_v7/g1-shadow-evidence.json",
+        "EVIDENCE:reports/market_demand_os_v7/g1-split-payment-shadow-evidence.json",
+        "EVIDENCE:reports/market_demand_os_v7/g2-outbox-evidence.json",
+        "EVIDENCE:reports/market_demand_os_v7/g2-inbound-attribution-shadow-evidence.json",
+        "EVIDENCE:reports/market_demand_os_v7/g2-motion-preflight-evidence.json",
+        "EVIDENCE:reports/market_demand_os_v7/g2-owner-preflight-evidence.json",
+        "EVIDENCE:reports/market_demand_os_v7/g2-manual-egress-evidence.json"
+      ],
+      "status": "IMPLEMENTED_NOT_INDEPENDENTLY_VERIFIED",
+      "open_gaps": ["GAP-INDEPENDENT-VERIFICATION-001"],
+      "observation": "pytest.ini pins official discovery to tests/. The safe full suite passed 1240 tests and 594 subtests with 4 collection warnings in 552.65s; the owner/CRM/handoff regression passed 110 tests in 53.70s and Ruff was clean across MDOS, tests, evidence runners and all 49 inventoried Python egress boundary modules. The earlier unconstrained collection failure is explicitly NOT_ACCEPTANCE_EVIDENCE and observed no successful external read."
+    },
+    {
+      "trace_id": "TRACE-G0-G1-PROGRAM",
+      "requirement_refs": ["MDOS-PRG-001", "MDOS-PRG-002", "MDOS-TRC-001", "MDOS-TRC-002", "MDOS-TRC-005"],
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DELIVERY-ASSURANCE.md#L50",
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DELIVERY-ASSURANCE.md#L63",
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DELIVERY-ASSURANCE.md#L29",
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DELIVERY-ASSURANCE.md#L33",
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DELIVERY-ASSURANCE.md#L43"
+      ],
+      "code_bindings": [
+        "CODE:lead_factory/mdos_v7/consent_suppression.py#ConsentSuppressionService",
+        "CODE:lead_factory/mdos_v7/suppression_fixture.py#run_g0_suppression_fixture",
+        "CODE:scripts/run_mdos_v7_g0_suppression.py",
+        "CODE:lead_factory/mdos_v7/fixture_slice.py#run_g1_fixture_slice",
+        "CODE:scripts/run_mdos_v7_g1_shadow.py",
+        "CODE:lead_factory/mdos_v7/split_payment_fixture.py#run_split_payment_fixture_slice",
+        "CODE:scripts/run_mdos_v7_split_payment_shadow.py"
+      ],
+      "test_bindings": [
+        "TEST:tests/test_mdos_v7_g1.py",
+        "TEST:tests/test_mdos_v7_adversarial.py",
+        "TEST:tests/test_mdos_v7_store.py",
+        "TEST:tests/test_mdos_v7_suppression.py",
+        "TEST:tests/test_mdos_v7_split_payments.py"
+      ],
+      "evidence_refs": [
+        "EVIDENCE:reports/market_demand_os_v7/g0-suppression-evidence.json",
+        "EVIDENCE:reports/market_demand_os_v7/g1-shadow-evidence.json",
+        "EVIDENCE:reports/market_demand_os_v7/g1-split-payment-shadow-evidence.json"
+      ],
+      "status": "IMPLEMENTED_NOT_INDEPENDENTLY_VERIFIED",
+      "locally_closed_gaps": ["GAP-SUPPRESSION-CONSENT-001"],
+      "open_gaps": ["GAP-INDEPENDENT-VERIFICATION-001"],
+      "gate_observation": "The bounded synthetic G0 consent/suppression, base G1 fixture and separate split-payment shadow slices are locally implemented; AT-COM-06 remains NOT_CLAIMED and normative completion, independent verification and production/live approval remain open."
+    },
+    {
+      "trace_id": "TRACE-G2-SHADOW-MOTIONS",
+      "requirement_refs": ["MDOS-PRG-003", "MDOS-PRG-009", "MDOS-MOT-001", "MDOS-MOT-002", "MDOS-MOT-003"],
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DELIVERY-ASSURANCE.md#L74",
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DELIVERY-ASSURANCE.md#L83",
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-COMMERCIAL-MODEL.md#L65",
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-COMMERCIAL-MODEL.md#L75",
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-COMMERCIAL-MODEL.md#L85",
+        "DESIGN:docs/market_demand_os_v7_delivery/g2-motion-profiles.json"
+      ],
+      "code_bindings": [
+        "CODE:lead_factory/mdos_v7/g2.py#G2MotionRegistry",
+        "CODE:lead_factory/mdos_v7/g2_preflight.py#G2ShadowPreflightService",
+        "CODE:lead_factory/mdos_v7/g2_preflight.py#build_preflight_bundle",
+        "CODE:scripts/run_mdos_v7_g2_motion_preflight.py"
+      ],
+      "test_bindings": [
+        "TEST:tests/test_mdos_v7_g2.py",
+        "TEST:tests/test_mdos_v7_g2_motion_preflight.py"
+      ],
+      "evidence_refs": [
+        "EVIDENCE:docs/market_demand_os_v7_delivery/g2-motion-profiles.json",
+        "EVIDENCE:reports/market_demand_os_v7/g2-motion-preflight-evidence.json",
+        "EVIDENCE:reports/market_demand_os_v7/g2-inbound-attribution-shadow-evidence.json",
+        "EVIDENCE:reports/market_demand_os_v7/g2-owner-preflight-evidence.json",
+        "EVIDENCE:reports/market_demand_os_v7/g2-manual-egress-evidence.json"
+      ],
+      "status": "IMPLEMENTED_NOT_INDEPENDENTLY_VERIFIED",
+      "open_gaps": [
+        "GAP-INBOUND-ATTRIBUTION-LIVE-001",
+        "GAP-MANUAL-EGRESS-001",
+        "GAP-RATIFICATION-001",
+        "GAP-CAPACITY-001",
+        "GAP-LEGAL-001",
+        "GAP-LIVE-INTEGRATION-001",
+        "GAP-SOD-001",
+        "GAP-INDEPENDENT-VERIFICATION-001"
+      ],
+      "observation": "Existing/win-back and dealer Benchmark RFQ preflights are READY_PROPOSAL_EFFECT_DENIED; high-intent inbound is RECONCILED_ATTRIBUTED; owner intent is CAPTURED_NOT_RATIFIED with an inactive first-cell proposal and Bank API pending; the Python egress inventory is default deny. All observed external effects and transport attempts are zero.",
+      "scope_limit": "All three profiles remain SHADOW_DESIGN_ONLY. Proposal evidence references are lexical-only pending human review; no local preflight, inventory or profile grants live authority."
+    },
+    {
+      "trace_id": "TRACE-OWNER-RATIFICATION-PREFLIGHT",
+      "requirement_refs": ["MDOS-ASR-001", "MDOS-ASR-002", "MDOS-AUT-002", "MDOS-AUT-003", "MDOS-AUT-005", "MDOS-BCH-001", "MDOS-BCH-002", "MDOS-BCH-003", "MDOS-BCH-004", "MDOS-BCH-005", "MDOS-GOV-001", "MDOS-LGL-001", "MDOS-LGL-003", "MDOS-REL-001", "MDOS-REL-002", "MDOS-SEC-001", "MDOS-SEC-002", "MDOS-TRC-003", "MDOS-TRC-004"],
+      "acceptance_refs": ["AT-ASR-03", "AT-ASR-04", "AT-ASR-05", "AT-ASR-12", "AT-SRC7-04", "AT-SRC7-07"],
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/CONTRACT.md",
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DELIVERY-ASSURANCE.md",
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-REFERENCE-ARCHITECTURE.md",
+        "DESIGN:lead_factory/mdos_v7/local_schemas/owner-intent-draft.schema.json",
+        "DESIGN:docs/market_demand_os_v7_delivery/g2-motion-profiles.json#/profiles/0"
+      ],
+      "code_bindings": [
+        "CODE:lead_factory/mdos_v7/ratification_preflight.py#assess_owner_ratification_preflight",
+        "CODE:lead_factory/mdos_v7/ratification_preflight.py#require_ready_for_independent_review",
+        "CODE:lead_factory/mdos_v7/ratification_preflight.py#assert_live_activation_allowed",
+        "CODE:lead_factory/mdos_v7/owner_artifacts.py#resolve_owner_artifact_bundle",
+        "CODE:lead_factory/mdos_v7/owner_artifacts.py#artifact_resolution_issues",
+        "CODE:lead_factory/mdos_v7/local_schemas/owner-artifact-bundle-manifest.schema.json",
+        "CODE:lead_factory/mdos_v7/local_schemas/owner-artifact-envelope.schema.json",
+        "CODE:lead_factory/mdos_v7/local_schemas/owner-ratification-access-preflight.schema.json",
+        "CODE:lead_factory/mdos_v7/templates/owner-ratification-access-preflight.unsigned.json",
+        "CODE:lead_factory/mdos_v7/owner_intent.py#load_captured_owner_intent_draft",
+        "CODE:lead_factory/mdos_v7/owner_intent.py#require_captured_owner_intent",
+        "CODE:lead_factory/mdos_v7/local_schemas/owner-intent-draft.schema.json",
+        "CODE:lead_factory/mdos_v7/templates/owner-intent-draft.captured-not-ratified.json",
+        "CODE:scripts/run_mdos_v7_owner_preflight.py#build_report"
+      ],
+      "test_bindings": [
+        "TEST:tests/test_mdos_v7_ratification_preflight.py",
+        "TEST:tests/test_mdos_v7_owner_artifacts.py",
+        "TEST:tests/test_mdos_v7_owner_intent.py",
+        "TEST:tests/test_mdos_v7_owner_preflight_runner.py"
+      ],
+      "evidence_refs": ["EVIDENCE:reports/market_demand_os_v7/g2-owner-preflight-evidence.json"],
+      "status": "IMPLEMENTED_NOT_INDEPENDENTLY_VERIFIED",
+      "open_gaps": ["GAP-MANUAL-EGRESS-001", "GAP-RATIFICATION-001", "GAP-CAPACITY-001", "GAP-LEGAL-001", "GAP-SOD-001", "GAP-INDEPENDENT-VERIFICATION-001"],
+      "observation": "Owner intent is CAPTURED_NOT_RATIFIED: all three motions are strategic intent, the proposed inactive first cell is ALUMINIUM_WINDOWS x RU-MOS (Moscow Oblast only) x FACTORY_DELIVERY_NO_INSTALLATION, review limits are 5/1/1 shadow-only, Bank API is pending, the real Bitrix stage is UNKNOWN, Dima is retained only as an opaque human role assignment and every authority/effect flag is false. The unsigned ratification packet remains NOT_RATIFIED with no verified roles or artifact resolution.",
+      "scope_limit": "Owner chat is captured as a privacy-safe non-authority draft, not a machine signature or beachhead ratification. Actual owner artifacts, exact capacity/legal/Bitrix/bank inputs, trusted keys and signatures must arrive out of band; a successor controlled release plus independent review is required before authority can change."
+    },
+    {
+      "trace_id": "TRACE-INDEPENDENT-VERIFIER-HANDOFF",
+      "requirement_refs": ["MDOS-ASR-003", "MDOS-GOV-005", "MDOS-TRC-002", "MDOS-REL-001", "MDOS-REL-002"],
+      "acceptance_refs": ["AT-ASR-01", "AT-ASR-02", "AT-ASR-03", "AT-ASR-04", "AT-ASR-05", "AT-ASR-06", "AT-ASR-07", "AT-ASR-08", "AT-ASR-09", "AT-ASR-10", "AT-ASR-11", "AT-ASR-12", "AT-ASR-13", "AT-ASR-14"],
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DELIVERY-ASSURANCE.md#L18",
+        "DESIGN:docs/market_demand_os_v7/CONTRACT.md#L203",
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DELIVERY-ASSURANCE.md#L33",
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DELIVERY-ASSURANCE.md#L137",
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DELIVERY-ASSURANCE.md#L151"
+      ],
+      "code_bindings": [
+        "CODE:lead_factory/mdos_v7/verification_handoff.py#build_verification_handoff",
+        "CODE:lead_factory/mdos_v7/verification_handoff.py#validate_ready_handoff",
+        "CODE:lead_factory/mdos_v7/verification_handoff.py#persist_content_addressed_handoff",
+        "CODE:lead_factory/mdos_v7/local_schemas/verification-handoff.schema.json",
+        "CODE:lead_factory/mdos_v7/templates/verification-handoff.unsigned.json",
+        "CODE:scripts/run_mdos_v7_verification_handoff.py"
+      ],
+      "test_bindings": ["TEST:tests/test_mdos_v7_verification_handoff.py"],
+      "evidence_refs": ["EVIDENCE:reports/market_demand_os_v7/test-summary.json"],
+      "status": "IMPLEMENTED_NOT_INDEPENDENTLY_VERIFIED",
+      "open_gaps": ["GAP-SOD-001", "GAP-INDEPENDENT-VERIFICATION-001"],
+      "observation": "The deterministic local builder binds the exact profile, implementation trace and nine-report catalog as READY_FOR_INDEPENDENT_REVIEW while retaining owner_preflight_state=NOT_RATIFIED, 36 P0 nonclaims, verified=false, independent_verification=false, prerequisites_satisfied=false, production_release_eligible=false and zero effects.",
+      "scope_limit": "The handoff is an unsigned implementation-team input bundle only. No owner-appointed verifier identity, key, signature, verdict, two-person break-glass, normative promotion, production release or live authority exists."
+    },
+    {
+      "trace_id": "TRACE-MANUAL-EGRESS-BOUNDARY-INVENTORY",
+      "requirement_refs": ["MDOS-ASR-001", "MDOS-ASR-002", "MDOS-ASR-004", "MDOS-AUT-002", "MDOS-AUT-005", "MDOS-LGL-001", "MDOS-LGL-003", "MDOS-REL-001", "MDOS-REL-002", "MDOS-SEC-002"],
+      "acceptance_refs": ["AT-ASR-03", "AT-ASR-04", "AT-ASR-12", "AT-SRC7-04", "AT-SRC7-07"],
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/CONTRACT.md",
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DELIVERY-ASSURANCE.md",
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-SOURCE-PORTFOLIO.md"
+      ],
+      "code_bindings": [
+        "CODE:lead_factory/mdos_v7/manual_egress.py#assert_manual_egress_allowed",
+        "CODE:lead_factory/mdos_v7/manual_egress.py#guarded_manual_egress_call",
+        "CODE:lead_factory/mdos_v7/manual_egress.py#guarded_manual_http_call",
+        "CODE:scripts/run_mdos_v7_manual_egress_evidence.py#build_report"
+      ],
+      "test_bindings": [
+        "TEST:tests/test_mdos_v7_manual_egress.py",
+        "TEST:tests/test_mdos_v7_manual_egress_runner.py",
+        "TEST:tests/test_mdos_v7_legacy_freeze.py"
+      ],
+      "evidence_refs": ["EVIDENCE:reports/market_demand_os_v7/g2-manual-egress-evidence.json"],
+      "status": "IMPLEMENTED_NOT_INDEPENDENTLY_VERIFIED",
+      "open_gaps": ["GAP-MANUAL-EGRESS-001", "GAP-RATIFICATION-001", "GAP-INDEPENDENT-VERIFICATION-001"],
+      "observation": "49 Python boundary modules and 40 registered manual operations are inventoried; unknown signature modules=0, transport attempts=0 and effects/contact/spend=0 under RC1 default deny.",
+      "scope_limit": "Static Python inventory is not a global organizational control: manual browser/phone/operator actions remain outside software enforcement, dynamic public-host classes are unratified and absence of every native transport is not proven."
+    },
+    {
+      "trace_id": "TRACE-HIGH-INTENT-INBOUND-ATTRIBUTION",
+      "owner_requirement_refs": ["DLV-REQ-INBOUND-ATTR-001"],
+      "requirement_refs": ["MDOS-TRU-003", "MDOS-ASR-004", "MDOS-EVT-001", "MDOS-EVT-003", "MDOS-MOT-003", "MDOS-EXP-002", "MDOS-LGL-001", "MDOS-LGL-003"],
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/CONTRACT.md#L87",
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DELIVERY-ASSURANCE.md#L22",
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-REFERENCE-ARCHITECTURE.md#L60",
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-REFERENCE-ARCHITECTURE.md#L67",
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-COMMERCIAL-MODEL.md#L85",
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DECISION-OUTCOMES.md#L50",
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-SOURCE-PORTFOLIO.md#L120",
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-SOURCE-PORTFOLIO.md#L128",
+        "DESIGN:docs/market_demand_os_v7_delivery/g2-motion-profiles.json#/profiles/2/inbound_attribution_contract"
+      ],
+      "code_bindings": [
+        "CODE:lead_factory/mdos_v7/inbound_attribution.py#WebsiteInboundAttributionContract",
+        "CODE:lead_factory/mdos_v7/inbound_attribution.py#reconcile_attribution",
+        "CODE:lead_factory/mdos_v7/inbound_attribution.py#assert_pii_free"
+      ],
+      "test_bindings": ["TEST:tests/test_mdos_v7_inbound_attribution.py"],
+      "local_test_observation": "6 passed; Ruff clean; no independent verifier.",
+      "evidence_refs": ["EVIDENCE:reports/market_demand_os_v7/g2-inbound-attribution-shadow-evidence.json"],
+      "evidence_sha256": "6b0c5c94d1e8aa7dff7208c1f10c53701d0e108716049c06dc4c9a9559ffd3b9",
+      "observed_evidence": {
+        "reconciliation_status": "RECONCILED_ATTRIBUTED",
+        "private_payload_separated": true,
+        "raw_private_values_included": false,
+        "external_effect_count": 0
+      },
+      "status": "IMPLEMENTED_NOT_INDEPENDENTLY_VERIFIED",
+      "open_gaps": ["GAP-INBOUND-ATTRIBUTION-LIVE-001", "GAP-INDEPENDENT-VERIFICATION-001"],
+      "privacy_decision": {
+        "missing_analytics_dimension": "UNKNOWN",
+        "paths": "path-only; query and fragment prohibited",
+        "source_hierarchy": "ALLOWLISTED_UTM > CLASSIFIED_EXTERNAL_REFERRER > DIRECT_WEBSITE > UNKNOWN",
+        "raw_metrika_ids": "private pseudonymous identifiers; only when lawful_supplied=true",
+        "analytics_bitrix_evidence_metrika": "presence flags only",
+        "pii_and_request_text": "separate private plane",
+        "form_to_bitrix": "opaque non-PII correlation",
+        "metrika_is_source_proof": false,
+        "external_effect_count": 0
+      }
+    }
+  ],
+  "acceptance_overlay": [
+    {"id": "AT-ASR-03", "status": "LOCALLY_TESTED_NOT_INDEPENDENTLY_VERIFIED"},
+    {"id": "AT-ASR-04", "status": "LOCALLY_TESTED_NOT_INDEPENDENTLY_VERIFIED"},
+    {"id": "AT-ASR-05", "status": "LOCALLY_TESTED_NOT_INDEPENDENTLY_VERIFIED"},
+    {"id": "AT-ASR-08", "status": "LOCALLY_TESTED_NOT_INDEPENDENTLY_VERIFIED"},
+    {"id": "AT-ASR-09", "status": "LOCALLY_TESTED_NOT_INDEPENDENTLY_VERIFIED"},
+    {"id": "AT-ASR-11", "status": "LOCALLY_TESTED_NOT_INDEPENDENTLY_VERIFIED"},
+    {"id": "AT-ASR-12", "status": "LOCALLY_TESTED_NOT_INDEPENDENTLY_VERIFIED"},
+    {"id": "AT-ASR-13", "status": "OVERLAY_OBEYS_NO_NORMATIVE_PROMOTION"},
+    {"id": "AT-ASR-14", "status": "LOCALLY_TESTED_NOT_INDEPENDENTLY_VERIFIED"},
+    {"id": "AT-COM-13", "status": "LOCALLY_TESTED_NOT_INDEPENDENTLY_VERIFIED"},
+    {"id": "AT-ARC-01", "status": "LOCALLY_TESTED_NOT_INDEPENDENTLY_VERIFIED"},
+    {"id": "AT-ARC-06", "status": "LOCALLY_TESTED_NOT_INDEPENDENTLY_VERIFIED"},
+    {"id": "AT-ARC-07", "status": "LOCALLY_TESTED_NOT_INDEPENDENTLY_VERIFIED"},
+    {"id": "AT-ARC-09", "status": "LOCALLY_TESTED_NOT_INDEPENDENTLY_VERIFIED"},
+    {"id": "AT-ARC-11", "status": "LOCALLY_TESTED_NOT_INDEPENDENTLY_VERIFIED"},
+    {"id": "AT-ARC-12", "status": "LOCALLY_TESTED_NOT_INDEPENDENTLY_VERIFIED"},
+    {"id": "AT-ARC-13", "status": "LOCALLY_TESTED_NOT_INDEPENDENTLY_VERIFIED"},
+    {"id": "AT-ARC-15", "status": "LOCALLY_TESTED_NOT_INDEPENDENTLY_VERIFIED"},
+    {"id": "AT-DEC-03", "status": "LOCALLY_TESTED_NOT_INDEPENDENTLY_VERIFIED"},
+    {"id": "AT-DEC-11", "status": "LOCALLY_TESTED_NOT_INDEPENDENTLY_VERIFIED"},
+    {"id": "AT-SRC7-04", "status": "LOCALLY_TESTED_NOT_INDEPENDENTLY_VERIFIED"},
+    {"id": "AT-SRC7-07", "status": "LOCALLY_TESTED_NOT_INDEPENDENTLY_VERIFIED"},
+    {"id": "AT-COM-06", "status": "NOT_CLAIMED"},
+    {"id": "AT-COM-12", "status": "PARTIAL_LOCAL_PRIVACY_BINDING_NOT_NORMATIVE_COMPLETION"}
+  ],
+  "p0_completion_statement": {
+    "all_p0_implemented": false,
+    "all_p0_tested": false,
+    "all_p0_evidenced": false,
+    "all_p0_independently_verified": false,
+    "normative_p0_count": 36,
+    "p0_requirements_not_claimed_complete": [
+      "MDOS-ASR-001",
+      "MDOS-ASR-002",
+      "MDOS-ASR-003",
+      "MDOS-ASR-004",
+      "MDOS-AUT-001",
+      "MDOS-AUT-002",
+      "MDOS-AUT-003",
+      "MDOS-AUT-004",
+      "MDOS-AUT-005",
+      "MDOS-BCH-001",
+      "MDOS-BCH-002",
+      "MDOS-BCH-003",
+      "MDOS-BCH-004",
+      "MDOS-BCH-005",
+      "MDOS-GOV-001",
+      "MDOS-GOV-002",
+      "MDOS-GOV-003",
+      "MDOS-GOV-004",
+      "MDOS-GOV-005",
+      "MDOS-LGL-001",
+      "MDOS-LGL-002",
+      "MDOS-LGL-003",
+      "MDOS-REL-001",
+      "MDOS-REL-002",
+      "MDOS-SEC-001",
+      "MDOS-SEC-002",
+      "MDOS-SEC-003",
+      "MDOS-TRC-001",
+      "MDOS-TRC-002",
+      "MDOS-TRC-003",
+      "MDOS-TRC-004",
+      "MDOS-TRC-005",
+      "MDOS-TRU-001",
+      "MDOS-TRU-002",
+      "MDOS-TRU-003",
+      "MDOS-TRU-004"
+    ],
+    "owner_overlay_p0_requirements_not_claimed_complete": [
+      "DLV-REQ-INBOUND-ATTR-001",
+      "DLV-REQ-OWNER-INTENT-001",
+      "DLV-REQ-BITRIX-CONTRACT-MILESTONE-001"
+    ],
+    "reason": "Local bounded behavior is not a normative completion claim; residual P0 controls and independent verification remain absent."
+  }
+}

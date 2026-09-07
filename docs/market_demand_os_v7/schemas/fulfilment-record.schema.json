@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://alumkomplekt-rf.ru/schemas/mdos/v7/fulfilment-record.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "fulfilment_record_id", "distinct_order_id", "event_type", "event_at", "actor_id", "primary_document_ref", "evidence_sha256", "version"],
+  "properties": {
+    "schema_version": {"const": "1.0.0"},
+    "fulfilment_record_id": {"type": "string", "minLength": 1},
+    "distinct_order_id": {"type": "string", "minLength": 1},
+    "event_type": {"enum": ["PRODUCTION_ACCEPTED", "READY_TO_SHIP", "SHIPPED", "DELIVERED", "INSTALLED", "ACCEPTED_BY_CUSTOMER", "CLAIM_OPENED", "REWORK", "REFUND", "CLOSED"]},
+    "event_at": {"type": "string", "format": "date-time"},
+    "actor_id": {"type": "string", "minLength": 1},
+    "primary_document_ref": {"type": "string", "minLength": 1},
+    "evidence_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "version": {"type": "integer", "minimum": 1}
+  }
+}

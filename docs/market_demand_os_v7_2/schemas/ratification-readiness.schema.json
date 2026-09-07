@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://alumkomplekt-rf.ru/schemas/mdos/v7.2/ratification-readiness.schema.json",
+  "title": "MDOS v7.2 ratification readiness",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "record_type",
+    "contract_id",
+    "package_version",
+    "status",
+    "proposed_beachhead_profile",
+    "required_roles",
+    "blockers",
+    "live_gates",
+    "tenderplan_stop",
+    "authority_effect"
+  ],
+  "properties": {
+    "schema_version": {"const": "1.0.0"},
+    "record_type": {"const": "RATIFICATION_READINESS"},
+    "contract_id": {"const": "AK-MDOS-V7"},
+    "package_version": {"const": "7.2.0-rc.2"},
+    "status": {"const": "BLOCKED_PENDING_OWNER_INPUT"},
+    "proposed_beachhead_profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["motion_id", "product_scope_id", "region_code", "fulfilment_model_id", "installation_scope"],
+      "properties": {
+        "motion_id": {"const": "EXISTING_ACCOUNT_EXPANSION"},
+        "product_scope_id": {"const": "ALUMINIUM_WINDOWS"},
+        "region_code": {"const": "RU-MOS"},
+        "fulfilment_model_id": {"const": "FACTORY_DELIVERY_NO_INSTALLATION"},
+        "installation_scope": {"const": "EXCLUDED"}
+      }
+    },
+    "required_roles": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["role", "state"],
+        "properties": {
+          "role": {"enum": ["BusinessOwner", "ContractAuthority", "PrivacyLegalOwner", "IndependentEvidenceVerifier"]},
+          "state": {"const": "UNASSIGNED_OR_UNSIGNED"}
+        }
+      }
+    },
+    "blockers": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1}
+    },
+    "live_gates": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["bitrix", "mango", "mail", "unisender", "tenderplan"],
+      "properties": {
+        "bitrix": {"const": false},
+        "mango": {"const": false},
+        "mail": {"const": false},
+        "unisender": {"const": false},
+        "tenderplan": {"const": false}
+      }
+    },
+    "tenderplan_stop": {"const": true},
+    "authority_effect": {"const": false}
+  }
+}

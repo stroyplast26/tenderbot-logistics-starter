@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://alumkomplekt-rf.ru/schemas/mdos/v7/entity-resolution-decision.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "decision_id", "entity_type", "left_ref", "right_ref", "comparison_vector", "prior", "match_probability", "lower_threshold", "upper_threshold", "zone", "ruleset_version", "evidence_claim_ids", "recorded_at", "reversible"],
+  "properties": {
+    "schema_version": {"const": "1.0.0"},
+    "decision_id": {"type": "string"},
+    "entity_type": {"enum": ["ACCOUNT", "PERSON", "OBJECT_SITE", "DEMAND_UNIT", "INSTALLED_ASSET"]},
+    "left_ref": {"type": "string"},
+    "right_ref": {"type": "string"},
+    "comparison_vector": {"type": "object"},
+    "prior": {"type": "number", "minimum": 0, "maximum": 1},
+    "match_probability": {"type": "number", "minimum": 0, "maximum": 1},
+    "lower_threshold": {"type": "number", "minimum": 0, "maximum": 1},
+    "upper_threshold": {"type": "number", "minimum": 0, "maximum": 1},
+    "zone": {"enum": ["AUTO_LINK", "REVIEW", "REJECT"]},
+    "ruleset_version": {"type": "string"},
+    "model_digest": {"type": ["string", "null"]},
+    "evidence_claim_ids": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+    "recorded_at": {"type": "string", "format": "date-time"},
+    "decided_by": {"type": ["string", "null"]},
+    "reversible": {"const": true},
+    "supersedes_decision_id": {"type": ["string", "null"]}
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "fixture_manifest_version": "wave1-fixture-manifest-v1",
+  "provider": "KONTUR_CLIENT_SEARCH",
+  "product_code": "KONTUR_CLIENT_SEARCH",
+  "source_id": "wave1:kontur_client_search",
+  "contract_version": "wave1-business-public-v1",
+  "mapping_version": "kontur_client_search-draft-mapping-v1",
+  "pages": [
+    {
+      "receipt_key": "kontur-search-page-001",
+      "content_sha256": "4875f0cecab31290c028bf5240adba18b851f059342f0907a3e52c7b3f1bc83d"
+    },
+    {
+      "receipt_key": "kontur-search-page-002",
+      "content_sha256": "3cea53c68faeaeec734dddb76989a719910c0869ce05f803b90d7674dbf551e6"
+    }
+  ]
+}

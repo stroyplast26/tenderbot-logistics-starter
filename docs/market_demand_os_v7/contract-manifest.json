@@ -1,0 +1,231 @@
+{
+  "$schema": "schemas/contract-manifest.schema.json",
+  "active_beachhead_profile": null,
+  "advisory_documents": [
+    {
+      "id": "MDOS-V7-README",
+      "path": "docs/market_demand_os_v7/README.md",
+      "sha256": "b60c4e0357b926f008f14ec2432c8a20dcb6795519345a270f45c45f67af32ab",
+      "version": "1.1.0"
+    }
+  ],
+  "contract_id": "AK-MDOS-V7",
+  "defaults_pending_ratification": {
+    "contact_enabled": false,
+    "external_reads_enabled": false,
+    "external_writers_enabled": false,
+    "pc10_enabled": false,
+    "spend_enabled": false
+  },
+  "fixed_at": "2026-08-25",
+  "normative_documents": [
+    {
+      "id": "MDOS-V7-ROOT",
+      "path": "docs/market_demand_os_v7/CONTRACT.md",
+      "sha256": "9e03b4e706fe7540d9cacf880d0edabed362715060e52610ab3d65a5e7c426ee",
+      "version": "1.1.0"
+    },
+    {
+      "id": "APP-MDOS-COMMERCIAL-MODEL",
+      "path": "docs/market_demand_os_v7/APP-MDOS-COMMERCIAL-MODEL.md",
+      "sha256": "6ee294eeef127a5a0d74863c2f472ccbe2e3d992ea3606394ffa08032f632c33",
+      "version": "1.1.0"
+    },
+    {
+      "id": "APP-MDOS-REFERENCE-ARCHITECTURE",
+      "path": "docs/market_demand_os_v7/APP-MDOS-REFERENCE-ARCHITECTURE.md",
+      "sha256": "8ff6f8561c2ae6c57fb3fe48ab7ff5ad870c46054676aea532a3898491372700",
+      "version": "1.1.0"
+    },
+    {
+      "id": "APP-MDOS-DEMAND-INTELLIGENCE",
+      "path": "docs/market_demand_os_v7/APP-MDOS-DEMAND-INTELLIGENCE.md",
+      "sha256": "469551d0ae4b19d3819c630e228a1c5d4cb16b411d9eb2afd53dbc457fcb5dbe",
+      "version": "1.0.0"
+    },
+    {
+      "id": "APP-MDOS-SOURCE-PORTFOLIO",
+      "path": "docs/market_demand_os_v7/APP-MDOS-SOURCE-PORTFOLIO.md",
+      "sha256": "916488383f6a3672830aab57c2e75e989b5d3b48212f650c28201f4a906d00bd",
+      "version": "1.1.0"
+    },
+    {
+      "id": "APP-MDOS-DECISION-OUTCOMES",
+      "path": "docs/market_demand_os_v7/APP-MDOS-DECISION-OUTCOMES.md",
+      "sha256": "6d1aa42a9f4de80a0efd21f4e6509865e69987cab9ac87742de20e79c57b1dc5",
+      "version": "1.1.0"
+    },
+    {
+      "id": "APP-MDOS-DELIVERY-ASSURANCE",
+      "path": "docs/market_demand_os_v7/APP-MDOS-DELIVERY-ASSURANCE.md",
+      "sha256": "b4f16d79cc341fb0d842213eb44014ffcb6d738deefcc04ba538cd6e0a14a403",
+      "version": "1.1.0"
+    }
+  ],
+  "package_digest_algorithm": "sha256(canonical-json(sorted(path,sha256)))",
+  "package_root_sha256": "d4da97bd47ed1bf76a52826a852e3a158611d18adf32a901b814a864e862d97e",
+  "package_version": "7.1.0-rc.1",
+  "ratification": null,
+  "registries": [
+    {
+      "id": "MDOS-V7-REQUIREMENTS",
+      "path": "docs/market_demand_os_v7/registries/requirements-registry.json",
+      "sha256": "6ef11ffc15b222b6d9639b69f458e3ed8c2afb5ebc3f53a653120d55a4877c50",
+      "version": "1.0.0"
+    },
+    {
+      "id": "MDOS-V7-ACCEPTANCE",
+      "path": "docs/market_demand_os_v7/registries/acceptance-manifest.json",
+      "sha256": "1bd9ed13414fb74dd2bf883170c793698755313b43724bb52a388444062da930",
+      "version": "1.0.0"
+    },
+    {
+      "id": "MDOS-V7-TRACEABILITY",
+      "path": "docs/market_demand_os_v7/registries/traceability-registry.json",
+      "sha256": "2cefc2007255f1a5481a618c99d5332096d7ee665b4ec6311b7a0169608b4154",
+      "version": "1.0.0"
+    }
+  ],
+  "required_approver_roles": [
+    "BusinessOwner",
+    "ContractAuthority",
+    "PrivacyLegalOwner",
+    "IndependentEvidenceVerifier"
+  ],
+  "schema_version": "1.1.0",
+  "schemas": [
+    {
+      "id": "SCHEMA-ACCEPTANCE-MANIFEST.SCHEMA",
+      "path": "docs/market_demand_os_v7/schemas/acceptance-manifest.schema.json",
+      "sha256": "0057c682eb042667ff786725520d0de0acdfbd6612f372651bbeea5a4eed63b1",
+      "version": "1.1.0"
+    },
+    {
+      "id": "SCHEMA-ACTION-ASSIGNMENT.SCHEMA",
+      "path": "docs/market_demand_os_v7/schemas/action-assignment.schema.json",
+      "sha256": "1666aa5125df6d3e831412d2930fc8f895cb0c7571911b9fb96cf0a4215ef5db",
+      "version": "1.1.0"
+    },
+    {
+      "id": "SCHEMA-BEACHHEAD-PROFILE.SCHEMA",
+      "path": "docs/market_demand_os_v7/schemas/beachhead-profile.schema.json",
+      "sha256": "fd0f07a7ce212ddaa09ab367d9b09bc68c8e86e52c3a841b4f2cff14de91d05d",
+      "version": "1.1.0"
+    },
+    {
+      "id": "SCHEMA-CLAIM.SCHEMA",
+      "path": "docs/market_demand_os_v7/schemas/claim.schema.json",
+      "sha256": "71142baa1ff19635def98d1dc3c7f582d48f444d9db48c2938a4e97b6e25489a",
+      "version": "1.1.0"
+    },
+    {
+      "id": "SCHEMA-CONTRACT-MANIFEST.SCHEMA",
+      "path": "docs/market_demand_os_v7/schemas/contract-manifest.schema.json",
+      "sha256": "9e36f1b7136993a1066f39f06b228a1ea51e8133073e7533851a2aba0fa06ada",
+      "version": "1.1.0"
+    },
+    {
+      "id": "SCHEMA-DEMAND-ASSESSMENT.SCHEMA",
+      "path": "docs/market_demand_os_v7/schemas/demand-assessment.schema.json",
+      "sha256": "4e8f5abedd63fbb82dc00905a9497ad6a296b850233a1671308e12338f1dba4a",
+      "version": "1.1.0"
+    },
+    {
+      "id": "SCHEMA-DEMAND-UNIT.SCHEMA",
+      "path": "docs/market_demand_os_v7/schemas/demand-unit.schema.json",
+      "sha256": "7461e34161d28c33f6395af9d4ebd70579470eb1090d64c31050135ec08c9dab",
+      "version": "1.1.0"
+    },
+    {
+      "id": "SCHEMA-ENTITY-RESOLUTION-DECISION.SCHEMA",
+      "path": "docs/market_demand_os_v7/schemas/entity-resolution-decision.schema.json",
+      "sha256": "0e794efec9e01d8c21b1e54278fd827e733c2cac1bbbf38fef89ccc762e56ad2",
+      "version": "1.1.0"
+    },
+    {
+      "id": "SCHEMA-FULFILMENT-RECORD.SCHEMA",
+      "path": "docs/market_demand_os_v7/schemas/fulfilment-record.schema.json",
+      "sha256": "71b46425b989b9ef24e63fc571b6f3bb8ac83188d1e892d3e34f6a7753b30a8e",
+      "version": "1.1.0"
+    },
+    {
+      "id": "SCHEMA-GOLD-ACCEPTANCE.SCHEMA",
+      "path": "docs/market_demand_os_v7/schemas/gold-acceptance.schema.json",
+      "sha256": "04429a1bf90440a0ee9473bea06d3728127c875e828b65894924964b4c86a5e8",
+      "version": "1.1.0"
+    },
+    {
+      "id": "SCHEMA-ORDER-RECORD.SCHEMA",
+      "path": "docs/market_demand_os_v7/schemas/order-record.schema.json",
+      "sha256": "37cab4519d7ccc369287c0222822832b8c98b358ebc76c7ef5add72d35d54496",
+      "version": "1.1.0"
+    },
+    {
+      "id": "SCHEMA-OUTCOME-EVENT.SCHEMA",
+      "path": "docs/market_demand_os_v7/schemas/outcome-event.schema.json",
+      "sha256": "b9a190af4726d3aa68f0996095d2b1c87df8833f7510d48665c86f356f523245",
+      "version": "1.1.0"
+    },
+    {
+      "id": "SCHEMA-PAYMENT-PROOF.SCHEMA",
+      "path": "docs/market_demand_os_v7/schemas/payment-proof.schema.json",
+      "sha256": "84292c021cc9d83e32c35884a924b3ba7299ff8c7555f8977b82efe476e3c7fa",
+      "version": "1.1.0"
+    },
+    {
+      "id": "SCHEMA-PERMIT-DECISION.SCHEMA",
+      "path": "docs/market_demand_os_v7/schemas/permit-decision.schema.json",
+      "sha256": "0e5002e2a0d6efe868c5ef38c4ea33c7744c9c3b636be6c4294bdd7c8fe5f825",
+      "version": "1.1.0"
+    },
+    {
+      "id": "SCHEMA-REQUIREMENT-REGISTRY.SCHEMA",
+      "path": "docs/market_demand_os_v7/schemas/requirement-registry.schema.json",
+      "sha256": "16156dde28127d02539a7cd304074f225d2f575b2569bd54cccbdd92c5c9f428",
+      "version": "1.1.0"
+    },
+    {
+      "id": "SCHEMA-SIGNAL-OBSERVATION.SCHEMA",
+      "path": "docs/market_demand_os_v7/schemas/signal-observation.schema.json",
+      "sha256": "8e727756e99ca8aafb4cb27b798c1267549fdc60e493927e5163ff34099b3107",
+      "version": "1.1.0"
+    },
+    {
+      "id": "SCHEMA-SOURCE-POLICY.SCHEMA",
+      "path": "docs/market_demand_os_v7/schemas/source-policy.schema.json",
+      "sha256": "5c74767c089d6aef04c59aa597fc94a4403104cb88ef92f17d95ce11da8dd940",
+      "version": "1.1.0"
+    },
+    {
+      "id": "SCHEMA-TRACEABILITY-REGISTRY.SCHEMA",
+      "path": "docs/market_demand_os_v7/schemas/traceability-registry.schema.json",
+      "sha256": "1a62611ee0eaccb39ae07d5e76a679fbbe62d380de9778b2430b1b8045abde1b",
+      "version": "1.1.0"
+    }
+  ],
+  "status": "RELEASE_CANDIDATE_FOR_OWNER_RATIFICATION",
+  "supersedes": {
+    "id": "AK-MDOS-V7",
+    "manifest_sha256": "e052b1bcda696df913aa6d1386d7cfdf3c9435c89fc2d2882a2055d01dd998d0",
+    "role": "SUPERSEDED_RELEASE_CANDIDATE",
+    "version": "7.0.0-rc.1"
+  },
+  "target_profiles": [
+    {
+      "evaluation_workdays": 30,
+      "id": "GDO10",
+      "minimum_total": 300,
+      "status": "ACTIVE_EVALUATION_TARGET",
+      "target_per_workday": 10,
+      "unit": "AcceptedGoldenDemandOpportunity"
+    },
+    {
+      "evaluation_workdays": 30,
+      "id": "PC10",
+      "minimum_total": 300,
+      "status": "SEPARATE_NOT_ACTIVE",
+      "target_per_workday": 10,
+      "unit": "NewPayingClient"
+    }
+  ]
+}

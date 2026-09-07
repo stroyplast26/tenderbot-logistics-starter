@@ -1,0 +1,297 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://alumkomplekt-rf.ru/schemas/mdos/v7.2/contract-manifest.schema.json",
+  "title": "MDOS v7.2 successor contract manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "schema_version",
+    "contract_id",
+    "package_version",
+    "status",
+    "fixed_at",
+    "package_root_sha256",
+    "package_digest_algorithm",
+    "supersedes",
+    "target_profiles",
+    "proposed_beachhead_profile",
+    "active_beachhead_profile",
+    "defaults_pending_ratification",
+    "live_gates",
+    "normative_documents",
+    "schemas",
+    "registries",
+    "evidence_artifacts",
+    "advisory_documents",
+    "required_approver_roles",
+    "ratification"
+  ],
+  "properties": {
+    "$schema": {"const": "schemas/contract-manifest.schema.json"},
+    "schema_version": {"const": "1.2.0"},
+    "contract_id": {"const": "AK-MDOS-V7"},
+    "package_version": {"const": "7.2.0-rc.2"},
+    "status": {
+      "enum": ["RELEASE_CANDIDATE_FOR_OWNER_RATIFICATION", "RATIFIED", "SUPERSEDED", "REVOKED"]
+    },
+    "fixed_at": {"type": "string", "format": "date"},
+    "package_root_sha256": {"$ref": "#/$defs/digest"},
+    "package_digest_algorithm": {"const": "sha256(canonical-json(sorted(path,sha256)))"},
+    "supersedes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version", "role", "manifest_sha256"],
+      "properties": {
+        "id": {"const": "AK-MDOS-V7"},
+        "version": {"const": "7.1.0-rc.1"},
+        "role": {"const": "SUPERSEDED_RELEASE_CANDIDATE"},
+        "manifest_sha256": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "target_profiles": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "unit", "status"],
+        "properties": {
+          "id": {"type": "string"},
+          "unit": {"type": "string"},
+          "status": {"enum": ["ACTIVE_EVALUATION_TARGET", "SEPARATE_NOT_ACTIVE", "PROVEN", "REVOKED"]},
+          "target_per_workday": {"type": "integer", "minimum": 1},
+          "evaluation_workdays": {"type": "integer", "minimum": 1},
+          "minimum_total": {"type": "integer", "minimum": 1}
+        }
+      }
+    },
+    "proposed_beachhead_profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "status",
+        "motion_id",
+        "product_scope_id",
+        "region_code",
+        "fulfilment_model_id",
+        "installation_scope",
+        "source_ref"
+      ],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "status": {"const": "PROPOSED_NOT_ACTIVE"},
+        "motion_id": {"const": "EXISTING_ACCOUNT_EXPANSION"},
+        "product_scope_id": {"const": "ALUMINIUM_WINDOWS"},
+        "region_code": {"const": "RU-MOS"},
+        "fulfilment_model_id": {"const": "FACTORY_DELIVERY_NO_INSTALLATION"},
+        "installation_scope": {"const": "EXCLUDED"},
+        "source_ref": {"type": "string", "minLength": 1}
+      }
+    },
+    "active_beachhead_profile": {"type": ["string", "null"]},
+    "defaults_pending_ratification": {"$ref": "#/$defs/default_deny"},
+    "live_gates": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["bitrix", "mango", "mail", "unisender", "tenderplan"],
+      "properties": {
+        "bitrix": {"const": false},
+        "mango": {"const": false},
+        "mail": {"const": false},
+        "unisender": {"const": false},
+        "tenderplan": {"const": false}
+      }
+    },
+    "normative_documents": {"$ref": "#/$defs/artifacts"},
+    "schemas": {"$ref": "#/$defs/artifacts"},
+    "registries": {"$ref": "#/$defs/artifacts"},
+    "evidence_artifacts": {"$ref": "#/$defs/artifacts"},
+    "advisory_documents": {"$ref": "#/$defs/artifacts"},
+    "required_approver_roles": {
+      "type": "array",
+      "minItems": 4,
+      "uniqueItems": true,
+      "items": {"type": "string"}
+    },
+    "ratification": {
+      "oneOf": [
+        {"type": "null"},
+        {"$ref": "#/$defs/ratification_record"}
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"status": {"const": "RELEASE_CANDIDATE_FOR_OWNER_RATIFICATION"}}},
+      "then": {
+        "properties": {
+          "active_beachhead_profile": {"type": "null"},
+          "ratification": {"type": "null"}
+        }
+      }
+    },
+    {
+      "if": {"properties": {"status": {"const": "RATIFIED"}}},
+      "then": {
+        "properties": {
+          "active_beachhead_profile": {"type": "string", "minLength": 1},
+          "ratification": {"$ref": "#/$defs/ratification_record"}
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,159}$"},
+    "digest": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "utc": {"type": "string", "format": "date-time", "pattern": "Z$"},
+    "ref": {"type": "string", "pattern": "^[A-Za-z][A-Za-z0-9+.-]*://[^\\s]+$"},
+    "sealed_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["uri", "sha256"],
+      "properties": {
+        "uri": {"$ref": "#/$defs/ref"},
+        "sha256": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "normative_artifacts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "target_profile",
+        "motions",
+        "economics",
+        "owner_capacity",
+        "payment_truth",
+        "consent_policy",
+        "source_permits",
+        "promises",
+        "initial_release_evidence"
+      ],
+      "properties": {
+        "target_profile": {"$ref": "#/$defs/sealed_ref"},
+        "motions": {"$ref": "#/$defs/sealed_ref"},
+        "economics": {"$ref": "#/$defs/sealed_ref"},
+        "owner_capacity": {"$ref": "#/$defs/sealed_ref"},
+        "payment_truth": {"$ref": "#/$defs/sealed_ref"},
+        "consent_policy": {"$ref": "#/$defs/sealed_ref"},
+        "source_permits": {"$ref": "#/$defs/sealed_ref"},
+        "promises": {"$ref": "#/$defs/sealed_ref"},
+        "initial_release_evidence": {"$ref": "#/$defs/sealed_ref"}
+      }
+    },
+    "default_deny": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["external_reads_enabled", "external_writers_enabled", "contact_enabled", "spend_enabled", "pc10_enabled"],
+      "properties": {
+        "external_reads_enabled": {"const": false},
+        "external_writers_enabled": {"const": false},
+        "contact_enabled": {"const": false},
+        "spend_enabled": {"const": false},
+        "pc10_enabled": {"const": false}
+      }
+    },
+    "artifacts": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "path", "version", "sha256"],
+        "properties": {
+          "id": {"type": "string"},
+          "path": {"type": "string"},
+          "version": {"type": "string"},
+          "sha256": {"$ref": "#/$defs/digest"}
+        }
+      }
+    },
+    "ratification_record": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "record_type",
+        "contract_id",
+        "package_version",
+        "package_root_sha256",
+        "ratified_candidate_manifest_sha256",
+        "ratification_binding_sha256",
+        "active_beachhead_profile_id",
+        "normative_artifacts",
+        "approvals",
+        "independent_verification_binding_sha256",
+        "independent_verification_ref",
+        "ratified_at_utc"
+      ],
+      "properties": {
+        "schema_version": {"const": "1.0.0"},
+        "record_type": {"const": "RATIFICATION_RECORD"},
+        "contract_id": {"const": "AK-MDOS-V7"},
+        "package_version": {"const": "7.2.0-rc.2"},
+        "package_root_sha256": {"$ref": "#/$defs/digest"},
+        "ratified_candidate_manifest_sha256": {"$ref": "#/$defs/digest"},
+        "ratification_binding_sha256": {"$ref": "#/$defs/digest"},
+        "active_beachhead_profile_id": {"$ref": "#/$defs/id"},
+        "normative_artifacts": {"$ref": "#/$defs/normative_artifacts"},
+        "approvals": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["BusinessOwner", "ContractAuthority", "PrivacyLegalOwner", "IndependentEvidenceVerifier"],
+          "properties": {
+            "BusinessOwner": {
+              "allOf": [
+                {"$ref": "#/$defs/approval"},
+                {"properties": {"role": {"const": "BusinessOwner"}}}
+              ]
+            },
+            "ContractAuthority": {
+              "allOf": [
+                {"$ref": "#/$defs/approval"},
+                {"properties": {"role": {"const": "ContractAuthority"}}}
+              ]
+            },
+            "PrivacyLegalOwner": {
+              "allOf": [
+                {"$ref": "#/$defs/approval"},
+                {"properties": {"role": {"const": "PrivacyLegalOwner"}}}
+              ]
+            },
+            "IndependentEvidenceVerifier": {
+              "allOf": [
+                {"$ref": "#/$defs/approval"},
+                {"properties": {"role": {"const": "IndependentEvidenceVerifier"}}}
+              ]
+            }
+          }
+        },
+        "independent_verification_binding_sha256": {"$ref": "#/$defs/digest"},
+        "independent_verification_ref": {"$ref": "#/$defs/sealed_ref"},
+        "ratified_at_utc": {"$ref": "#/$defs/utc"}
+      }
+    },
+    "approval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "role",
+        "actor_ref",
+        "key_id",
+        "signed_binding_sha256",
+        "signature_ref",
+        "approved_at_utc"
+      ],
+      "properties": {
+        "role": {"type": "string"},
+        "actor_ref": {"$ref": "#/$defs/id"},
+        "key_id": {"$ref": "#/$defs/id"},
+        "signed_binding_sha256": {"$ref": "#/$defs/digest"},
+        "signature_ref": {"$ref": "#/$defs/sealed_ref"},
+        "approved_at_utc": {"$ref": "#/$defs/utc"}
+      }
+    }
+  }
+}

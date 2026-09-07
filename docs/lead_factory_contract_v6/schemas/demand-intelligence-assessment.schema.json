@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://alumkomplekt.local/lead-factory/v6/demand-intelligence-assessment.schema.json",
+  "title": "Demand Intelligence Assessment v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "assessment_id", "funnel_case_id", "as_of_utc", "input_snapshot_sha256",
+    "model_profile_version", "qualification_profile_version", "axes",
+    "procurement_clock", "positive_evidence_refs", "negative_evidence_refs",
+    "missing_claims", "critic", "decision", "decision_reason", "expires_at_utc"
+  ],
+  "properties": {
+    "assessment_id": {"type": "string", "minLength": 8, "maxLength": 160},
+    "funnel_case_id": {"type": "string", "minLength": 8, "maxLength": 160},
+    "as_of_utc": {"type": "string", "format": "date-time"},
+    "input_snapshot_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "model_profile_version": {"type": "string", "minLength": 1},
+    "qualification_profile_version": {"type": "string", "minLength": 1},
+    "axes": {
+      "type": "object", "additionalProperties": false,
+      "required": ["product_fit", "buyer_role", "intent", "supplier_openness", "reachability", "data_completeness", "expected_contribution", "capacity_fit", "negative_risk", "epistemic_uncertainty"],
+      "properties": {
+        "product_fit": {"type": "number", "minimum": 0, "maximum": 1},
+        "buyer_role": {"type": "number", "minimum": 0, "maximum": 1},
+        "intent": {"type": "number", "minimum": 0, "maximum": 1},
+        "supplier_openness": {"type": "number", "minimum": 0, "maximum": 1},
+        "reachability": {"type": "number", "minimum": 0, "maximum": 1},
+        "data_completeness": {"type": "number", "minimum": 0, "maximum": 1},
+        "expected_contribution": {"type": "number"},
+        "capacity_fit": {"type": "number", "minimum": 0, "maximum": 1},
+        "negative_risk": {"type": "number", "minimum": 0, "maximum": 1},
+        "epistemic_uncertainty": {"type": "number", "minimum": 0, "maximum": 1}
+      }
+    },
+    "procurement_clock": {
+      "type": "object", "additionalProperties": false,
+      "required": ["D0_7", "D8_30", "D31_60", "D61_90", "GT90", "UNKNOWN"],
+      "properties": {
+        "D0_7": {"type": "number", "minimum": 0, "maximum": 1},
+        "D8_30": {"type": "number", "minimum": 0, "maximum": 1},
+        "D31_60": {"type": "number", "minimum": 0, "maximum": 1},
+        "D61_90": {"type": "number", "minimum": 0, "maximum": 1},
+        "GT90": {"type": "number", "minimum": 0, "maximum": 1},
+        "UNKNOWN": {"type": "number", "minimum": 0, "maximum": 1}
+      }
+    },
+    "positive_evidence_refs": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 3}},
+    "negative_evidence_refs": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 3}},
+    "missing_claims": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 2}},
+    "critic": {
+      "type": "object", "additionalProperties": false,
+      "required": ["model_version", "status", "reasons"],
+      "properties": {
+        "model_version": {"type": "string", "minLength": 1},
+        "status": {"enum": ["AGREE", "DISAGREE", "INSUFFICIENT_EVIDENCE"]},
+        "reasons": {"type": "array", "items": {"type": "string", "minLength": 2}}
+      }
+    },
+    "decision": {"enum": ["RESEARCH", "REVIEW", "NURTURE", "READY_FOR_GOLD_GATE", "BLOCKED"]},
+    "decision_reason": {"type": "string", "minLength": 2},
+    "expires_at_utc": {"type": "string", "format": "date-time"}
+  }
+}
+

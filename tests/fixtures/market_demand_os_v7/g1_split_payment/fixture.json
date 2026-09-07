@@ -1,0 +1,76 @@
+{
+  "contract_id": "AK-MDOS-V7",
+  "package_version": "7.1.0-rc.1",
+  "package_root_sha256": "d4da97bd47ed1bf76a52826a852e3a158611d18adf32a901b814a864e862d97e",
+  "classification": "SYNTHETIC_FIXTURE_NON_CANONICAL_NON_KPI",
+  "fixture_id": "g1-split-payment-shadow-001",
+  "base_fixture_id": "g1-existing-account-shadow-001",
+  "commercial_terms": {
+    "distinct_order_id": "order-fixture-split-001",
+    "amount": 125000.0,
+    "currency": "RUB"
+  },
+  "human_inputs": {
+    "order_approval": {
+      "approver_id": "fixture-order-approver",
+      "decision": "APPROVED",
+      "distinct_order_id": "order-fixture-split-001",
+      "amount": 125000.0,
+      "currency": "RUB",
+      "sealed_input_sha256": "178ed20df1a9deb76dd47c1e30e9f01f3c109583607c82fae5289c1c6cc22878"
+    },
+    "payment_verification": {
+      "verifier_id": "fixture-bank-verifier",
+      "decision": "RECONCILED",
+      "distinct_order_id": "order-fixture-split-001",
+      "provider_event_ids": [
+        "bank-fixture-split-event-001",
+        "bank-fixture-split-event-002"
+      ],
+      "sealed_input_sha256": "c0b48a4bc6e8544b12813cf21cc53c8be49f04e5c2cfebafc6afef4c15d27011"
+    },
+    "fulfilment_attestation": {
+      "actor_id": "fixture-fulfilment-writer",
+      "decision": "ACCEPTED_BY_CUSTOMER",
+      "distinct_order_id": "order-fixture-split-001",
+      "document_ref": "upd-fixture-split-001",
+      "sealed_input_sha256": "44fdae352656d23afb0055167104c53b49ed16fecb243a6158e8c488afdaa61f"
+    }
+  },
+  "signed_bank_statement_payloads": [
+    {
+      "fixture": true,
+      "signed": true,
+      "provider": "fixture-signed-bank-statement",
+      "provider_event_id": "bank-fixture-split-event-001",
+      "distinct_order_id": "order-fixture-split-001",
+      "canonical_account_id": "acct-fixture-alum-001",
+      "payer_identity_ref": "payer-fixture-001",
+      "recipient_identity_ref": "alumkomplekt-fixture-legal-entity",
+      "amount": 50000.0,
+      "currency": "RUB",
+      "value_at": "2026-08-25T10:12:00Z"
+    },
+    {
+      "fixture": true,
+      "signed": true,
+      "provider": "fixture-signed-bank-statement",
+      "provider_event_id": "bank-fixture-split-event-002",
+      "distinct_order_id": "order-fixture-split-001",
+      "canonical_account_id": "acct-fixture-alum-001",
+      "payer_identity_ref": "payer-fixture-001",
+      "recipient_identity_ref": "alumkomplekt-fixture-legal-entity",
+      "amount": 75000.0,
+      "currency": "RUB",
+      "value_at": "2026-08-25T10:14:00Z"
+    }
+  ],
+  "fulfilment_document_payload": {
+    "fixture": true,
+    "document_type": "SIGNED_UPD",
+    "document_ref": "upd-fixture-split-001",
+    "distinct_order_id": "order-fixture-split-001",
+    "accepted_by_customer": true,
+    "event_at": "2026-08-25T10:20:00Z"
+  }
+}

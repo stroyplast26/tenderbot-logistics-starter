@@ -1,0 +1,70 @@
+# Secrets and real configuration
+.env*
+**/.env*
+!**/.env.example
+config.toml
+**/config.toml
+*password*
+*secret*
+*token*
+Пароль от почты.txt
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Runtime and commercial data
+_diagnostics/
+logs/
+mailbox/
+outputs/
+pool/
+reports/
+state/
+task_backups/
+tmp/
+taskbot/data/
+taskbot/backups/
+taskbot/users.json
+docs/LEAD_FACTORY_BITRIX_GRAPH_*_EVIDENCE.json
+docs/LEAD_FACTORY_BITRIX_GRAPH_CAP5_INPUT.json
+
+# Databases, exports and archives
+*.sqlite*
+*.db
+*.bak*
+*.backup*
+*.log
+*.tmp
+*.pid
+*.csv
+*.tsv
+*.xls
+*.xlsx
+*.numbers
+*.jsonl
+*.ndjson
+*.pdf
+*.doc
+*.docx
+*.zip
+*.rar
+*.7z
+*.gz
+
+# Python and local tooling
+__pycache__/
+*.py[cod]
+.venv/
+.venv.*/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.gitnexus/
+
+# Frontend dependencies if a UI is added later
+node_modules/
+dist/
+build/
+.DS_Store

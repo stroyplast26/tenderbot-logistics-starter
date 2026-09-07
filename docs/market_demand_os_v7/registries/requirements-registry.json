@@ -1,0 +1,7017 @@
+{
+  "contract_id": "AK-MDOS-V7",
+  "package_version": "7.1.0-rc.1",
+  "registry_id": "MDOS-V7-REQUIREMENTS",
+  "registry_version": "1.0.0",
+  "requirements": [
+    {
+      "acceptance_ids": [
+        "AT-SRC7-01",
+        "AT-SRC7-02",
+        "AT-SRC7-03",
+        "AT-SRC7-04",
+        "AT-SRC7-05",
+        "AT-SRC7-06",
+        "AT-SRC7-07",
+        "AT-SRC7-08",
+        "AT-SRC7-09",
+        "AT-SRC7-10"
+      ],
+      "applicable_tiers": [
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P2",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-SOURCE-PORTFOLIO.md#L101"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-SOURCE-PORTFOLIO.md",
+      "evidence_refs": [],
+      "id": "MDOS-ADP-001",
+      "line": 101,
+      "owner_role": "SourceAuthority",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "529187efdf38be273a4fc17fda751a49f8f58829c020f1a3aee98e6f45c1e0ce"
+    },
+    {
+      "acceptance_ids": [
+        "AT-SRC7-01",
+        "AT-SRC7-02",
+        "AT-SRC7-03",
+        "AT-SRC7-04",
+        "AT-SRC7-05",
+        "AT-SRC7-06",
+        "AT-SRC7-07",
+        "AT-SRC7-08",
+        "AT-SRC7-09",
+        "AT-SRC7-10"
+      ],
+      "applicable_tiers": [
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P2",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-SOURCE-PORTFOLIO.md#L106"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-SOURCE-PORTFOLIO.md",
+      "evidence_refs": [],
+      "id": "MDOS-ADP-002",
+      "line": 106,
+      "owner_role": "SourceAuthority",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "d39e96a9717445a32e0f3366ee77335a315eac1edf6f84e2562cdbca7014f9ea"
+    },
+    {
+      "acceptance_ids": [
+        "AT-SRC7-01",
+        "AT-SRC7-02",
+        "AT-SRC7-03",
+        "AT-SRC7-04",
+        "AT-SRC7-05",
+        "AT-SRC7-06",
+        "AT-SRC7-07",
+        "AT-SRC7-08",
+        "AT-SRC7-09",
+        "AT-SRC7-10"
+      ],
+      "applicable_tiers": [
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P2",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-SOURCE-PORTFOLIO.md#L110"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-SOURCE-PORTFOLIO.md",
+      "evidence_refs": [],
+      "id": "MDOS-ADP-003",
+      "line": 110,
+      "owner_role": "SourceAuthority",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "c373b77e7b0074ac9bcdf05bcee7d4095d70a29e3e1806d928ae7a54945fa453"
+    },
+    {
+      "acceptance_ids": [
+        "AT-SRC7-01",
+        "AT-SRC7-02",
+        "AT-SRC7-03",
+        "AT-SRC7-04",
+        "AT-SRC7-05",
+        "AT-SRC7-06",
+        "AT-SRC7-07",
+        "AT-SRC7-08",
+        "AT-SRC7-09",
+        "AT-SRC7-10"
+      ],
+      "applicable_tiers": [
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P2",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-SOURCE-PORTFOLIO.md#L114"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-SOURCE-PORTFOLIO.md",
+      "evidence_refs": [],
+      "id": "MDOS-ADP-004",
+      "line": 114,
+      "owner_role": "SourceAuthority",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "386995372d0adb5927305e05054a81663fc809e7317647e3447c91d77833960f"
+    },
+    {
+      "acceptance_ids": [
+        "AT-ARC-01",
+        "AT-ARC-02",
+        "AT-ARC-03",
+        "AT-ARC-04",
+        "AT-ARC-05",
+        "AT-ARC-06",
+        "AT-ARC-07",
+        "AT-ARC-08",
+        "AT-ARC-09",
+        "AT-ARC-10",
+        "AT-ARC-11",
+        "AT-ARC-12",
+        "AT-ARC-13",
+        "AT-ARC-14",
+        "AT-ARC-15"
+      ],
+      "applicable_tiers": [
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P2",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-REFERENCE-ARCHITECTURE.md#L37"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-REFERENCE-ARCHITECTURE.md",
+      "evidence_refs": [],
+      "id": "MDOS-ARC-001",
+      "line": 37,
+      "owner_role": "PlatformOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "73c942e7dd4df5c74fc879bad2c299735e7710ca9f4a1a944db8b8c7151e490f"
+    },
+    {
+      "acceptance_ids": [
+        "AT-ARC-01",
+        "AT-ARC-02",
+        "AT-ARC-03",
+        "AT-ARC-04",
+        "AT-ARC-05",
+        "AT-ARC-06",
+        "AT-ARC-07",
+        "AT-ARC-08",
+        "AT-ARC-09",
+        "AT-ARC-10",
+        "AT-ARC-11",
+        "AT-ARC-12",
+        "AT-ARC-13",
+        "AT-ARC-14",
+        "AT-ARC-15"
+      ],
+      "applicable_tiers": [
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P2",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-REFERENCE-ARCHITECTURE.md#L41"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-REFERENCE-ARCHITECTURE.md",
+      "evidence_refs": [],
+      "id": "MDOS-ARC-002",
+      "line": 41,
+      "owner_role": "PlatformOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "2606a8a5a38359188bb74a91fa3a8b9b66dd63f029e022cf73e8cb6a7766dbdc"
+    },
+    {
+      "acceptance_ids": [
+        "AT-ASR-01",
+        "AT-ASR-02",
+        "AT-ASR-03",
+        "AT-ASR-04",
+        "AT-ASR-05",
+        "AT-ASR-06",
+        "AT-ASR-07",
+        "AT-ASR-08",
+        "AT-ASR-09",
+        "AT-ASR-10",
+        "AT-ASR-11",
+        "AT-ASR-12",
+        "AT-ASR-13",
+        "AT-ASR-14"
+      ],
+      "applicable_tiers": [
+        "G0",
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P0",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DELIVERY-ASSURANCE.md#L8"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-DELIVERY-ASSURANCE.md",
+      "evidence_refs": [],
+      "id": "MDOS-ASR-001",
+      "line": 8,
+      "owner_role": "AssuranceOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "34b5e15394551f69b0c5eb21cdbc6400e38882df3b4614baf47e0d83e5fd4445"
+    },
+    {
+      "acceptance_ids": [
+        "AT-ASR-01",
+        "AT-ASR-02",
+        "AT-ASR-03",
+        "AT-ASR-04",
+        "AT-ASR-05",
+        "AT-ASR-06",
+        "AT-ASR-07",
+        "AT-ASR-08",
+        "AT-ASR-09",
+        "AT-ASR-10",
+        "AT-ASR-11",
+        "AT-ASR-12",
+        "AT-ASR-13",
+        "AT-ASR-14"
+      ],
+      "applicable_tiers": [
+        "G0",
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P0",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DELIVERY-ASSURANCE.md#L13"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-DELIVERY-ASSURANCE.md",
+      "evidence_refs": [],
+      "id": "MDOS-ASR-002",
+      "line": 13,
+      "owner_role": "AssuranceOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "36eb9951c033a0f7904096e0ee3ce78ba07ad509da28e8f2ed772ea741b0b1f5"
+    },
+    {
+      "acceptance_ids": [
+        "AT-ASR-01",
+        "AT-ASR-02",
+        "AT-ASR-03",
+        "AT-ASR-04",
+        "AT-ASR-05",
+        "AT-ASR-06",
+        "AT-ASR-07",
+        "AT-ASR-08",
+        "AT-ASR-09",
+        "AT-ASR-10",
+        "AT-ASR-11",
+        "AT-ASR-12",
+        "AT-ASR-13",
+        "AT-ASR-14"
+      ],
+      "applicable_tiers": [
+        "G0",
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P0",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DELIVERY-ASSURANCE.md#L18"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-DELIVERY-ASSURANCE.md",
+      "evidence_refs": [],
+      "id": "MDOS-ASR-003",
+      "line": 18,
+      "owner_role": "AssuranceOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "e2cde54b588d3676b5c677fffdb734070ce67522bfb7ecac2ba7637d9e8b116f"
+    },
+    {
+      "acceptance_ids": [
+        "AT-ASR-01",
+        "AT-ASR-02",
+        "AT-ASR-03",
+        "AT-ASR-04",
+        "AT-ASR-05",
+        "AT-ASR-06",
+        "AT-ASR-07",
+        "AT-ASR-08",
+        "AT-ASR-09",
+        "AT-ASR-10",
+        "AT-ASR-11",
+        "AT-ASR-12",
+        "AT-ASR-13",
+        "AT-ASR-14"
+      ],
+      "applicable_tiers": [
+        "G0",
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P0",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DELIVERY-ASSURANCE.md#L22"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-DELIVERY-ASSURANCE.md",
+      "evidence_refs": [],
+      "id": "MDOS-ASR-004",
+      "line": 22,
+      "owner_role": "AssuranceOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "fe20546b3fea33405fa26ca39b22462363b63da7b525cc9f710d3ef2f1cd2ac8"
+    },
+    {
+      "acceptance_ids": [
+        "AT-ARC-01",
+        "AT-ARC-02",
+        "AT-ARC-03",
+        "AT-ARC-04",
+        "AT-ARC-05",
+        "AT-ARC-06",
+        "AT-ARC-07",
+        "AT-ARC-08",
+        "AT-ARC-09",
+        "AT-ARC-10",
+        "AT-ARC-11",
+        "AT-ARC-12",
+        "AT-ARC-13",
+        "AT-ARC-14",
+        "AT-ARC-15"
+      ],
+      "applicable_tiers": [
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P2",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/CONTRACT.md#L99"
+      ],
+      "document": "docs/market_demand_os_v7/CONTRACT.md",
+      "evidence_refs": [],
+      "id": "MDOS-AST-001",
+      "line": 99,
+      "owner_role": "RevenueArchitect",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "cd49e2311db8c4c99d2021595aa0062a90a97ddc26756e7160d6599d91402b3e"
+    },
+    {
+      "acceptance_ids": [
+        "AT-ARC-01",
+        "AT-ARC-02",
+        "AT-ARC-03",
+        "AT-ARC-04",
+        "AT-ARC-05",
+        "AT-ARC-06",
+        "AT-ARC-07",
+        "AT-ARC-08",
+        "AT-ARC-09",
+        "AT-ARC-10",
+        "AT-ARC-11",
+        "AT-ARC-12",
+        "AT-ARC-13",
+        "AT-ARC-14",
+        "AT-ARC-15"
+      ],
+      "applicable_tiers": [
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P2",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/CONTRACT.md#L111"
+      ],
+      "document": "docs/market_demand_os_v7/CONTRACT.md",
+      "evidence_refs": [],
+      "id": "MDOS-AST-002",
+      "line": 111,
+      "owner_role": "RevenueArchitect",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "ad307b460e58fa9e774336f541d9c64a9ee81892741e40c25e0e00504dd482b6"
+    },
+    {
+      "acceptance_ids": [
+        "AT-ARC-01",
+        "AT-ARC-02",
+        "AT-ARC-03",
+        "AT-ARC-04",
+        "AT-ARC-05",
+        "AT-ARC-06",
+        "AT-ARC-07",
+        "AT-ARC-08",
+        "AT-ARC-09",
+        "AT-ARC-10",
+        "AT-ARC-11",
+        "AT-ARC-12",
+        "AT-ARC-13",
+        "AT-ARC-14",
+        "AT-ARC-15"
+      ],
+      "applicable_tiers": [
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P2",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/CONTRACT.md#L116"
+      ],
+      "document": "docs/market_demand_os_v7/CONTRACT.md",
+      "evidence_refs": [],
+      "id": "MDOS-AST-003",
+      "line": 116,
+      "owner_role": "RevenueArchitect",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "ee0878c4fde7c17914f7302e7ece193e176da9c1807cbd5726a6cfe020e65bdb"
+    },
+    {
+      "acceptance_ids": [
+        "AT-ASR-01",
+        "AT-ASR-02",
+        "AT-ASR-03",
+        "AT-ASR-04",
+        "AT-ASR-05",
+        "AT-ASR-06",
+        "AT-ASR-07",
+        "AT-ASR-08",
+        "AT-ASR-09",
+        "AT-ASR-10",
+        "AT-ASR-11",
+        "AT-ASR-12",
+        "AT-ASR-13",
+        "AT-ASR-14"
+      ],
+      "applicable_tiers": [
+        "G0",
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P0",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/CONTRACT.md#L136"
+      ],
+      "document": "docs/market_demand_os_v7/CONTRACT.md",
+      "evidence_refs": [],
+      "id": "MDOS-AUT-001",
+      "line": 136,
+      "owner_role": "PolicyAuthority",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "3ae9da4513b4acb88aae94f459ec54086f5c8c64120c1ffd43ad1168f67a077c"
+    },
+    {
+      "acceptance_ids": [
+        "AT-ASR-01",
+        "AT-ASR-02",
+        "AT-ASR-03",
+        "AT-ASR-04",
+        "AT-ASR-05",
+        "AT-ASR-06",
+        "AT-ASR-07",
+        "AT-ASR-08",
+        "AT-ASR-09",
+        "AT-ASR-10",
+        "AT-ASR-11",
+        "AT-ASR-12",
+        "AT-ASR-13",
+        "AT-ASR-14"
+      ],
+      "applicable_tiers": [
+        "G0",
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P0",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/CONTRACT.md#L139"
+      ],
+      "document": "docs/market_demand_os_v7/CONTRACT.md",
+      "evidence_refs": [],
+      "id": "MDOS-AUT-002",
+      "line": 139,
+      "owner_role": "PolicyAuthority",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "3942e043421b128b7b7492182b574870971a8fd158dd4be48e320801516bc9fb"
+    },
+    {
+      "acceptance_ids": [
+        "AT-ASR-01",
+        "AT-ASR-02",
+        "AT-ASR-03",
+        "AT-ASR-04",
+        "AT-ASR-05",
+        "AT-ASR-06",
+        "AT-ASR-07",
+        "AT-ASR-08",
+        "AT-ASR-09",
+        "AT-ASR-10",
+        "AT-ASR-11",
+        "AT-ASR-12",
+        "AT-ASR-13",
+        "AT-ASR-14"
+      ],
+      "applicable_tiers": [
+        "G0",
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P0",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/CONTRACT.md#L143"
+      ],
+      "document": "docs/market_demand_os_v7/CONTRACT.md",
+      "evidence_refs": [],
+      "id": "MDOS-AUT-003",
+      "line": 143,
+      "owner_role": "PolicyAuthority",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "70358171e11f2e00b79a8db576cdfd8446e0c3e245200fb5ac25fd1c962e6053"
+    },
+    {
+      "acceptance_ids": [
+        "AT-ASR-01",
+        "AT-ASR-02",
+        "AT-ASR-03",
+        "AT-ASR-04",
+        "AT-ASR-05",
+        "AT-ASR-06",
+        "AT-ASR-07",
+        "AT-ASR-08",
+        "AT-ASR-09",
+        "AT-ASR-10",
+        "AT-ASR-11",
+        "AT-ASR-12",
+        "AT-ASR-13",
+        "AT-ASR-14"
+      ],
+      "applicable_tiers": [
+        "G0",
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P0",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/CONTRACT.md#L147"
+      ],
+      "document": "docs/market_demand_os_v7/CONTRACT.md",
+      "evidence_refs": [],
+      "id": "MDOS-AUT-004",
+      "line": 147,
+      "owner_role": "PolicyAuthority",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "dba3c238cf045a2d05fc60e507fef733acb649c30139e64ae641984227a92488"
+    },
+    {
+      "acceptance_ids": [
+        "AT-ASR-01",
+        "AT-ASR-02",
+        "AT-ASR-03",
+        "AT-ASR-04",
+        "AT-ASR-05",
+        "AT-ASR-06",
+        "AT-ASR-07",
+        "AT-ASR-08",
+        "AT-ASR-09",
+        "AT-ASR-10",
+        "AT-ASR-11",
+        "AT-ASR-12",
+        "AT-ASR-13",
+        "AT-ASR-14"
+      ],
+      "applicable_tiers": [
+        "G0",
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P0",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/CONTRACT.md#L150"
+      ],
+      "document": "docs/market_demand_os_v7/CONTRACT.md",
+      "evidence_refs": [],
+      "id": "MDOS-AUT-005",
+      "line": 150,
+      "owner_role": "PolicyAuthority",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "03c624c31b3d6d91ab64bbf013da7ba8eaca272b1cb1e690b77372c6324a1c46"
+    },
+    {
+      "acceptance_ids": [
+        "AT-ASR-01",
+        "AT-ASR-02",
+        "AT-ASR-03",
+        "AT-ASR-04",
+        "AT-ASR-05",
+        "AT-ASR-06",
+        "AT-ASR-07",
+        "AT-ASR-08",
+        "AT-ASR-09",
+        "AT-ASR-10",
+        "AT-ASR-11",
+        "AT-ASR-12",
+        "AT-ASR-13",
+        "AT-ASR-14"
+      ],
+      "applicable_tiers": [
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P2",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DELIVERY-ASSURANCE.md#L108"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-DELIVERY-ASSURANCE.md",
+      "evidence_refs": [],
+      "id": "MDOS-BAS-001",
+      "line": 108,
+      "owner_role": "DataSteward",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "1fb7c2910246f7907fc4141c2d61219ac20539b7f1c9e27f8c882b8cb37d2513"
+    },
+    {
+      "acceptance_ids": [
+        "AT-ASR-01",
+        "AT-ASR-02",
+        "AT-ASR-03",
+        "AT-ASR-04",
+        "AT-ASR-05",
+        "AT-ASR-06",
+        "AT-ASR-07",
+        "AT-ASR-08",
+        "AT-ASR-09",
+        "AT-ASR-10",
+        "AT-ASR-11",
+        "AT-ASR-12",
+        "AT-ASR-13",
+        "AT-ASR-14"
+      ],
+      "applicable_tiers": [
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P2",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DELIVERY-ASSURANCE.md#L113"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-DELIVERY-ASSURANCE.md",
+      "evidence_refs": [],
+      "id": "MDOS-BAS-002",
+      "line": 113,
+      "owner_role": "DataSteward",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "2f535399390bb8d7f50a5ac087af27d4748eb57e9e6f1bed928724b3a78dff69"
+    },
+    {
+      "acceptance_ids": [
+        "AT-ASR-01",
+        "AT-ASR-02",
+        "AT-ASR-03",
+        "AT-ASR-04",
+        "AT-ASR-05",
+        "AT-ASR-06",
+        "AT-ASR-07",
+        "AT-ASR-08",
+        "AT-ASR-09",
+        "AT-ASR-10",
+        "AT-ASR-11",
+        "AT-ASR-12",
+        "AT-ASR-13",
+        "AT-ASR-14"
+      ],
+      "applicable_tiers": [
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P2",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DELIVERY-ASSURANCE.md#L117"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-DELIVERY-ASSURANCE.md",
+      "evidence_refs": [],
+      "id": "MDOS-BAS-003",
+      "line": 117,
+      "owner_role": "DataSteward",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "95caa521b013ab40db3da9bceee617d257f9043d38900bca21b5062bb5d56274"
+    },
+    {
+      "acceptance_ids": [
+        "AT-COM-01",
+        "AT-COM-02",
+        "AT-COM-03",
+        "AT-COM-04",
+        "AT-COM-05",
+        "AT-COM-06",
+        "AT-COM-07",
+        "AT-COM-08",
+        "AT-COM-09",
+        "AT-COM-10",
+        "AT-COM-11",
+        "AT-COM-12",
+        "AT-COM-13",
+        "AT-COM-14",
+        "AT-COM-15",
+        "AT-COM-16"
+      ],
+      "applicable_tiers": [
+        "G0",
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P0",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-COMMERCIAL-MODEL.md#L208"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-COMMERCIAL-MODEL.md",
+      "evidence_refs": [],
+      "id": "MDOS-BCH-001",
+      "line": 208,
+      "owner_role": "BusinessOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "09361651c4d922f833f91439d981c7bcb995b6d02209c53df948db9ea1df7fb0"
+    },
+    {
+      "acceptance_ids": [
+        "AT-COM-01",
+        "AT-COM-02",
+        "AT-COM-03",
+        "AT-COM-04",
+        "AT-COM-05",
+        "AT-COM-06",
+        "AT-COM-07",
+        "AT-COM-08",
+        "AT-COM-09",
+        "AT-COM-10",
+        "AT-COM-11",
+        "AT-COM-12",
+        "AT-COM-13",
+        "AT-COM-14",
+        "AT-COM-15",
+        "AT-COM-16"
+      ],
+      "applicable_tiers": [
+        "G0",
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P0",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-COMMERCIAL-MODEL.md#L212"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-COMMERCIAL-MODEL.md",
+      "evidence_refs": [],
+      "id": "MDOS-BCH-002",
+      "line": 212,
+      "owner_role": "BusinessOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "96cea8e6c523552598a39d26aa568c3661c1c90db84cb062e56cb999fef9570d"
+    },
+    {
+      "acceptance_ids": [
+        "AT-COM-01",
+        "AT-COM-02",
+        "AT-COM-03",
+        "AT-COM-04",
+        "AT-COM-05",
+        "AT-COM-06",
+        "AT-COM-07",
+        "AT-COM-08",
+        "AT-COM-09",
+        "AT-COM-10",
+        "AT-COM-11",
+        "AT-COM-12",
+        "AT-COM-13",
+        "AT-COM-14",
+        "AT-COM-15",
+        "AT-COM-16"
+      ],
+      "applicable_tiers": [
+        "G0",
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P0",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-COMMERCIAL-MODEL.md#L216"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-COMMERCIAL-MODEL.md",
+      "evidence_refs": [],
+      "id": "MDOS-BCH-003",
+      "line": 216,
+      "owner_role": "BusinessOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "f6c4a98d6276a5eecbebc61468d9e282fa431fbae30660f97c48f1545a8cba8e"
+    },
+    {
+      "acceptance_ids": [
+        "AT-COM-01",
+        "AT-COM-02",
+        "AT-COM-03",
+        "AT-COM-04",
+        "AT-COM-05",
+        "AT-COM-06",
+        "AT-COM-07",
+        "AT-COM-08",
+        "AT-COM-09",
+        "AT-COM-10",
+        "AT-COM-11",
+        "AT-COM-12",
+        "AT-COM-13",
+        "AT-COM-14",
+        "AT-COM-15",
+        "AT-COM-16"
+      ],
+      "applicable_tiers": [
+        "G0",
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P0",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-COMMERCIAL-MODEL.md#L220"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-COMMERCIAL-MODEL.md",
+      "evidence_refs": [],
+      "id": "MDOS-BCH-004",
+      "line": 220,
+      "owner_role": "BusinessOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "4fca82b2a558aed2fa777f9049c1441063116402e32c48a7518c36b353a170db"
+    },
+    {
+      "acceptance_ids": [
+        "AT-COM-01",
+        "AT-COM-02",
+        "AT-COM-03",
+        "AT-COM-04",
+        "AT-COM-05",
+        "AT-COM-06",
+        "AT-COM-07",
+        "AT-COM-08",
+        "AT-COM-09",
+        "AT-COM-10",
+        "AT-COM-11",
+        "AT-COM-12",
+        "AT-COM-13",
+        "AT-COM-14",
+        "AT-COM-15",
+        "AT-COM-16"
+      ],
+      "applicable_tiers": [
+        "G0",
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P0",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-COMMERCIAL-MODEL.md#L224"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-COMMERCIAL-MODEL.md",
+      "evidence_refs": [],
+      "id": "MDOS-BCH-005",
+      "line": 224,
+      "owner_role": "BusinessOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "c66cc31cc56c1266ca06ec09ab9abb86835299459b857933c533004f84935832"
+    },
+    {
+      "acceptance_ids": [
+        "AT-DI7-01",
+        "AT-DI7-02",
+        "AT-DI7-03",
+        "AT-DI7-04",
+        "AT-DI7-05",
+        "AT-DI7-06",
+        "AT-DI7-07",
+        "AT-DI7-08",
+        "AT-DI7-09",
+        "AT-DI7-10",
+        "AT-DI7-11",
+        "AT-DI7-12"
+      ],
+      "applicable_tiers": [
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P1",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DEMAND-INTELLIGENCE.md#L96"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-DEMAND-INTELLIGENCE.md",
+      "evidence_refs": [],
+      "id": "MDOS-CAL-001",
+      "line": 96,
+      "owner_role": "IndependentModelValidator",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "554d35403953810e5b779926b7c6041d750066b54febe28db725f46a566b3065"
+    },
+    {
+      "acceptance_ids": [
+        "AT-DI7-01",
+        "AT-DI7-02",
+        "AT-DI7-03",
+        "AT-DI7-04",
+        "AT-DI7-05",
+        "AT-DI7-06",
+        "AT-DI7-07",
+        "AT-DI7-08",
+        "AT-DI7-09",
+        "AT-DI7-10",
+        "AT-DI7-11",
+        "AT-DI7-12"
+      ],
+      "applicable_tiers": [
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P1",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DEMAND-INTELLIGENCE.md#L100"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-DEMAND-INTELLIGENCE.md",
+      "evidence_refs": [],
+      "id": "MDOS-CAL-002",
+      "line": 100,
+      "owner_role": "IndependentModelValidator",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "484d85de36c6cacbf7b39c7e3dfd99e0113852a1b177fe1865d7ed42b8180e1b"
+    },
+    {
+      "acceptance_ids": [
+        "AT-DI7-01",
+        "AT-DI7-02",
+        "AT-DI7-03",
+        "AT-DI7-04",
+        "AT-DI7-05",
+        "AT-DI7-06",
+        "AT-DI7-07",
+        "AT-DI7-08",
+        "AT-DI7-09",
+        "AT-DI7-10",
+        "AT-DI7-11",
+        "AT-DI7-12"
+      ],
+      "applicable_tiers": [
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P1",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DEMAND-INTELLIGENCE.md#L104"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-DEMAND-INTELLIGENCE.md",
+      "evidence_refs": [],
+      "id": "MDOS-CAL-003",
+      "line": 104,
+      "owner_role": "IndependentModelValidator",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "4fa15537d14032b9350d791cf8e7625b2ec230506ab267b6bc05cf8f808e01df"
+    },
+    {
+      "acceptance_ids": [
+        "AT-ARC-01",
+        "AT-ARC-02",
+        "AT-ARC-03",
+        "AT-ARC-04",
+        "AT-ARC-05",
+        "AT-ARC-06",
+        "AT-ARC-07",
+        "AT-ARC-08",
+        "AT-ARC-09",
+        "AT-ARC-10",
+        "AT-ARC-11",
+        "AT-ARC-12",
+        "AT-ARC-13",
+        "AT-ARC-14",
+        "AT-ARC-15"
+      ],
+      "applicable_tiers": [
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P2",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-REFERENCE-ARCHITECTURE.md#L96"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-REFERENCE-ARCHITECTURE.md",
+      "evidence_refs": [],
+      "id": "MDOS-CAP-001",
+      "line": 96,
+      "owner_role": "OperationsOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "d5dda1b2489a0e1f5e1a10a36a688b07f01495b471e1f085d9ee8203ed7c851d"
+    },
+    {
+      "acceptance_ids": [
+        "AT-ARC-01",
+        "AT-ARC-02",
+        "AT-ARC-03",
+        "AT-ARC-04",
+        "AT-ARC-05",
+        "AT-ARC-06",
+        "AT-ARC-07",
+        "AT-ARC-08",
+        "AT-ARC-09",
+        "AT-ARC-10",
+        "AT-ARC-11",
+        "AT-ARC-12",
+        "AT-ARC-13",
+        "AT-ARC-14",
+        "AT-ARC-15"
+      ],
+      "applicable_tiers": [
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P2",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-REFERENCE-ARCHITECTURE.md#L100"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-REFERENCE-ARCHITECTURE.md",
+      "evidence_refs": [],
+      "id": "MDOS-CAP-002",
+      "line": 100,
+      "owner_role": "OperationsOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "40dd93793e2185b26b5ffdf3dc80193e07f9f152cbff9d14603bf8457130afe7"
+    },
+    {
+      "acceptance_ids": [
+        "AT-ARC-01",
+        "AT-ARC-02",
+        "AT-ARC-03",
+        "AT-ARC-04",
+        "AT-ARC-05",
+        "AT-ARC-06",
+        "AT-ARC-07",
+        "AT-ARC-08",
+        "AT-ARC-09",
+        "AT-ARC-10",
+        "AT-ARC-11",
+        "AT-ARC-12",
+        "AT-ARC-13",
+        "AT-ARC-14",
+        "AT-ARC-15"
+      ],
+      "applicable_tiers": [
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P2",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-REFERENCE-ARCHITECTURE.md#L104"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-REFERENCE-ARCHITECTURE.md",
+      "evidence_refs": [],
+      "id": "MDOS-CAP-003",
+      "line": 104,
+      "owner_role": "OperationsOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "1456bf487dc864e4cf0a0d047fc710fe22748e08f538d5d3ee3e111501676afa"
+    },
+    {
+      "acceptance_ids": [
+        "AT-COM-01",
+        "AT-COM-02",
+        "AT-COM-03",
+        "AT-COM-04",
+        "AT-COM-05",
+        "AT-COM-06",
+        "AT-COM-07",
+        "AT-COM-08",
+        "AT-COM-09",
+        "AT-COM-10",
+        "AT-COM-11",
+        "AT-COM-12",
+        "AT-COM-13",
+        "AT-COM-14",
+        "AT-COM-15",
+        "AT-COM-16"
+      ],
+      "applicable_tiers": [
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P2",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-COMMERCIAL-MODEL.md#L8"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-COMMERCIAL-MODEL.md",
+      "evidence_refs": [],
+      "id": "MDOS-COM-001",
+      "line": 8,
+      "owner_role": "RevenueArchitect",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "3accbad50b835cfb0b5ecf00f893864617d3ef2148642cca9cb9f266e2971011"
+    },
+    {
+      "acceptance_ids": [
+        "AT-COM-01",
+        "AT-COM-02",
+        "AT-COM-03",
+        "AT-COM-04",
+        "AT-COM-05",
+        "AT-COM-06",
+        "AT-COM-07",
+        "AT-COM-08",
+        "AT-COM-09",
+        "AT-COM-10",
+        "AT-COM-11",
+        "AT-COM-12",
+        "AT-COM-13",
+        "AT-COM-14",
+        "AT-COM-15",
+        "AT-COM-16"
+      ],
+      "applicable_tiers": [
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P2",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-COMMERCIAL-MODEL.md#L21"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-COMMERCIAL-MODEL.md",
+      "evidence_refs": [],
+      "id": "MDOS-COM-002",
+      "line": 21,
+      "owner_role": "RevenueArchitect",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "b7cefb5a267c72a4ec2bc4d522536e3d1db9dfcb7311d7e5885b25defb29de65"
+    },
+    {
+      "acceptance_ids": [
+        "AT-COM-01",
+        "AT-COM-02",
+        "AT-COM-03",
+        "AT-COM-04",
+        "AT-COM-05",
+        "AT-COM-06",
+        "AT-COM-07",
+        "AT-COM-08",
+        "AT-COM-09",
+        "AT-COM-10",
+        "AT-COM-11",
+        "AT-COM-12",
+        "AT-COM-13",
+        "AT-COM-14",
+        "AT-COM-15",
+        "AT-COM-16"
+      ],
+      "applicable_tiers": [
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P2",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-COMMERCIAL-MODEL.md#L25"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-COMMERCIAL-MODEL.md",
+      "evidence_refs": [],
+      "id": "MDOS-COM-003",
+      "line": 25,
+      "owner_role": "RevenueArchitect",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "2a291486cb995489c2548096b0d5e90be102f096635d919115f1d2e42bdd8501"
+    },
+    {
+      "acceptance_ids": [
+        "AT-COM-01",
+        "AT-COM-02",
+        "AT-COM-03",
+        "AT-COM-04",
+        "AT-COM-05",
+        "AT-COM-06",
+        "AT-COM-07",
+        "AT-COM-08",
+        "AT-COM-09",
+        "AT-COM-10",
+        "AT-COM-11",
+        "AT-COM-12",
+        "AT-COM-13",
+        "AT-COM-14",
+        "AT-COM-15",
+        "AT-COM-16"
+      ],
+      "applicable_tiers": [
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P2",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-COMMERCIAL-MODEL.md#L29"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-COMMERCIAL-MODEL.md",
+      "evidence_refs": [],
+      "id": "MDOS-COM-004",
+      "line": 29,
+      "owner_role": "RevenueArchitect",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "ee6eeef252bc89e6e6a2df29fc2985a225bb61defd7039239330a860ef81cc54"
+    },
+    {
+      "acceptance_ids": [
+        "AT-DEC-01",
+        "AT-DEC-02",
+        "AT-DEC-03",
+        "AT-DEC-04",
+        "AT-DEC-05",
+        "AT-DEC-06",
+        "AT-DEC-07",
+        "AT-DEC-08",
+        "AT-DEC-09",
+        "AT-DEC-10",
+        "AT-DEC-11",
+        "AT-DEC-12",
+        "AT-DEC-13",
+        "AT-DEC-14",
+        "AT-DEC-15"
+      ],
+      "applicable_tiers": [
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P1",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DECISION-OUTCOMES.md#L8"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-DECISION-OUTCOMES.md",
+      "evidence_refs": [],
+      "id": "MDOS-DEC-001",
+      "line": 8,
+      "owner_role": "DecisionScienceOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "42e49a20e277c480a51d452d3e0c0c92b474cb48768c9cb5f9088c8e2b29c4ee"
+    },
+    {
+      "acceptance_ids": [
+        "AT-DEC-01",
+        "AT-DEC-02",
+        "AT-DEC-03",
+        "AT-DEC-04",
+        "AT-DEC-05",
+        "AT-DEC-06",
+        "AT-DEC-07",
+        "AT-DEC-08",
+        "AT-DEC-09",
+        "AT-DEC-10",
+        "AT-DEC-11",
+        "AT-DEC-12",
+        "AT-DEC-13",
+        "AT-DEC-14",
+        "AT-DEC-15"
+      ],
+      "applicable_tiers": [
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P1",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DECISION-OUTCOMES.md#L12"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-DECISION-OUTCOMES.md",
+      "evidence_refs": [],
+      "id": "MDOS-DEC-002",
+      "line": 12,
+      "owner_role": "DecisionScienceOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "23ee5a5902a0e192bceef12d463144ca66b2c506197ba94776dd03a5d717e0bf"
+    },
+    {
+      "acceptance_ids": [
+        "AT-DEC-01",
+        "AT-DEC-02",
+        "AT-DEC-03",
+        "AT-DEC-04",
+        "AT-DEC-05",
+        "AT-DEC-06",
+        "AT-DEC-07",
+        "AT-DEC-08",
+        "AT-DEC-09",
+        "AT-DEC-10",
+        "AT-DEC-11",
+        "AT-DEC-12",
+        "AT-DEC-13",
+        "AT-DEC-14",
+        "AT-DEC-15"
+      ],
+      "applicable_tiers": [
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P1",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DECISION-OUTCOMES.md#L16"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-DECISION-OUTCOMES.md",
+      "evidence_refs": [],
+      "id": "MDOS-DEC-003",
+      "line": 16,
+      "owner_role": "DecisionScienceOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "aa0c7b456b779d321fe354d818c94cda6d6a05dd5e284f0a4f3452f5e22cde65"
+    },
+    {
+      "acceptance_ids": [
+        "AT-DEC-01",
+        "AT-DEC-02",
+        "AT-DEC-03",
+        "AT-DEC-04",
+        "AT-DEC-05",
+        "AT-DEC-06",
+        "AT-DEC-07",
+        "AT-DEC-08",
+        "AT-DEC-09",
+        "AT-DEC-10",
+        "AT-DEC-11",
+        "AT-DEC-12",
+        "AT-DEC-13",
+        "AT-DEC-14",
+        "AT-DEC-15"
+      ],
+      "applicable_tiers": [
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P1",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DECISION-OUTCOMES.md#L20"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-DECISION-OUTCOMES.md",
+      "evidence_refs": [],
+      "id": "MDOS-DEC-004",
+      "line": 20,
+      "owner_role": "DecisionScienceOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "81fb4208b47cb6f3d9cc606bd30c1b345c2fdc4ed33e4c96a9c3d0891b8896eb"
+    },
+    {
+      "acceptance_ids": [
+        "AT-DI7-01",
+        "AT-DI7-02",
+        "AT-DI7-03",
+        "AT-DI7-04",
+        "AT-DI7-05",
+        "AT-DI7-06",
+        "AT-DI7-07",
+        "AT-DI7-08",
+        "AT-DI7-09",
+        "AT-DI7-10",
+        "AT-DI7-11",
+        "AT-DI7-12"
+      ],
+      "applicable_tiers": [
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P1",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DEMAND-INTELLIGENCE.md#L8"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-DEMAND-INTELLIGENCE.md",
+      "evidence_refs": [],
+      "id": "MDOS-DI-001",
+      "line": 8,
+      "owner_role": "ModelRiskOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "5d3433e3c06025a6441f2a78460c661d0439877c9fa8807b93942ced5ea0c17f"
+    },
+    {
+      "acceptance_ids": [
+        "AT-DI7-01",
+        "AT-DI7-02",
+        "AT-DI7-03",
+        "AT-DI7-04",
+        "AT-DI7-05",
+        "AT-DI7-06",
+        "AT-DI7-07",
+        "AT-DI7-08",
+        "AT-DI7-09",
+        "AT-DI7-10",
+        "AT-DI7-11",
+        "AT-DI7-12"
+      ],
+      "applicable_tiers": [
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P1",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DEMAND-INTELLIGENCE.md#L12"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-DEMAND-INTELLIGENCE.md",
+      "evidence_refs": [],
+      "id": "MDOS-DI-002",
+      "line": 12,
+      "owner_role": "ModelRiskOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "42a8b600cebe21f327db5a0e8fd2bc21fe3f295fff97b65f723fc3e16d67eb3a"
+    },
+    {
+      "acceptance_ids": [
+        "AT-DI7-01",
+        "AT-DI7-02",
+        "AT-DI7-03",
+        "AT-DI7-04",
+        "AT-DI7-05",
+        "AT-DI7-06",
+        "AT-DI7-07",
+        "AT-DI7-08",
+        "AT-DI7-09",
+        "AT-DI7-10",
+        "AT-DI7-11",
+        "AT-DI7-12"
+      ],
+      "applicable_tiers": [
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P1",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DEMAND-INTELLIGENCE.md#L16"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-DEMAND-INTELLIGENCE.md",
+      "evidence_refs": [],
+      "id": "MDOS-DI-003",
+      "line": 16,
+      "owner_role": "ModelRiskOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "dce93d4ebb4a0798505fd71a9dd30be420a2adcc3fef4c16c315242f617efdcf"
+    },
+    {
+      "acceptance_ids": [
+        "AT-DI7-01",
+        "AT-DI7-02",
+        "AT-DI7-03",
+        "AT-DI7-04",
+        "AT-DI7-05",
+        "AT-DI7-06",
+        "AT-DI7-07",
+        "AT-DI7-08",
+        "AT-DI7-09",
+        "AT-DI7-10",
+        "AT-DI7-11",
+        "AT-DI7-12"
+      ],
+      "applicable_tiers": [
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P2",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DEMAND-INTELLIGENCE.md#L21"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-DEMAND-INTELLIGENCE.md",
+      "evidence_refs": [],
+      "id": "MDOS-DOC-001",
+      "line": 21,
+      "owner_role": "DocumentIntelligenceOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "98f22d62a98582c6d19b95383e022a16a8b4e8cf3f073df43ab2895222ed983a"
+    },
+    {
+      "acceptance_ids": [
+        "AT-DI7-01",
+        "AT-DI7-02",
+        "AT-DI7-03",
+        "AT-DI7-04",
+        "AT-DI7-05",
+        "AT-DI7-06",
+        "AT-DI7-07",
+        "AT-DI7-08",
+        "AT-DI7-09",
+        "AT-DI7-10",
+        "AT-DI7-11",
+        "AT-DI7-12"
+      ],
+      "applicable_tiers": [
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P2",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DEMAND-INTELLIGENCE.md#L25"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-DEMAND-INTELLIGENCE.md",
+      "evidence_refs": [],
+      "id": "MDOS-DOC-002",
+      "line": 25,
+      "owner_role": "DocumentIntelligenceOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "9b56b0c7d60e6465b2e695abd29dc2a9a4bb4ce622ce0320c51272a7e3c00182"
+    },
+    {
+      "acceptance_ids": [
+        "AT-DI7-01",
+        "AT-DI7-02",
+        "AT-DI7-03",
+        "AT-DI7-04",
+        "AT-DI7-05",
+        "AT-DI7-06",
+        "AT-DI7-07",
+        "AT-DI7-08",
+        "AT-DI7-09",
+        "AT-DI7-10",
+        "AT-DI7-11",
+        "AT-DI7-12"
+      ],
+      "applicable_tiers": [
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P2",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DEMAND-INTELLIGENCE.md#L29"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-DEMAND-INTELLIGENCE.md",
+      "evidence_refs": [],
+      "id": "MDOS-DOC-003",
+      "line": 29,
+      "owner_role": "DocumentIntelligenceOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "b4ffca87f22cf0db4f30d08e73c4efd93484d2a63232b80513074caddebf1d1c"
+    },
+    {
+      "acceptance_ids": [
+        "AT-DI7-01",
+        "AT-DI7-02",
+        "AT-DI7-03",
+        "AT-DI7-04",
+        "AT-DI7-05",
+        "AT-DI7-06",
+        "AT-DI7-07",
+        "AT-DI7-08",
+        "AT-DI7-09",
+        "AT-DI7-10",
+        "AT-DI7-11",
+        "AT-DI7-12"
+      ],
+      "applicable_tiers": [
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P2",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DEMAND-INTELLIGENCE.md#L33"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-DEMAND-INTELLIGENCE.md",
+      "evidence_refs": [],
+      "id": "MDOS-DOC-004",
+      "line": 33,
+      "owner_role": "DocumentIntelligenceOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "111bc128727b96ba7041a54c93875fccaa4f8853fdff2e927937b2452a0c2524"
+    },
+    {
+      "acceptance_ids": [
+        "AT-COM-01",
+        "AT-COM-02",
+        "AT-COM-03",
+        "AT-COM-04",
+        "AT-COM-05",
+        "AT-COM-06",
+        "AT-COM-07",
+        "AT-COM-08",
+        "AT-COM-09",
+        "AT-COM-10",
+        "AT-COM-11",
+        "AT-COM-12",
+        "AT-COM-13",
+        "AT-COM-14",
+        "AT-COM-15",
+        "AT-COM-16"
+      ],
+      "applicable_tiers": [
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P2",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-COMMERCIAL-MODEL.md#L180"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-COMMERCIAL-MODEL.md",
+      "evidence_refs": [],
+      "id": "MDOS-DTP-001",
+      "line": 180,
+      "owner_role": "PartnerOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "282c85d52fc18177814445ce7a7306133c41fe112b9dff4ccf19feedacc2fa7b"
+    },
+    {
+      "acceptance_ids": [
+        "AT-COM-01",
+        "AT-COM-02",
+        "AT-COM-03",
+        "AT-COM-04",
+        "AT-COM-05",
+        "AT-COM-06",
+        "AT-COM-07",
+        "AT-COM-08",
+        "AT-COM-09",
+        "AT-COM-10",
+        "AT-COM-11",
+        "AT-COM-12",
+        "AT-COM-13",
+        "AT-COM-14",
+        "AT-COM-15",
+        "AT-COM-16"
+      ],
+      "applicable_tiers": [
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P2",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-COMMERCIAL-MODEL.md#L184"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-COMMERCIAL-MODEL.md",
+      "evidence_refs": [],
+      "id": "MDOS-DTP-002",
+      "line": 184,
+      "owner_role": "PartnerOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "771274dae2a5ada7be2d22af2a009f89f06640292e93d747a33cf2fbf58d7919"
+    },
+    {
+      "acceptance_ids": [
+        "AT-COM-01",
+        "AT-COM-02",
+        "AT-COM-03",
+        "AT-COM-04",
+        "AT-COM-05",
+        "AT-COM-06",
+        "AT-COM-07",
+        "AT-COM-08",
+        "AT-COM-09",
+        "AT-COM-10",
+        "AT-COM-11",
+        "AT-COM-12",
+        "AT-COM-13",
+        "AT-COM-14",
+        "AT-COM-15",
+        "AT-COM-16"
+      ],
+      "applicable_tiers": [
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P2",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-COMMERCIAL-MODEL.md#L188"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-COMMERCIAL-MODEL.md",
+      "evidence_refs": [],
+      "id": "MDOS-DTP-003",
+      "line": 188,
+      "owner_role": "PartnerOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "df919ac495f83d9c5bb9964877f264b31f51303dfa8fb910207466a62e223254"
+    },
+    {
+      "acceptance_ids": [
+        "AT-DEC-01",
+        "AT-DEC-02",
+        "AT-DEC-03",
+        "AT-DEC-04",
+        "AT-DEC-05",
+        "AT-DEC-06",
+        "AT-DEC-07",
+        "AT-DEC-08",
+        "AT-DEC-09",
+        "AT-DEC-10",
+        "AT-DEC-11",
+        "AT-DEC-12",
+        "AT-DEC-13",
+        "AT-DEC-14",
+        "AT-DEC-15"
+      ],
+      "applicable_tiers": [
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P1",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DECISION-OUTCOMES.md#L63"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-DECISION-OUTCOMES.md",
+      "evidence_refs": [],
+      "id": "MDOS-ECO-001",
+      "line": 63,
+      "owner_role": "CommercialFinanceOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "ecb1f945410bbad6392f4338a5376e6826b530b596837c2ab9fa00f589d9c007"
+    },
+    {
+      "acceptance_ids": [
+        "AT-DEC-01",
+        "AT-DEC-02",
+        "AT-DEC-03",
+        "AT-DEC-04",
+        "AT-DEC-05",
+        "AT-DEC-06",
+        "AT-DEC-07",
+        "AT-DEC-08",
+        "AT-DEC-09",
+        "AT-DEC-10",
+        "AT-DEC-11",
+        "AT-DEC-12",
+        "AT-DEC-13",
+        "AT-DEC-14",
+        "AT-DEC-15"
+      ],
+      "applicable_tiers": [
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P1",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DECISION-OUTCOMES.md#L68"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-DECISION-OUTCOMES.md",
+      "evidence_refs": [],
+      "id": "MDOS-ECO-002",
+      "line": 68,
+      "owner_role": "CommercialFinanceOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "6b3b0bf03cec0d60079d6edc8bd117296069ea7a15f242aa35422970ec734eed"
+    },
+    {
+      "acceptance_ids": [
+        "AT-DEC-01",
+        "AT-DEC-02",
+        "AT-DEC-03",
+        "AT-DEC-04",
+        "AT-DEC-05",
+        "AT-DEC-06",
+        "AT-DEC-07",
+        "AT-DEC-08",
+        "AT-DEC-09",
+        "AT-DEC-10",
+        "AT-DEC-11",
+        "AT-DEC-12",
+        "AT-DEC-13",
+        "AT-DEC-14",
+        "AT-DEC-15"
+      ],
+      "applicable_tiers": [
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P1",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DECISION-OUTCOMES.md#L72"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-DECISION-OUTCOMES.md",
+      "evidence_refs": [],
+      "id": "MDOS-ECO-003",
+      "line": 72,
+      "owner_role": "CommercialFinanceOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "c01e10eb8c0fac169e4254f9435f9ff554ff45a81517c12302353d9efdd44882"
+    },
+    {
+      "acceptance_ids": [
+        "AT-DI7-01",
+        "AT-DI7-02",
+        "AT-DI7-03",
+        "AT-DI7-04",
+        "AT-DI7-05",
+        "AT-DI7-06",
+        "AT-DI7-07",
+        "AT-DI7-08",
+        "AT-DI7-09",
+        "AT-DI7-10",
+        "AT-DI7-11",
+        "AT-DI7-12"
+      ],
+      "applicable_tiers": [
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P1",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DEMAND-INTELLIGENCE.md#L39"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-DEMAND-INTELLIGENCE.md",
+      "evidence_refs": [],
+      "id": "MDOS-ER-001",
+      "line": 39,
+      "owner_role": "IdentitySteward",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "23d6d8b3e923c695656458e2296110f99e78e4f3e1e4f4c1b8d3cdba22253d26"
+    },
+    {
+      "acceptance_ids": [
+        "AT-DI7-01",
+        "AT-DI7-02",
+        "AT-DI7-03",
+        "AT-DI7-04",
+        "AT-DI7-05",
+        "AT-DI7-06",
+        "AT-DI7-07",
+        "AT-DI7-08",
+        "AT-DI7-09",
+        "AT-DI7-10",
+        "AT-DI7-11",
+        "AT-DI7-12"
+      ],
+      "applicable_tiers": [
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P1",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DEMAND-INTELLIGENCE.md#L44"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-DEMAND-INTELLIGENCE.md",
+      "evidence_refs": [],
+      "id": "MDOS-ER-002",
+      "line": 44,
+      "owner_role": "IdentitySteward",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "a409b5c0490ba81aed48efff6d9a6e3d0ef04a7086c0ff2ea58b7e4951527bc2"
+    },
+    {
+      "acceptance_ids": [
+        "AT-DI7-01",
+        "AT-DI7-02",
+        "AT-DI7-03",
+        "AT-DI7-04",
+        "AT-DI7-05",
+        "AT-DI7-06",
+        "AT-DI7-07",
+        "AT-DI7-08",
+        "AT-DI7-09",
+        "AT-DI7-10",
+        "AT-DI7-11",
+        "AT-DI7-12"
+      ],
+      "applicable_tiers": [
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P1",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DEMAND-INTELLIGENCE.md#L48"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-DEMAND-INTELLIGENCE.md",
+      "evidence_refs": [],
+      "id": "MDOS-ER-003",
+      "line": 48,
+      "owner_role": "IdentitySteward",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "677196ffa300df12e78c0cba79e20afc9625b56318b00e436de176a53bea9fa0"
+    },
+    {
+      "acceptance_ids": [
+        "AT-ARC-01",
+        "AT-ARC-02",
+        "AT-ARC-03",
+        "AT-ARC-04",
+        "AT-ARC-05",
+        "AT-ARC-06",
+        "AT-ARC-07",
+        "AT-ARC-08",
+        "AT-ARC-09",
+        "AT-ARC-10",
+        "AT-ARC-11",
+        "AT-ARC-12",
+        "AT-ARC-13",
+        "AT-ARC-14",
+        "AT-ARC-15"
+      ],
+      "applicable_tiers": [
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P1",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-REFERENCE-ARCHITECTURE.md#L60"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-REFERENCE-ARCHITECTURE.md",
+      "evidence_refs": [],
+      "id": "MDOS-EVT-001",
+      "line": 60,
+      "owner_role": "DataPlatformOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "ffe498f42033cd5d339484001b982b250a20d35307e9932d15c5003109095731"
+    },
+    {
+      "acceptance_ids": [
+        "AT-ARC-01",
+        "AT-ARC-02",
+        "AT-ARC-03",
+        "AT-ARC-04",
+        "AT-ARC-05",
+        "AT-ARC-06",
+        "AT-ARC-07",
+        "AT-ARC-08",
+        "AT-ARC-09",
+        "AT-ARC-10",
+        "AT-ARC-11",
+        "AT-ARC-12",
+        "AT-ARC-13",
+        "AT-ARC-14",
+        "AT-ARC-15"
+      ],
+      "applicable_tiers": [
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P1",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-REFERENCE-ARCHITECTURE.md#L64"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-REFERENCE-ARCHITECTURE.md",
+      "evidence_refs": [],
+      "id": "MDOS-EVT-002",
+      "line": 64,
+      "owner_role": "DataPlatformOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "0df87c7f51e3cdafde2a5312e17f7169d01f286d5586aaaa4255e8ae69978fa6"
+    },
+    {
+      "acceptance_ids": [
+        "AT-ARC-01",
+        "AT-ARC-02",
+        "AT-ARC-03",
+        "AT-ARC-04",
+        "AT-ARC-05",
+        "AT-ARC-06",
+        "AT-ARC-07",
+        "AT-ARC-08",
+        "AT-ARC-09",
+        "AT-ARC-10",
+        "AT-ARC-11",
+        "AT-ARC-12",
+        "AT-ARC-13",
+        "AT-ARC-14",
+        "AT-ARC-15"
+      ],
+      "applicable_tiers": [
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P1",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-REFERENCE-ARCHITECTURE.md#L67"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-REFERENCE-ARCHITECTURE.md",
+      "evidence_refs": [],
+      "id": "MDOS-EVT-003",
+      "line": 67,
+      "owner_role": "DataPlatformOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "62167b8542d06d14afc0d830f0cba6b128cdb52116a59d8e64d1209723c15702"
+    },
+    {
+      "acceptance_ids": [
+        "AT-ARC-01",
+        "AT-ARC-02",
+        "AT-ARC-03",
+        "AT-ARC-04",
+        "AT-ARC-05",
+        "AT-ARC-06",
+        "AT-ARC-07",
+        "AT-ARC-08",
+        "AT-ARC-09",
+        "AT-ARC-10",
+        "AT-ARC-11",
+        "AT-ARC-12",
+        "AT-ARC-13",
+        "AT-ARC-14",
+        "AT-ARC-15"
+      ],
+      "applicable_tiers": [
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P1",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-REFERENCE-ARCHITECTURE.md#L70"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-REFERENCE-ARCHITECTURE.md",
+      "evidence_refs": [],
+      "id": "MDOS-EVT-004",
+      "line": 70,
+      "owner_role": "DataPlatformOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "c6c31439495c1104562752a2c551367ce1296f86153487ca2a3bfbd0df2dfce0"
+    },
+    {
+      "acceptance_ids": [
+        "AT-DEC-01",
+        "AT-DEC-02",
+        "AT-DEC-03",
+        "AT-DEC-04",
+        "AT-DEC-05",
+        "AT-DEC-06",
+        "AT-DEC-07",
+        "AT-DEC-08",
+        "AT-DEC-09",
+        "AT-DEC-10",
+        "AT-DEC-11",
+        "AT-DEC-12",
+        "AT-DEC-13",
+        "AT-DEC-14",
+        "AT-DEC-15"
+      ],
+      "applicable_tiers": [
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P1",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DECISION-OUTCOMES.md#L46"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-DECISION-OUTCOMES.md",
+      "evidence_refs": [],
+      "id": "MDOS-EXP-001",
+      "line": 46,
+      "owner_role": "ExperimentOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "5d19e12fd49ad5ee4089b321f3adcd445642552f9a4e5839b2c95e6b05a8701c"
+    },
+    {
+      "acceptance_ids": [
+        "AT-DEC-01",
+        "AT-DEC-02",
+        "AT-DEC-03",
+        "AT-DEC-04",
+        "AT-DEC-05",
+        "AT-DEC-06",
+        "AT-DEC-07",
+        "AT-DEC-08",
+        "AT-DEC-09",
+        "AT-DEC-10",
+        "AT-DEC-11",
+        "AT-DEC-12",
+        "AT-DEC-13",
+        "AT-DEC-14",
+        "AT-DEC-15"
+      ],
+      "applicable_tiers": [
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P1",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DECISION-OUTCOMES.md#L50"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-DECISION-OUTCOMES.md",
+      "evidence_refs": [],
+      "id": "MDOS-EXP-002",
+      "line": 50,
+      "owner_role": "ExperimentOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "90282f7e3e845484497ed6f4b890ca82f1a31771d3b73312a605d36e48adeec8"
+    },
+    {
+      "acceptance_ids": [
+        "AT-DEC-01",
+        "AT-DEC-02",
+        "AT-DEC-03",
+        "AT-DEC-04",
+        "AT-DEC-05",
+        "AT-DEC-06",
+        "AT-DEC-07",
+        "AT-DEC-08",
+        "AT-DEC-09",
+        "AT-DEC-10",
+        "AT-DEC-11",
+        "AT-DEC-12",
+        "AT-DEC-13",
+        "AT-DEC-14",
+        "AT-DEC-15"
+      ],
+      "applicable_tiers": [
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P1",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DECISION-OUTCOMES.md#L53"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-DECISION-OUTCOMES.md",
+      "evidence_refs": [],
+      "id": "MDOS-EXP-003",
+      "line": 53,
+      "owner_role": "ExperimentOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "99c72528c0dee2fd47d47e2e66419ab736c067e5065b6d8e0d31981472407f3f"
+    },
+    {
+      "acceptance_ids": [
+        "AT-DEC-01",
+        "AT-DEC-02",
+        "AT-DEC-03",
+        "AT-DEC-04",
+        "AT-DEC-05",
+        "AT-DEC-06",
+        "AT-DEC-07",
+        "AT-DEC-08",
+        "AT-DEC-09",
+        "AT-DEC-10",
+        "AT-DEC-11",
+        "AT-DEC-12",
+        "AT-DEC-13",
+        "AT-DEC-14",
+        "AT-DEC-15"
+      ],
+      "applicable_tiers": [
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P1",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DECISION-OUTCOMES.md#L57"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-DECISION-OUTCOMES.md",
+      "evidence_refs": [],
+      "id": "MDOS-EXP-004",
+      "line": 57,
+      "owner_role": "ExperimentOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "3cdcc9d5de6d2322b65b86aeffb1e3354a90e937128b34fab31f7f7c32a72d5d"
+    },
+    {
+      "acceptance_ids": [
+        "AT-DEC-01",
+        "AT-DEC-02",
+        "AT-DEC-03",
+        "AT-DEC-04",
+        "AT-DEC-05",
+        "AT-DEC-06",
+        "AT-DEC-07",
+        "AT-DEC-08",
+        "AT-DEC-09",
+        "AT-DEC-10",
+        "AT-DEC-11",
+        "AT-DEC-12",
+        "AT-DEC-13",
+        "AT-DEC-14",
+        "AT-DEC-15"
+      ],
+      "applicable_tiers": [
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P1",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DECISION-OUTCOMES.md#L77"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-DECISION-OUTCOMES.md",
+      "evidence_refs": [],
+      "id": "MDOS-G10-001",
+      "line": 77,
+      "owner_role": "IndependentEvidenceVerifier",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "86ff8407ac873ecbb26e3389f014c70defc53adf7defbba1f4f4596c6bdd00fb"
+    },
+    {
+      "acceptance_ids": [
+        "AT-DEC-01",
+        "AT-DEC-02",
+        "AT-DEC-03",
+        "AT-DEC-04",
+        "AT-DEC-05",
+        "AT-DEC-06",
+        "AT-DEC-07",
+        "AT-DEC-08",
+        "AT-DEC-09",
+        "AT-DEC-10",
+        "AT-DEC-11",
+        "AT-DEC-12",
+        "AT-DEC-13",
+        "AT-DEC-14",
+        "AT-DEC-15"
+      ],
+      "applicable_tiers": [
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P1",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DECISION-OUTCOMES.md#L81"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-DECISION-OUTCOMES.md",
+      "evidence_refs": [],
+      "id": "MDOS-G10-002",
+      "line": 81,
+      "owner_role": "IndependentEvidenceVerifier",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "5cdbd41e4d96557b398ddbc8f2c3d5bf2bfb233156b3d01dcf8849c7d43ec91f"
+    },
+    {
+      "acceptance_ids": [
+        "AT-DEC-01",
+        "AT-DEC-02",
+        "AT-DEC-03",
+        "AT-DEC-04",
+        "AT-DEC-05",
+        "AT-DEC-06",
+        "AT-DEC-07",
+        "AT-DEC-08",
+        "AT-DEC-09",
+        "AT-DEC-10",
+        "AT-DEC-11",
+        "AT-DEC-12",
+        "AT-DEC-13",
+        "AT-DEC-14",
+        "AT-DEC-15"
+      ],
+      "applicable_tiers": [
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P1",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DECISION-OUTCOMES.md#L85"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-DECISION-OUTCOMES.md",
+      "evidence_refs": [],
+      "id": "MDOS-G10-003",
+      "line": 85,
+      "owner_role": "IndependentEvidenceVerifier",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "e92b84ac897848765c7f21859c1873f0ce239bec34b867df9a1d2b42eead78de"
+    },
+    {
+      "acceptance_ids": [
+        "AT-DEC-01",
+        "AT-DEC-02",
+        "AT-DEC-03",
+        "AT-DEC-04",
+        "AT-DEC-05",
+        "AT-DEC-06",
+        "AT-DEC-07",
+        "AT-DEC-08",
+        "AT-DEC-09",
+        "AT-DEC-10",
+        "AT-DEC-11",
+        "AT-DEC-12",
+        "AT-DEC-13",
+        "AT-DEC-14",
+        "AT-DEC-15"
+      ],
+      "applicable_tiers": [
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P1",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DECISION-OUTCOMES.md#L89"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-DECISION-OUTCOMES.md",
+      "evidence_refs": [],
+      "id": "MDOS-G10-004",
+      "line": 89,
+      "owner_role": "IndependentEvidenceVerifier",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "1e8592f2d4f68d0a5b1ecc892b12168ae4a6dfb134ab850121b3c78710367a0b"
+    },
+    {
+      "acceptance_ids": [
+        "AT-DEC-01",
+        "AT-DEC-02",
+        "AT-DEC-03",
+        "AT-DEC-04",
+        "AT-DEC-05",
+        "AT-DEC-06",
+        "AT-DEC-07",
+        "AT-DEC-08",
+        "AT-DEC-09",
+        "AT-DEC-10",
+        "AT-DEC-11",
+        "AT-DEC-12",
+        "AT-DEC-13",
+        "AT-DEC-14",
+        "AT-DEC-15"
+      ],
+      "applicable_tiers": [
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P1",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DECISION-OUTCOMES.md#L93"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-DECISION-OUTCOMES.md",
+      "evidence_refs": [],
+      "id": "MDOS-G10-005",
+      "line": 93,
+      "owner_role": "IndependentEvidenceVerifier",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "297d5a0f61ecc509bd8e6e278d685e7899ce32ec7d1acb7373e4d1c9ba5ce95a"
+    },
+    {
+      "acceptance_ids": [
+        "AT-DEC-01",
+        "AT-DEC-02",
+        "AT-DEC-03",
+        "AT-DEC-04",
+        "AT-DEC-05",
+        "AT-DEC-06",
+        "AT-DEC-07",
+        "AT-DEC-08",
+        "AT-DEC-09",
+        "AT-DEC-10",
+        "AT-DEC-11",
+        "AT-DEC-12",
+        "AT-DEC-13",
+        "AT-DEC-14",
+        "AT-DEC-15"
+      ],
+      "applicable_tiers": [
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P1",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DECISION-OUTCOMES.md#L97"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-DECISION-OUTCOMES.md",
+      "evidence_refs": [],
+      "id": "MDOS-G10-006",
+      "line": 97,
+      "owner_role": "IndependentEvidenceVerifier",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "5129bba133b409f38599c990058d25d0a82e8ad60b086018d81a7aae402f44df"
+    },
+    {
+      "acceptance_ids": [
+        "AT-DEC-01",
+        "AT-DEC-02",
+        "AT-DEC-03",
+        "AT-DEC-04",
+        "AT-DEC-05",
+        "AT-DEC-06",
+        "AT-DEC-07",
+        "AT-DEC-08",
+        "AT-DEC-09",
+        "AT-DEC-10",
+        "AT-DEC-11",
+        "AT-DEC-12",
+        "AT-DEC-13",
+        "AT-DEC-14",
+        "AT-DEC-15"
+      ],
+      "applicable_tiers": [
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P1",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DECISION-OUTCOMES.md#L101"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-DECISION-OUTCOMES.md",
+      "evidence_refs": [],
+      "id": "MDOS-G10-007",
+      "line": 101,
+      "owner_role": "IndependentEvidenceVerifier",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "b2fb6493dbe2f9f55d4ad861654ce83aa04bf4fbaff3ded95cec7448424ff739"
+    },
+    {
+      "acceptance_ids": [
+        "AT-DEC-01",
+        "AT-DEC-02",
+        "AT-DEC-03",
+        "AT-DEC-04",
+        "AT-DEC-05",
+        "AT-DEC-06",
+        "AT-DEC-07",
+        "AT-DEC-08",
+        "AT-DEC-09",
+        "AT-DEC-10",
+        "AT-DEC-11",
+        "AT-DEC-12",
+        "AT-DEC-13",
+        "AT-DEC-14",
+        "AT-DEC-15"
+      ],
+      "applicable_tiers": [
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P1",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DECISION-OUTCOMES.md#L105"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-DECISION-OUTCOMES.md",
+      "evidence_refs": [],
+      "id": "MDOS-G10-008",
+      "line": 105,
+      "owner_role": "IndependentEvidenceVerifier",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "38058d29c280dcc7e808a4aba2c5d6f982408e23ecd91e3a9f8035a5781ed260"
+    },
+    {
+      "acceptance_ids": [
+        "AT-DEC-01",
+        "AT-DEC-02",
+        "AT-DEC-03",
+        "AT-DEC-04",
+        "AT-DEC-05",
+        "AT-DEC-06",
+        "AT-DEC-07",
+        "AT-DEC-08",
+        "AT-DEC-09",
+        "AT-DEC-10",
+        "AT-DEC-11",
+        "AT-DEC-12",
+        "AT-DEC-13",
+        "AT-DEC-14",
+        "AT-DEC-15"
+      ],
+      "applicable_tiers": [
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P1",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DECISION-OUTCOMES.md#L109"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-DECISION-OUTCOMES.md",
+      "evidence_refs": [],
+      "id": "MDOS-G10-009",
+      "line": 109,
+      "owner_role": "IndependentEvidenceVerifier",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "a85e0a4d595046dd760654beea2891f9e0ea98335b3558099f0a11f8a642cda5"
+    },
+    {
+      "acceptance_ids": [
+        "AT-COM-01",
+        "AT-COM-02",
+        "AT-COM-03",
+        "AT-COM-04",
+        "AT-COM-05",
+        "AT-COM-06",
+        "AT-COM-07",
+        "AT-COM-08",
+        "AT-COM-09",
+        "AT-COM-10",
+        "AT-COM-11",
+        "AT-COM-12",
+        "AT-COM-13",
+        "AT-COM-14",
+        "AT-COM-15",
+        "AT-COM-16"
+      ],
+      "applicable_tiers": [
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P2",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-COMMERCIAL-MODEL.md#L194"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-COMMERCIAL-MODEL.md",
+      "evidence_refs": [],
+      "id": "MDOS-GEO-001",
+      "line": 194,
+      "owner_role": "CommercialFinanceOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "b28d4c5414d571c1f1a52669d56ecc94bbc403d0c723c824c507bb8ece056e35"
+    },
+    {
+      "acceptance_ids": [
+        "AT-COM-01",
+        "AT-COM-02",
+        "AT-COM-03",
+        "AT-COM-04",
+        "AT-COM-05",
+        "AT-COM-06",
+        "AT-COM-07",
+        "AT-COM-08",
+        "AT-COM-09",
+        "AT-COM-10",
+        "AT-COM-11",
+        "AT-COM-12",
+        "AT-COM-13",
+        "AT-COM-14",
+        "AT-COM-15",
+        "AT-COM-16"
+      ],
+      "applicable_tiers": [
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P1",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-COMMERCIAL-MODEL.md#L36"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-COMMERCIAL-MODEL.md",
+      "evidence_refs": [],
+      "id": "MDOS-GOLD-001",
+      "line": 36,
+      "owner_role": "SalesOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "b1720e5d0406dc95808c68dd77cae522261ea0ecb4f93b60302073114c4b8a8a"
+    },
+    {
+      "acceptance_ids": [
+        "AT-COM-01",
+        "AT-COM-02",
+        "AT-COM-03",
+        "AT-COM-04",
+        "AT-COM-05",
+        "AT-COM-06",
+        "AT-COM-07",
+        "AT-COM-08",
+        "AT-COM-09",
+        "AT-COM-10",
+        "AT-COM-11",
+        "AT-COM-12",
+        "AT-COM-13",
+        "AT-COM-14",
+        "AT-COM-15",
+        "AT-COM-16"
+      ],
+      "applicable_tiers": [
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P1",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-COMMERCIAL-MODEL.md#L49"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-COMMERCIAL-MODEL.md",
+      "evidence_refs": [],
+      "id": "MDOS-GOLD-002",
+      "line": 49,
+      "owner_role": "SalesOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "826d34abba395878406b1a090542b2dd4d3faf494ed05e6a3355cbb098e69059"
+    },
+    {
+      "acceptance_ids": [
+        "AT-COM-01",
+        "AT-COM-02",
+        "AT-COM-03",
+        "AT-COM-04",
+        "AT-COM-05",
+        "AT-COM-06",
+        "AT-COM-07",
+        "AT-COM-08",
+        "AT-COM-09",
+        "AT-COM-10",
+        "AT-COM-11",
+        "AT-COM-12",
+        "AT-COM-13",
+        "AT-COM-14",
+        "AT-COM-15",
+        "AT-COM-16"
+      ],
+      "applicable_tiers": [
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P1",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-COMMERCIAL-MODEL.md#L53"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-COMMERCIAL-MODEL.md",
+      "evidence_refs": [],
+      "id": "MDOS-GOLD-003",
+      "line": 53,
+      "owner_role": "SalesOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "d2849f981456cf65768a15905d74ea8f5a24d016aff3af35560cb7dba5647a71"
+    },
+    {
+      "acceptance_ids": [
+        "AT-COM-01",
+        "AT-COM-02",
+        "AT-COM-03",
+        "AT-COM-04",
+        "AT-COM-05",
+        "AT-COM-06",
+        "AT-COM-07",
+        "AT-COM-08",
+        "AT-COM-09",
+        "AT-COM-10",
+        "AT-COM-11",
+        "AT-COM-12",
+        "AT-COM-13",
+        "AT-COM-14",
+        "AT-COM-15",
+        "AT-COM-16"
+      ],
+      "applicable_tiers": [
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P1",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-COMMERCIAL-MODEL.md#L57"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-COMMERCIAL-MODEL.md",
+      "evidence_refs": [],
+      "id": "MDOS-GOLD-004",
+      "line": 57,
+      "owner_role": "SalesOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "0b45c3bb243aafb15635c4882ec08a840985769e04aaafaa0454967742b06bf6"
+    },
+    {
+      "acceptance_ids": [
+        "AT-ASR-01",
+        "AT-ASR-02",
+        "AT-ASR-03",
+        "AT-ASR-04",
+        "AT-ASR-05",
+        "AT-ASR-06",
+        "AT-ASR-07",
+        "AT-ASR-08",
+        "AT-ASR-09",
+        "AT-ASR-10",
+        "AT-ASR-11",
+        "AT-ASR-12",
+        "AT-ASR-13",
+        "AT-ASR-14"
+      ],
+      "applicable_tiers": [
+        "G0",
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P0",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/CONTRACT.md#L186"
+      ],
+      "document": "docs/market_demand_os_v7/CONTRACT.md",
+      "evidence_refs": [],
+      "id": "MDOS-GOV-001",
+      "line": 186,
+      "owner_role": "ContractAuthority",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "55bb00b4019c72729f0110ff3b6e7b96cf639bf494bdb4951e6c3598f58a909b"
+    },
+    {
+      "acceptance_ids": [
+        "AT-ASR-01",
+        "AT-ASR-02",
+        "AT-ASR-03",
+        "AT-ASR-04",
+        "AT-ASR-05",
+        "AT-ASR-06",
+        "AT-ASR-07",
+        "AT-ASR-08",
+        "AT-ASR-09",
+        "AT-ASR-10",
+        "AT-ASR-11",
+        "AT-ASR-12",
+        "AT-ASR-13",
+        "AT-ASR-14"
+      ],
+      "applicable_tiers": [
+        "G0",
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P0",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/CONTRACT.md#L190"
+      ],
+      "document": "docs/market_demand_os_v7/CONTRACT.md",
+      "evidence_refs": [],
+      "id": "MDOS-GOV-002",
+      "line": 190,
+      "owner_role": "ContractAuthority",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "df5f6092713b8977dba2b65d0155753915eeae78a2645987d82c0a8aaf0e7f84"
+    },
+    {
+      "acceptance_ids": [
+        "AT-ASR-01",
+        "AT-ASR-02",
+        "AT-ASR-03",
+        "AT-ASR-04",
+        "AT-ASR-05",
+        "AT-ASR-06",
+        "AT-ASR-07",
+        "AT-ASR-08",
+        "AT-ASR-09",
+        "AT-ASR-10",
+        "AT-ASR-11",
+        "AT-ASR-12",
+        "AT-ASR-13",
+        "AT-ASR-14"
+      ],
+      "applicable_tiers": [
+        "G0",
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P0",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/CONTRACT.md#L194"
+      ],
+      "document": "docs/market_demand_os_v7/CONTRACT.md",
+      "evidence_refs": [],
+      "id": "MDOS-GOV-003",
+      "line": 194,
+      "owner_role": "ContractAuthority",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "97ca03e7534315df02d0a749e591694f3bfdc6f9f92d5255ff319436cf5ccf13"
+    },
+    {
+      "acceptance_ids": [
+        "AT-ASR-01",
+        "AT-ASR-02",
+        "AT-ASR-03",
+        "AT-ASR-04",
+        "AT-ASR-05",
+        "AT-ASR-06",
+        "AT-ASR-07",
+        "AT-ASR-08",
+        "AT-ASR-09",
+        "AT-ASR-10",
+        "AT-ASR-11",
+        "AT-ASR-12",
+        "AT-ASR-13",
+        "AT-ASR-14"
+      ],
+      "applicable_tiers": [
+        "G0",
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P0",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/CONTRACT.md#L198"
+      ],
+      "document": "docs/market_demand_os_v7/CONTRACT.md",
+      "evidence_refs": [],
+      "id": "MDOS-GOV-004",
+      "line": 198,
+      "owner_role": "ContractAuthority",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "ce0e006bc745a8b271d0da3a0ba4ddaa28c62d1e7f6678d91dd9de227b8a1914"
+    },
+    {
+      "acceptance_ids": [
+        "AT-ASR-01",
+        "AT-ASR-02",
+        "AT-ASR-03",
+        "AT-ASR-04",
+        "AT-ASR-05",
+        "AT-ASR-06",
+        "AT-ASR-07",
+        "AT-ASR-08",
+        "AT-ASR-09",
+        "AT-ASR-10",
+        "AT-ASR-11",
+        "AT-ASR-12",
+        "AT-ASR-13",
+        "AT-ASR-14"
+      ],
+      "applicable_tiers": [
+        "G0",
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P0",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/CONTRACT.md#L203"
+      ],
+      "document": "docs/market_demand_os_v7/CONTRACT.md",
+      "evidence_refs": [],
+      "id": "MDOS-GOV-005",
+      "line": 203,
+      "owner_role": "ContractAuthority",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "684451a5748a8fddc389cfb587948060f6cff8f5aaf9808b9fae55a9877c329c"
+    },
+    {
+      "acceptance_ids": [
+        "AT-ARC-01",
+        "AT-ARC-02",
+        "AT-ARC-03",
+        "AT-ARC-04",
+        "AT-ARC-05",
+        "AT-ARC-06",
+        "AT-ARC-07",
+        "AT-ARC-08",
+        "AT-ARC-09",
+        "AT-ARC-10",
+        "AT-ARC-11",
+        "AT-ARC-12",
+        "AT-ARC-13",
+        "AT-ARC-14",
+        "AT-ARC-15"
+      ],
+      "applicable_tiers": [
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P2",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-REFERENCE-ARCHITECTURE.md#L110"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-REFERENCE-ARCHITECTURE.md",
+      "evidence_refs": [],
+      "id": "MDOS-JRN-001",
+      "line": 110,
+      "owner_role": "JourneyOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "95e9aa338baaf44a22792bb6e042a2e68c9c2042781f90a492059af2db8be7f2"
+    },
+    {
+      "acceptance_ids": [
+        "AT-ARC-01",
+        "AT-ARC-02",
+        "AT-ARC-03",
+        "AT-ARC-04",
+        "AT-ARC-05",
+        "AT-ARC-06",
+        "AT-ARC-07",
+        "AT-ARC-08",
+        "AT-ARC-09",
+        "AT-ARC-10",
+        "AT-ARC-11",
+        "AT-ARC-12",
+        "AT-ARC-13",
+        "AT-ARC-14",
+        "AT-ARC-15"
+      ],
+      "applicable_tiers": [
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P2",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-REFERENCE-ARCHITECTURE.md#L114"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-REFERENCE-ARCHITECTURE.md",
+      "evidence_refs": [],
+      "id": "MDOS-JRN-002",
+      "line": 114,
+      "owner_role": "JourneyOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "62a67f933bee4b75ac9839d26084329cdbd3b6db3d5c6d259af1cac5e57c18d6"
+    },
+    {
+      "acceptance_ids": [
+        "AT-ARC-01",
+        "AT-ARC-02",
+        "AT-ARC-03",
+        "AT-ARC-04",
+        "AT-ARC-05",
+        "AT-ARC-06",
+        "AT-ARC-07",
+        "AT-ARC-08",
+        "AT-ARC-09",
+        "AT-ARC-10",
+        "AT-ARC-11",
+        "AT-ARC-12",
+        "AT-ARC-13",
+        "AT-ARC-14",
+        "AT-ARC-15"
+      ],
+      "applicable_tiers": [
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P2",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-REFERENCE-ARCHITECTURE.md#L118"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-REFERENCE-ARCHITECTURE.md",
+      "evidence_refs": [],
+      "id": "MDOS-JRN-003",
+      "line": 118,
+      "owner_role": "JourneyOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "524f73f9199200cc1ebe37968ef1fb462b595760541a3d7ba494d9d1cb3962e7"
+    },
+    {
+      "acceptance_ids": [
+        "AT-ARC-01",
+        "AT-ARC-02",
+        "AT-ARC-03",
+        "AT-ARC-04",
+        "AT-ARC-05",
+        "AT-ARC-06",
+        "AT-ARC-07",
+        "AT-ARC-08",
+        "AT-ARC-09",
+        "AT-ARC-10",
+        "AT-ARC-11",
+        "AT-ARC-12",
+        "AT-ARC-13",
+        "AT-ARC-14",
+        "AT-ARC-15"
+      ],
+      "applicable_tiers": [
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P2",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-REFERENCE-ARCHITECTURE.md#L122"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-REFERENCE-ARCHITECTURE.md",
+      "evidence_refs": [],
+      "id": "MDOS-JRN-004",
+      "line": 122,
+      "owner_role": "JourneyOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "0f1d12808a312de84d6f77bcd0c8b461ea25e97da207ba3a0f643a17df803c23"
+    },
+    {
+      "acceptance_ids": [
+        "AT-ARC-01",
+        "AT-ARC-02",
+        "AT-ARC-03",
+        "AT-ARC-04",
+        "AT-ARC-05",
+        "AT-ARC-06",
+        "AT-ARC-07",
+        "AT-ARC-08",
+        "AT-ARC-09",
+        "AT-ARC-10",
+        "AT-ARC-11",
+        "AT-ARC-12",
+        "AT-ARC-13",
+        "AT-ARC-14",
+        "AT-ARC-15"
+      ],
+      "applicable_tiers": [
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P1",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-REFERENCE-ARCHITECTURE.md#L75"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-REFERENCE-ARCHITECTURE.md",
+      "evidence_refs": [],
+      "id": "MDOS-KG-001",
+      "line": 75,
+      "owner_role": "DataSteward",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "ccf1918f578a0bf26e14e753b239b252aa6818cec836b672b12f962e4efd142e"
+    },
+    {
+      "acceptance_ids": [
+        "AT-ARC-01",
+        "AT-ARC-02",
+        "AT-ARC-03",
+        "AT-ARC-04",
+        "AT-ARC-05",
+        "AT-ARC-06",
+        "AT-ARC-07",
+        "AT-ARC-08",
+        "AT-ARC-09",
+        "AT-ARC-10",
+        "AT-ARC-11",
+        "AT-ARC-12",
+        "AT-ARC-13",
+        "AT-ARC-14",
+        "AT-ARC-15"
+      ],
+      "applicable_tiers": [
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P1",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-REFERENCE-ARCHITECTURE.md#L79"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-REFERENCE-ARCHITECTURE.md",
+      "evidence_refs": [],
+      "id": "MDOS-KG-002",
+      "line": 79,
+      "owner_role": "DataSteward",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "46af042b41c0d9236054aafa05e5e8919606583fbe1aedfffeea77c5d7fe9f0b"
+    },
+    {
+      "acceptance_ids": [
+        "AT-ARC-01",
+        "AT-ARC-02",
+        "AT-ARC-03",
+        "AT-ARC-04",
+        "AT-ARC-05",
+        "AT-ARC-06",
+        "AT-ARC-07",
+        "AT-ARC-08",
+        "AT-ARC-09",
+        "AT-ARC-10",
+        "AT-ARC-11",
+        "AT-ARC-12",
+        "AT-ARC-13",
+        "AT-ARC-14",
+        "AT-ARC-15"
+      ],
+      "applicable_tiers": [
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P1",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-REFERENCE-ARCHITECTURE.md#L82"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-REFERENCE-ARCHITECTURE.md",
+      "evidence_refs": [],
+      "id": "MDOS-KG-003",
+      "line": 82,
+      "owner_role": "DataSteward",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "83538ab52eac78fa53dcaf8cdf11aec062ada6d9282b9eac0e332dafd9c89a77"
+    },
+    {
+      "acceptance_ids": [
+        "AT-ARC-01",
+        "AT-ARC-02",
+        "AT-ARC-03",
+        "AT-ARC-04",
+        "AT-ARC-05",
+        "AT-ARC-06",
+        "AT-ARC-07",
+        "AT-ARC-08",
+        "AT-ARC-09",
+        "AT-ARC-10",
+        "AT-ARC-11",
+        "AT-ARC-12",
+        "AT-ARC-13",
+        "AT-ARC-14",
+        "AT-ARC-15"
+      ],
+      "applicable_tiers": [
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P1",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-REFERENCE-ARCHITECTURE.md#L86"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-REFERENCE-ARCHITECTURE.md",
+      "evidence_refs": [],
+      "id": "MDOS-KG-004",
+      "line": 86,
+      "owner_role": "DataSteward",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "7be671c21aa2417bf1f6f5c5a6197e192fd3dfa1014e50b0ecc2c74ba5159a14"
+    },
+    {
+      "acceptance_ids": [
+        "AT-ARC-01",
+        "AT-ARC-02",
+        "AT-ARC-03",
+        "AT-ARC-04",
+        "AT-ARC-05",
+        "AT-ARC-06",
+        "AT-ARC-07",
+        "AT-ARC-08",
+        "AT-ARC-09",
+        "AT-ARC-10",
+        "AT-ARC-11",
+        "AT-ARC-12",
+        "AT-ARC-13",
+        "AT-ARC-14",
+        "AT-ARC-15"
+      ],
+      "applicable_tiers": [
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P1",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-REFERENCE-ARCHITECTURE.md#L90"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-REFERENCE-ARCHITECTURE.md",
+      "evidence_refs": [],
+      "id": "MDOS-KG-005",
+      "line": 90,
+      "owner_role": "DataSteward",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "2a8b22a307130461e20451a07213c9c0ba04bc37308a029c45e86c69b016dd62"
+    },
+    {
+      "acceptance_ids": [
+        "AT-SRC7-01",
+        "AT-SRC7-02",
+        "AT-SRC7-03",
+        "AT-SRC7-04",
+        "AT-SRC7-05",
+        "AT-SRC7-06",
+        "AT-SRC7-07",
+        "AT-SRC7-08",
+        "AT-SRC7-09",
+        "AT-SRC7-10"
+      ],
+      "applicable_tiers": [
+        "G0",
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P0",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-SOURCE-PORTFOLIO.md#L120"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-SOURCE-PORTFOLIO.md",
+      "evidence_refs": [],
+      "id": "MDOS-LGL-001",
+      "line": 120,
+      "owner_role": "PrivacyLegalOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "ce173497dc7874e29a9e514fe2a0e5c36ed606c7a13a6ab2b04e827bccb82fa3"
+    },
+    {
+      "acceptance_ids": [
+        "AT-SRC7-01",
+        "AT-SRC7-02",
+        "AT-SRC7-03",
+        "AT-SRC7-04",
+        "AT-SRC7-05",
+        "AT-SRC7-06",
+        "AT-SRC7-07",
+        "AT-SRC7-08",
+        "AT-SRC7-09",
+        "AT-SRC7-10"
+      ],
+      "applicable_tiers": [
+        "G0",
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P0",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-SOURCE-PORTFOLIO.md#L124"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-SOURCE-PORTFOLIO.md",
+      "evidence_refs": [],
+      "id": "MDOS-LGL-002",
+      "line": 124,
+      "owner_role": "PrivacyLegalOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "ec858a72a3bb19cadeec9d9ca86647f7660f75750ba5c6e616827b0a36b2eae8"
+    },
+    {
+      "acceptance_ids": [
+        "AT-SRC7-01",
+        "AT-SRC7-02",
+        "AT-SRC7-03",
+        "AT-SRC7-04",
+        "AT-SRC7-05",
+        "AT-SRC7-06",
+        "AT-SRC7-07",
+        "AT-SRC7-08",
+        "AT-SRC7-09",
+        "AT-SRC7-10"
+      ],
+      "applicable_tiers": [
+        "G0",
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P0",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-SOURCE-PORTFOLIO.md#L128"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-SOURCE-PORTFOLIO.md",
+      "evidence_refs": [],
+      "id": "MDOS-LGL-003",
+      "line": 128,
+      "owner_role": "PrivacyLegalOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "38359edb148d2255a287a984741126e37610fda4883da9944845210b606b1f6b"
+    },
+    {
+      "acceptance_ids": [
+        "AT-DI7-01",
+        "AT-DI7-02",
+        "AT-DI7-03",
+        "AT-DI7-04",
+        "AT-DI7-05",
+        "AT-DI7-06",
+        "AT-DI7-07",
+        "AT-DI7-08",
+        "AT-DI7-09",
+        "AT-DI7-10",
+        "AT-DI7-11",
+        "AT-DI7-12"
+      ],
+      "applicable_tiers": [
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P1",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DEMAND-INTELLIGENCE.md#L123"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-DEMAND-INTELLIGENCE.md",
+      "evidence_refs": [],
+      "id": "MDOS-LRN-001",
+      "line": 123,
+      "owner_role": "DecisionScienceOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "ed9cf6fef5dfd8528d56f868ef61ee67f4b7c3a7bf1d76bfb0c73e8e8272a44f"
+    },
+    {
+      "acceptance_ids": [
+        "AT-DI7-01",
+        "AT-DI7-02",
+        "AT-DI7-03",
+        "AT-DI7-04",
+        "AT-DI7-05",
+        "AT-DI7-06",
+        "AT-DI7-07",
+        "AT-DI7-08",
+        "AT-DI7-09",
+        "AT-DI7-10",
+        "AT-DI7-11",
+        "AT-DI7-12"
+      ],
+      "applicable_tiers": [
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P1",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DEMAND-INTELLIGENCE.md#L127"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-DEMAND-INTELLIGENCE.md",
+      "evidence_refs": [],
+      "id": "MDOS-LRN-002",
+      "line": 127,
+      "owner_role": "DecisionScienceOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "745f682ec6b86d4a52cd6e2f668a265c552e9d5297dfae621f71472bd76b4a37"
+    },
+    {
+      "acceptance_ids": [
+        "AT-DI7-01",
+        "AT-DI7-02",
+        "AT-DI7-03",
+        "AT-DI7-04",
+        "AT-DI7-05",
+        "AT-DI7-06",
+        "AT-DI7-07",
+        "AT-DI7-08",
+        "AT-DI7-09",
+        "AT-DI7-10",
+        "AT-DI7-11",
+        "AT-DI7-12"
+      ],
+      "applicable_tiers": [
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P1",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DEMAND-INTELLIGENCE.md#L131"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-DEMAND-INTELLIGENCE.md",
+      "evidence_refs": [],
+      "id": "MDOS-LRN-003",
+      "line": 131,
+      "owner_role": "DecisionScienceOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "6ba193f68ff50c374b9457b6807d4231f54d55def0e95fe58280fdfb0f478eb5"
+    },
+    {
+      "acceptance_ids": [
+        "AT-DI7-01",
+        "AT-DI7-02",
+        "AT-DI7-03",
+        "AT-DI7-04",
+        "AT-DI7-05",
+        "AT-DI7-06",
+        "AT-DI7-07",
+        "AT-DI7-08",
+        "AT-DI7-09",
+        "AT-DI7-10",
+        "AT-DI7-11",
+        "AT-DI7-12"
+      ],
+      "applicable_tiers": [
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P1",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DEMAND-INTELLIGENCE.md#L134"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-DEMAND-INTELLIGENCE.md",
+      "evidence_refs": [],
+      "id": "MDOS-LRN-004",
+      "line": 134,
+      "owner_role": "DecisionScienceOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "3686faf60c9736673efdd907b608ea7c183fcffb3f6056ac0e996c0f19b24c7c"
+    },
+    {
+      "acceptance_ids": [
+        "AT-DI7-01",
+        "AT-DI7-02",
+        "AT-DI7-03",
+        "AT-DI7-04",
+        "AT-DI7-05",
+        "AT-DI7-06",
+        "AT-DI7-07",
+        "AT-DI7-08",
+        "AT-DI7-09",
+        "AT-DI7-10",
+        "AT-DI7-11",
+        "AT-DI7-12"
+      ],
+      "applicable_tiers": [
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P1",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DEMAND-INTELLIGENCE.md#L138"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-DEMAND-INTELLIGENCE.md",
+      "evidence_refs": [],
+      "id": "MDOS-LRN-005",
+      "line": 138,
+      "owner_role": "DecisionScienceOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "51d1c37e8e11f6ffb23f14a174ce9f572029e824a3db4cca96990853b68d52ff"
+    },
+    {
+      "acceptance_ids": [
+        "AT-DEC-01",
+        "AT-DEC-02",
+        "AT-DEC-03",
+        "AT-DEC-04",
+        "AT-DEC-05",
+        "AT-DEC-06",
+        "AT-DEC-07",
+        "AT-DEC-08",
+        "AT-DEC-09",
+        "AT-DEC-10",
+        "AT-DEC-11",
+        "AT-DEC-12",
+        "AT-DEC-13",
+        "AT-DEC-14",
+        "AT-DEC-15"
+      ],
+      "applicable_tiers": [
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P2",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DECISION-OUTCOMES.md#L129"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-DECISION-OUTCOMES.md",
+      "evidence_refs": [],
+      "id": "MDOS-MET-001",
+      "line": 129,
+      "owner_role": "AnalyticsOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "fc50fc804c300272182c9c95d0704eb3ff5fe8dbec93dc8df65f78d31749eb4b"
+    },
+    {
+      "acceptance_ids": [
+        "AT-DEC-01",
+        "AT-DEC-02",
+        "AT-DEC-03",
+        "AT-DEC-04",
+        "AT-DEC-05",
+        "AT-DEC-06",
+        "AT-DEC-07",
+        "AT-DEC-08",
+        "AT-DEC-09",
+        "AT-DEC-10",
+        "AT-DEC-11",
+        "AT-DEC-12",
+        "AT-DEC-13",
+        "AT-DEC-14",
+        "AT-DEC-15"
+      ],
+      "applicable_tiers": [
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P2",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DECISION-OUTCOMES.md#L132"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-DECISION-OUTCOMES.md",
+      "evidence_refs": [],
+      "id": "MDOS-MET-002",
+      "line": 132,
+      "owner_role": "AnalyticsOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "8e3a85694060bbeeeba71310282961fb62b82e00be5b74e567fd6bee49ce2d32"
+    },
+    {
+      "acceptance_ids": [
+        "AT-DEC-01",
+        "AT-DEC-02",
+        "AT-DEC-03",
+        "AT-DEC-04",
+        "AT-DEC-05",
+        "AT-DEC-06",
+        "AT-DEC-07",
+        "AT-DEC-08",
+        "AT-DEC-09",
+        "AT-DEC-10",
+        "AT-DEC-11",
+        "AT-DEC-12",
+        "AT-DEC-13",
+        "AT-DEC-14",
+        "AT-DEC-15"
+      ],
+      "applicable_tiers": [
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P2",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DECISION-OUTCOMES.md#L136"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-DECISION-OUTCOMES.md",
+      "evidence_refs": [],
+      "id": "MDOS-MET-003",
+      "line": 136,
+      "owner_role": "AnalyticsOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "c0a6555395bfa2ae822f5fa7b81e4f8956df3f61f8a050addae80657801420bb"
+    },
+    {
+      "acceptance_ids": [
+        "AT-DEC-01",
+        "AT-DEC-02",
+        "AT-DEC-03",
+        "AT-DEC-04",
+        "AT-DEC-05",
+        "AT-DEC-06",
+        "AT-DEC-07",
+        "AT-DEC-08",
+        "AT-DEC-09",
+        "AT-DEC-10",
+        "AT-DEC-11",
+        "AT-DEC-12",
+        "AT-DEC-13",
+        "AT-DEC-14",
+        "AT-DEC-15"
+      ],
+      "applicable_tiers": [
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P2",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DECISION-OUTCOMES.md#L140"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-DECISION-OUTCOMES.md",
+      "evidence_refs": [],
+      "id": "MDOS-MET-004",
+      "line": 140,
+      "owner_role": "AnalyticsOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "ce43a42cc3f5f2ef0627a6f3f5b1ca0cb3d9ce1e9f678ecd496028c8f1854958"
+    },
+    {
+      "acceptance_ids": [
+        "AT-DEC-01",
+        "AT-DEC-02",
+        "AT-DEC-03",
+        "AT-DEC-04",
+        "AT-DEC-05",
+        "AT-DEC-06",
+        "AT-DEC-07",
+        "AT-DEC-08",
+        "AT-DEC-09",
+        "AT-DEC-10",
+        "AT-DEC-11",
+        "AT-DEC-12",
+        "AT-DEC-13",
+        "AT-DEC-14",
+        "AT-DEC-15"
+      ],
+      "applicable_tiers": [
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P1",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/CONTRACT.md#L13"
+      ],
+      "document": "docs/market_demand_os_v7/CONTRACT.md",
+      "evidence_refs": [],
+      "id": "MDOS-MIS-001",
+      "line": 13,
+      "owner_role": "BusinessOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "3fbb5680c046e5a7209c6e4080c40cc69f45d22b99b91318c96b30414ad4e231"
+    },
+    {
+      "acceptance_ids": [
+        "AT-DEC-01",
+        "AT-DEC-02",
+        "AT-DEC-03",
+        "AT-DEC-04",
+        "AT-DEC-05",
+        "AT-DEC-06",
+        "AT-DEC-07",
+        "AT-DEC-08",
+        "AT-DEC-09",
+        "AT-DEC-10",
+        "AT-DEC-11",
+        "AT-DEC-12",
+        "AT-DEC-13",
+        "AT-DEC-14",
+        "AT-DEC-15"
+      ],
+      "applicable_tiers": [
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P1",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/CONTRACT.md#L17"
+      ],
+      "document": "docs/market_demand_os_v7/CONTRACT.md",
+      "evidence_refs": [],
+      "id": "MDOS-MIS-002",
+      "line": 17,
+      "owner_role": "BusinessOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "a4ae546e8316eea3dd1c63438a3053ef3432a3267eafebeda2103160362468fb"
+    },
+    {
+      "acceptance_ids": [
+        "AT-DEC-01",
+        "AT-DEC-02",
+        "AT-DEC-03",
+        "AT-DEC-04",
+        "AT-DEC-05",
+        "AT-DEC-06",
+        "AT-DEC-07",
+        "AT-DEC-08",
+        "AT-DEC-09",
+        "AT-DEC-10",
+        "AT-DEC-11",
+        "AT-DEC-12",
+        "AT-DEC-13",
+        "AT-DEC-14",
+        "AT-DEC-15"
+      ],
+      "applicable_tiers": [
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P1",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/CONTRACT.md#L22"
+      ],
+      "document": "docs/market_demand_os_v7/CONTRACT.md",
+      "evidence_refs": [],
+      "id": "MDOS-MIS-003",
+      "line": 22,
+      "owner_role": "BusinessOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "6d4dd5154455e6d57865a379bbaeac3cae894d4658d841f9b78958db550343eb"
+    },
+    {
+      "acceptance_ids": [
+        "AT-DEC-01",
+        "AT-DEC-02",
+        "AT-DEC-03",
+        "AT-DEC-04",
+        "AT-DEC-05",
+        "AT-DEC-06",
+        "AT-DEC-07",
+        "AT-DEC-08",
+        "AT-DEC-09",
+        "AT-DEC-10",
+        "AT-DEC-11",
+        "AT-DEC-12",
+        "AT-DEC-13",
+        "AT-DEC-14",
+        "AT-DEC-15"
+      ],
+      "applicable_tiers": [
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P1",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/CONTRACT.md#L26"
+      ],
+      "document": "docs/market_demand_os_v7/CONTRACT.md",
+      "evidence_refs": [],
+      "id": "MDOS-MIS-004",
+      "line": 26,
+      "owner_role": "BusinessOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "918c062ae59b8a28fa497919180cf04fc611976a4073c5b9fe30122f2a4fd51c"
+    },
+    {
+      "acceptance_ids": [
+        "AT-DEC-01",
+        "AT-DEC-02",
+        "AT-DEC-03",
+        "AT-DEC-04",
+        "AT-DEC-05",
+        "AT-DEC-06",
+        "AT-DEC-07",
+        "AT-DEC-08",
+        "AT-DEC-09",
+        "AT-DEC-10",
+        "AT-DEC-11",
+        "AT-DEC-12",
+        "AT-DEC-13",
+        "AT-DEC-14",
+        "AT-DEC-15"
+      ],
+      "applicable_tiers": [
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P1",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/CONTRACT.md#L31"
+      ],
+      "document": "docs/market_demand_os_v7/CONTRACT.md",
+      "evidence_refs": [],
+      "id": "MDOS-MIS-005",
+      "line": 31,
+      "owner_role": "BusinessOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "eff7a87f836d685747b99dffd9e356ed27fa01c715103008728da0755833ddc5"
+    },
+    {
+      "acceptance_ids": [
+        "AT-DEC-01",
+        "AT-DEC-02",
+        "AT-DEC-03",
+        "AT-DEC-04",
+        "AT-DEC-05",
+        "AT-DEC-06",
+        "AT-DEC-07",
+        "AT-DEC-08",
+        "AT-DEC-09",
+        "AT-DEC-10",
+        "AT-DEC-11",
+        "AT-DEC-12",
+        "AT-DEC-13",
+        "AT-DEC-14",
+        "AT-DEC-15"
+      ],
+      "applicable_tiers": [
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P1",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/CONTRACT.md#L35"
+      ],
+      "document": "docs/market_demand_os_v7/CONTRACT.md",
+      "evidence_refs": [],
+      "id": "MDOS-MIS-006",
+      "line": 35,
+      "owner_role": "BusinessOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "10b6eea8d7b1b4b7792045f582488f62dc73bb049afd2a25c14d14b34b193818"
+    },
+    {
+      "acceptance_ids": [
+        "AT-COM-01",
+        "AT-COM-02",
+        "AT-COM-03",
+        "AT-COM-04",
+        "AT-COM-05",
+        "AT-COM-06",
+        "AT-COM-07",
+        "AT-COM-08",
+        "AT-COM-09",
+        "AT-COM-10",
+        "AT-COM-11",
+        "AT-COM-12",
+        "AT-COM-13",
+        "AT-COM-14",
+        "AT-COM-15",
+        "AT-COM-16"
+      ],
+      "applicable_tiers": [
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P2",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-COMMERCIAL-MODEL.md#L65"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-COMMERCIAL-MODEL.md",
+      "evidence_refs": [],
+      "id": "MDOS-MOT-001",
+      "line": 65,
+      "owner_role": "MotionOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "f083f1319de787e8c0fc05dc2968ef92734a286e0be51d7184c8f29e8a7fa0cc"
+    },
+    {
+      "acceptance_ids": [
+        "AT-COM-01",
+        "AT-COM-02",
+        "AT-COM-03",
+        "AT-COM-04",
+        "AT-COM-05",
+        "AT-COM-06",
+        "AT-COM-07",
+        "AT-COM-08",
+        "AT-COM-09",
+        "AT-COM-10",
+        "AT-COM-11",
+        "AT-COM-12",
+        "AT-COM-13",
+        "AT-COM-14",
+        "AT-COM-15",
+        "AT-COM-16"
+      ],
+      "applicable_tiers": [
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P2",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-COMMERCIAL-MODEL.md#L75"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-COMMERCIAL-MODEL.md",
+      "evidence_refs": [],
+      "id": "MDOS-MOT-002",
+      "line": 75,
+      "owner_role": "MotionOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "f213f0fb4c3e88ba38201b274b40224127b1553cd57905f73e121750af944037"
+    },
+    {
+      "acceptance_ids": [
+        "AT-COM-01",
+        "AT-COM-02",
+        "AT-COM-03",
+        "AT-COM-04",
+        "AT-COM-05",
+        "AT-COM-06",
+        "AT-COM-07",
+        "AT-COM-08",
+        "AT-COM-09",
+        "AT-COM-10",
+        "AT-COM-11",
+        "AT-COM-12",
+        "AT-COM-13",
+        "AT-COM-14",
+        "AT-COM-15",
+        "AT-COM-16"
+      ],
+      "applicable_tiers": [
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P2",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-COMMERCIAL-MODEL.md#L85"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-COMMERCIAL-MODEL.md",
+      "evidence_refs": [],
+      "id": "MDOS-MOT-003",
+      "line": 85,
+      "owner_role": "MotionOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "465f4aeaccb93917049bc2dabffdd923b54bbf6ab53d2d86a4b1f5cae0ed7661"
+    },
+    {
+      "acceptance_ids": [
+        "AT-COM-01",
+        "AT-COM-02",
+        "AT-COM-03",
+        "AT-COM-04",
+        "AT-COM-05",
+        "AT-COM-06",
+        "AT-COM-07",
+        "AT-COM-08",
+        "AT-COM-09",
+        "AT-COM-10",
+        "AT-COM-11",
+        "AT-COM-12",
+        "AT-COM-13",
+        "AT-COM-14",
+        "AT-COM-15",
+        "AT-COM-16"
+      ],
+      "applicable_tiers": [
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P2",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-COMMERCIAL-MODEL.md#L96"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-COMMERCIAL-MODEL.md",
+      "evidence_refs": [],
+      "id": "MDOS-MOT-004",
+      "line": 96,
+      "owner_role": "MotionOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "1e42d76d59321f8afe45c8e0c3441135323f69f2e2fa28dce4c35cf134d62152"
+    },
+    {
+      "acceptance_ids": [
+        "AT-COM-01",
+        "AT-COM-02",
+        "AT-COM-03",
+        "AT-COM-04",
+        "AT-COM-05",
+        "AT-COM-06",
+        "AT-COM-07",
+        "AT-COM-08",
+        "AT-COM-09",
+        "AT-COM-10",
+        "AT-COM-11",
+        "AT-COM-12",
+        "AT-COM-13",
+        "AT-COM-14",
+        "AT-COM-15",
+        "AT-COM-16"
+      ],
+      "applicable_tiers": [
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P2",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-COMMERCIAL-MODEL.md#L106"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-COMMERCIAL-MODEL.md",
+      "evidence_refs": [],
+      "id": "MDOS-MOT-005",
+      "line": 106,
+      "owner_role": "MotionOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "f2863de7bc5fcb11ab5c995a3a8bb9dd291777bb21956ddc75d09d3fbfbe7903"
+    },
+    {
+      "acceptance_ids": [
+        "AT-COM-01",
+        "AT-COM-02",
+        "AT-COM-03",
+        "AT-COM-04",
+        "AT-COM-05",
+        "AT-COM-06",
+        "AT-COM-07",
+        "AT-COM-08",
+        "AT-COM-09",
+        "AT-COM-10",
+        "AT-COM-11",
+        "AT-COM-12",
+        "AT-COM-13",
+        "AT-COM-14",
+        "AT-COM-15",
+        "AT-COM-16"
+      ],
+      "applicable_tiers": [
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P2",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-COMMERCIAL-MODEL.md#L116"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-COMMERCIAL-MODEL.md",
+      "evidence_refs": [],
+      "id": "MDOS-MOT-006",
+      "line": 116,
+      "owner_role": "MotionOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "2b15ecc2d5eb86b3a71941a90fd63978aec130beb3772ee0c879a763a4cd7807"
+    },
+    {
+      "acceptance_ids": [
+        "AT-COM-01",
+        "AT-COM-02",
+        "AT-COM-03",
+        "AT-COM-04",
+        "AT-COM-05",
+        "AT-COM-06",
+        "AT-COM-07",
+        "AT-COM-08",
+        "AT-COM-09",
+        "AT-COM-10",
+        "AT-COM-11",
+        "AT-COM-12",
+        "AT-COM-13",
+        "AT-COM-14",
+        "AT-COM-15",
+        "AT-COM-16"
+      ],
+      "applicable_tiers": [
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P2",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-COMMERCIAL-MODEL.md#L127"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-COMMERCIAL-MODEL.md",
+      "evidence_refs": [],
+      "id": "MDOS-MOT-007",
+      "line": 127,
+      "owner_role": "MotionOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "d373760c36619d9401143b74e096cf0b739930df63cd05529da17827fac48ba6"
+    },
+    {
+      "acceptance_ids": [
+        "AT-COM-01",
+        "AT-COM-02",
+        "AT-COM-03",
+        "AT-COM-04",
+        "AT-COM-05",
+        "AT-COM-06",
+        "AT-COM-07",
+        "AT-COM-08",
+        "AT-COM-09",
+        "AT-COM-10",
+        "AT-COM-11",
+        "AT-COM-12",
+        "AT-COM-13",
+        "AT-COM-14",
+        "AT-COM-15",
+        "AT-COM-16"
+      ],
+      "applicable_tiers": [
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P2",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-COMMERCIAL-MODEL.md#L137"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-COMMERCIAL-MODEL.md",
+      "evidence_refs": [],
+      "id": "MDOS-MOT-008",
+      "line": 137,
+      "owner_role": "MotionOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "f4be30258c68ebc8d23a78bad7a58bc13ed7daf32be744d15a2604743973214a"
+    },
+    {
+      "acceptance_ids": [
+        "AT-COM-01",
+        "AT-COM-02",
+        "AT-COM-03",
+        "AT-COM-04",
+        "AT-COM-05",
+        "AT-COM-06",
+        "AT-COM-07",
+        "AT-COM-08",
+        "AT-COM-09",
+        "AT-COM-10",
+        "AT-COM-11",
+        "AT-COM-12",
+        "AT-COM-13",
+        "AT-COM-14",
+        "AT-COM-15",
+        "AT-COM-16"
+      ],
+      "applicable_tiers": [
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P2",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-COMMERCIAL-MODEL.md#L148"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-COMMERCIAL-MODEL.md",
+      "evidence_refs": [],
+      "id": "MDOS-MOT-009",
+      "line": 148,
+      "owner_role": "MotionOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "093a1bec4039dde4d556d8eec4b7fe45678c936840c647ebc25a38b1dfa964c0"
+    },
+    {
+      "acceptance_ids": [
+        "AT-COM-01",
+        "AT-COM-02",
+        "AT-COM-03",
+        "AT-COM-04",
+        "AT-COM-05",
+        "AT-COM-06",
+        "AT-COM-07",
+        "AT-COM-08",
+        "AT-COM-09",
+        "AT-COM-10",
+        "AT-COM-11",
+        "AT-COM-12",
+        "AT-COM-13",
+        "AT-COM-14",
+        "AT-COM-15",
+        "AT-COM-16"
+      ],
+      "applicable_tiers": [
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P2",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-COMMERCIAL-MODEL.md#L158"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-COMMERCIAL-MODEL.md",
+      "evidence_refs": [],
+      "id": "MDOS-MOT-010",
+      "line": 158,
+      "owner_role": "MotionOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "d5b8eec4e37b15493a2bb33ea825f965d2c9232a65813ae51e4f795f781628fc"
+    },
+    {
+      "acceptance_ids": [
+        "AT-COM-01",
+        "AT-COM-02",
+        "AT-COM-03",
+        "AT-COM-04",
+        "AT-COM-05",
+        "AT-COM-06",
+        "AT-COM-07",
+        "AT-COM-08",
+        "AT-COM-09",
+        "AT-COM-10",
+        "AT-COM-11",
+        "AT-COM-12",
+        "AT-COM-13",
+        "AT-COM-14",
+        "AT-COM-15",
+        "AT-COM-16"
+      ],
+      "applicable_tiers": [
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P2",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-COMMERCIAL-MODEL.md#L168"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-COMMERCIAL-MODEL.md",
+      "evidence_refs": [],
+      "id": "MDOS-MOT-011",
+      "line": 168,
+      "owner_role": "MotionOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "218c70ba1b6e174eb61ca191ee9fcdc8e0bb0e9f6826f7375914e8d65740a578"
+    },
+    {
+      "acceptance_ids": [
+        "AT-COM-01",
+        "AT-COM-02",
+        "AT-COM-03",
+        "AT-COM-04",
+        "AT-COM-05",
+        "AT-COM-06",
+        "AT-COM-07",
+        "AT-COM-08",
+        "AT-COM-09",
+        "AT-COM-10",
+        "AT-COM-11",
+        "AT-COM-12",
+        "AT-COM-13",
+        "AT-COM-14",
+        "AT-COM-15",
+        "AT-COM-16"
+      ],
+      "applicable_tiers": [
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P2",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-COMMERCIAL-MODEL.md#L198"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-COMMERCIAL-MODEL.md",
+      "evidence_refs": [],
+      "id": "MDOS-OFR-001",
+      "line": 198,
+      "owner_role": "ProductAndPromiseOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "01a01205918bddd6b895fba8c5413bf235fe02c3565c4a656600dfa26c6ab7be"
+    },
+    {
+      "acceptance_ids": [
+        "AT-COM-01",
+        "AT-COM-02",
+        "AT-COM-03",
+        "AT-COM-04",
+        "AT-COM-05",
+        "AT-COM-06",
+        "AT-COM-07",
+        "AT-COM-08",
+        "AT-COM-09",
+        "AT-COM-10",
+        "AT-COM-11",
+        "AT-COM-12",
+        "AT-COM-13",
+        "AT-COM-14",
+        "AT-COM-15",
+        "AT-COM-16"
+      ],
+      "applicable_tiers": [
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P2",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-COMMERCIAL-MODEL.md#L202"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-COMMERCIAL-MODEL.md",
+      "evidence_refs": [],
+      "id": "MDOS-OFR-002",
+      "line": 202,
+      "owner_role": "ProductAndPromiseOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "5fa82ca27fbdd89921b6672eb1e46aa217b405a870a2e68997802bb8194fabcb"
+    },
+    {
+      "acceptance_ids": [
+        "AT-ARC-01",
+        "AT-ARC-02",
+        "AT-ARC-03",
+        "AT-ARC-04",
+        "AT-ARC-05",
+        "AT-ARC-06",
+        "AT-ARC-07",
+        "AT-ARC-08",
+        "AT-ARC-09",
+        "AT-ARC-10",
+        "AT-ARC-11",
+        "AT-ARC-12",
+        "AT-ARC-13",
+        "AT-ARC-14",
+        "AT-ARC-15"
+      ],
+      "applicable_tiers": [
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P2",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-REFERENCE-ARCHITECTURE.md#L160"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-REFERENCE-ARCHITECTURE.md",
+      "evidence_refs": [],
+      "id": "MDOS-OPS-001",
+      "line": 160,
+      "owner_role": "SREOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "5efb004d62deed2f265d5847c786cba6a2bf26f75ce4151bec46d9efe47d2e87"
+    },
+    {
+      "acceptance_ids": [
+        "AT-ARC-01",
+        "AT-ARC-02",
+        "AT-ARC-03",
+        "AT-ARC-04",
+        "AT-ARC-05",
+        "AT-ARC-06",
+        "AT-ARC-07",
+        "AT-ARC-08",
+        "AT-ARC-09",
+        "AT-ARC-10",
+        "AT-ARC-11",
+        "AT-ARC-12",
+        "AT-ARC-13",
+        "AT-ARC-14",
+        "AT-ARC-15"
+      ],
+      "applicable_tiers": [
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P2",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-REFERENCE-ARCHITECTURE.md#L163"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-REFERENCE-ARCHITECTURE.md",
+      "evidence_refs": [],
+      "id": "MDOS-OPS-002",
+      "line": 163,
+      "owner_role": "SREOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "a124a86476ab84ae8ffcc018f98cc44c780ec4bfb6c96dc60a8d1435f7555377"
+    },
+    {
+      "acceptance_ids": [
+        "AT-ARC-01",
+        "AT-ARC-02",
+        "AT-ARC-03",
+        "AT-ARC-04",
+        "AT-ARC-05",
+        "AT-ARC-06",
+        "AT-ARC-07",
+        "AT-ARC-08",
+        "AT-ARC-09",
+        "AT-ARC-10",
+        "AT-ARC-11",
+        "AT-ARC-12",
+        "AT-ARC-13",
+        "AT-ARC-14",
+        "AT-ARC-15"
+      ],
+      "applicable_tiers": [
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P2",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-REFERENCE-ARCHITECTURE.md#L166"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-REFERENCE-ARCHITECTURE.md",
+      "evidence_refs": [],
+      "id": "MDOS-OPS-003",
+      "line": 166,
+      "owner_role": "SREOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "9f4eccbc841654e3f2eb06b7466024156638ef0fcab69a4f407726ede13a2c3b"
+    },
+    {
+      "acceptance_ids": [
+        "AT-ARC-01",
+        "AT-ARC-02",
+        "AT-ARC-03",
+        "AT-ARC-04",
+        "AT-ARC-05",
+        "AT-ARC-06",
+        "AT-ARC-07",
+        "AT-ARC-08",
+        "AT-ARC-09",
+        "AT-ARC-10",
+        "AT-ARC-11",
+        "AT-ARC-12",
+        "AT-ARC-13",
+        "AT-ARC-14",
+        "AT-ARC-15"
+      ],
+      "applicable_tiers": [
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P2",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-REFERENCE-ARCHITECTURE.md#L169"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-REFERENCE-ARCHITECTURE.md",
+      "evidence_refs": [],
+      "id": "MDOS-OPS-004",
+      "line": 169,
+      "owner_role": "SREOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "307f604fe0c89524df9c3e1de6a74a9cb7154d0ee4652bfe99bf4715836f7e6f"
+    },
+    {
+      "acceptance_ids": [
+        "AT-DEC-01",
+        "AT-DEC-02",
+        "AT-DEC-03",
+        "AT-DEC-04",
+        "AT-DEC-05",
+        "AT-DEC-06",
+        "AT-DEC-07",
+        "AT-DEC-08",
+        "AT-DEC-09",
+        "AT-DEC-10",
+        "AT-DEC-11",
+        "AT-DEC-12",
+        "AT-DEC-13",
+        "AT-DEC-14",
+        "AT-DEC-15"
+      ],
+      "applicable_tiers": [
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P2",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/CONTRACT.md#L122"
+      ],
+      "document": "docs/market_demand_os_v7/CONTRACT.md",
+      "evidence_refs": [],
+      "id": "MDOS-OUT-001",
+      "line": 122,
+      "owner_role": "BusinessOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "958a1224688d8d58db692b4da93cee122e49f0e551626cfb130909d02dee73f9"
+    },
+    {
+      "acceptance_ids": [
+        "AT-DEC-01",
+        "AT-DEC-02",
+        "AT-DEC-03",
+        "AT-DEC-04",
+        "AT-DEC-05",
+        "AT-DEC-06",
+        "AT-DEC-07",
+        "AT-DEC-08",
+        "AT-DEC-09",
+        "AT-DEC-10",
+        "AT-DEC-11",
+        "AT-DEC-12",
+        "AT-DEC-13",
+        "AT-DEC-14",
+        "AT-DEC-15"
+      ],
+      "applicable_tiers": [
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P2",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/CONTRACT.md#L126"
+      ],
+      "document": "docs/market_demand_os_v7/CONTRACT.md",
+      "evidence_refs": [],
+      "id": "MDOS-OUT-002",
+      "line": 126,
+      "owner_role": "BusinessOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "7302ac08e8b23c4538c24bdd4e2465efdc7699e79ec98a13f9a6b010638a8e15"
+    },
+    {
+      "acceptance_ids": [
+        "AT-DEC-01",
+        "AT-DEC-02",
+        "AT-DEC-03",
+        "AT-DEC-04",
+        "AT-DEC-05",
+        "AT-DEC-06",
+        "AT-DEC-07",
+        "AT-DEC-08",
+        "AT-DEC-09",
+        "AT-DEC-10",
+        "AT-DEC-11",
+        "AT-DEC-12",
+        "AT-DEC-13",
+        "AT-DEC-14",
+        "AT-DEC-15"
+      ],
+      "applicable_tiers": [
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P2",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/CONTRACT.md#L130"
+      ],
+      "document": "docs/market_demand_os_v7/CONTRACT.md",
+      "evidence_refs": [],
+      "id": "MDOS-OUT-003",
+      "line": 130,
+      "owner_role": "BusinessOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "70d77e685174841d9740997645d4ebc538f2b66bcce200b7f4b53248ce3a083a"
+    },
+    {
+      "acceptance_ids": [
+        "AT-DEC-01",
+        "AT-DEC-02",
+        "AT-DEC-03",
+        "AT-DEC-04",
+        "AT-DEC-05",
+        "AT-DEC-06",
+        "AT-DEC-07",
+        "AT-DEC-08",
+        "AT-DEC-09",
+        "AT-DEC-10",
+        "AT-DEC-11",
+        "AT-DEC-12",
+        "AT-DEC-13",
+        "AT-DEC-14",
+        "AT-DEC-15"
+      ],
+      "applicable_tiers": [
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P1",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DECISION-OUTCOMES.md#L26"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-DECISION-OUTCOMES.md",
+      "evidence_refs": [],
+      "id": "MDOS-OUTC-001",
+      "line": 26,
+      "owner_role": "FinanceDataOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "d96b6db545d027daebfd935370ed05061bf424efcd40796e9a0762e5cd93f8d0"
+    },
+    {
+      "acceptance_ids": [
+        "AT-DEC-01",
+        "AT-DEC-02",
+        "AT-DEC-03",
+        "AT-DEC-04",
+        "AT-DEC-05",
+        "AT-DEC-06",
+        "AT-DEC-07",
+        "AT-DEC-08",
+        "AT-DEC-09",
+        "AT-DEC-10",
+        "AT-DEC-11",
+        "AT-DEC-12",
+        "AT-DEC-13",
+        "AT-DEC-14",
+        "AT-DEC-15"
+      ],
+      "applicable_tiers": [
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P1",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DECISION-OUTCOMES.md#L36"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-DECISION-OUTCOMES.md",
+      "evidence_refs": [],
+      "id": "MDOS-OUTC-002",
+      "line": 36,
+      "owner_role": "FinanceDataOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "673f73e5f02f82d071ca92f2fe54db019980cf497e07f1361d7e3efa6e7bb814"
+    },
+    {
+      "acceptance_ids": [
+        "AT-DEC-01",
+        "AT-DEC-02",
+        "AT-DEC-03",
+        "AT-DEC-04",
+        "AT-DEC-05",
+        "AT-DEC-06",
+        "AT-DEC-07",
+        "AT-DEC-08",
+        "AT-DEC-09",
+        "AT-DEC-10",
+        "AT-DEC-11",
+        "AT-DEC-12",
+        "AT-DEC-13",
+        "AT-DEC-14",
+        "AT-DEC-15"
+      ],
+      "applicable_tiers": [
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P1",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DECISION-OUTCOMES.md#L40"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-DECISION-OUTCOMES.md",
+      "evidence_refs": [],
+      "id": "MDOS-OUTC-003",
+      "line": 40,
+      "owner_role": "FinanceDataOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "ee0b83c366e0a09c86e5ed40c0436ad0b7d90e4df0f7cebc8ad2cb4c7b7aee3a"
+    },
+    {
+      "acceptance_ids": [
+        "AT-DEC-01",
+        "AT-DEC-02",
+        "AT-DEC-03",
+        "AT-DEC-04",
+        "AT-DEC-05",
+        "AT-DEC-06",
+        "AT-DEC-07",
+        "AT-DEC-08",
+        "AT-DEC-09",
+        "AT-DEC-10",
+        "AT-DEC-11",
+        "AT-DEC-12",
+        "AT-DEC-13",
+        "AT-DEC-14",
+        "AT-DEC-15"
+      ],
+      "applicable_tiers": [
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P1",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DECISION-OUTCOMES.md#L115"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-DECISION-OUTCOMES.md",
+      "evidence_refs": [],
+      "id": "MDOS-PC10-001",
+      "line": 115,
+      "owner_role": "IndependentEvidenceVerifier",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "8170a5558aa172089c64f5fdced382643c564aa44ed85ee70e757135b89bcbdd"
+    },
+    {
+      "acceptance_ids": [
+        "AT-DEC-01",
+        "AT-DEC-02",
+        "AT-DEC-03",
+        "AT-DEC-04",
+        "AT-DEC-05",
+        "AT-DEC-06",
+        "AT-DEC-07",
+        "AT-DEC-08",
+        "AT-DEC-09",
+        "AT-DEC-10",
+        "AT-DEC-11",
+        "AT-DEC-12",
+        "AT-DEC-13",
+        "AT-DEC-14",
+        "AT-DEC-15"
+      ],
+      "applicable_tiers": [
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P1",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DECISION-OUTCOMES.md#L118"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-DECISION-OUTCOMES.md",
+      "evidence_refs": [],
+      "id": "MDOS-PC10-002",
+      "line": 118,
+      "owner_role": "IndependentEvidenceVerifier",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "46149a51b7cc411fedca35b9e1afd670d5a8d5d218f3fb7844b111974c40cb96"
+    },
+    {
+      "acceptance_ids": [
+        "AT-DEC-01",
+        "AT-DEC-02",
+        "AT-DEC-03",
+        "AT-DEC-04",
+        "AT-DEC-05",
+        "AT-DEC-06",
+        "AT-DEC-07",
+        "AT-DEC-08",
+        "AT-DEC-09",
+        "AT-DEC-10",
+        "AT-DEC-11",
+        "AT-DEC-12",
+        "AT-DEC-13",
+        "AT-DEC-14",
+        "AT-DEC-15"
+      ],
+      "applicable_tiers": [
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P1",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DECISION-OUTCOMES.md#L122"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-DECISION-OUTCOMES.md",
+      "evidence_refs": [],
+      "id": "MDOS-PC10-003",
+      "line": 122,
+      "owner_role": "IndependentEvidenceVerifier",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "993eadbe46cd80b7d1879ce053eaae17029b14f98be020d023f77965f1465dad"
+    },
+    {
+      "acceptance_ids": [
+        "AT-SRC7-01",
+        "AT-SRC7-02",
+        "AT-SRC7-03",
+        "AT-SRC7-04",
+        "AT-SRC7-05",
+        "AT-SRC7-06",
+        "AT-SRC7-07",
+        "AT-SRC7-08",
+        "AT-SRC7-09",
+        "AT-SRC7-10"
+      ],
+      "applicable_tiers": [
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P2",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-SOURCE-PORTFOLIO.md#L29"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-SOURCE-PORTFOLIO.md",
+      "evidence_refs": [],
+      "id": "MDOS-PORT-001",
+      "line": 29,
+      "owner_role": "SourcePortfolioOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "8938f83f4e7d105e93120d0125cd49f57d1767542c11770d18cd766d90f7b1e2"
+    },
+    {
+      "acceptance_ids": [
+        "AT-SRC7-01",
+        "AT-SRC7-02",
+        "AT-SRC7-03",
+        "AT-SRC7-04",
+        "AT-SRC7-05",
+        "AT-SRC7-06",
+        "AT-SRC7-07",
+        "AT-SRC7-08",
+        "AT-SRC7-09",
+        "AT-SRC7-10"
+      ],
+      "applicable_tiers": [
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P2",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-SOURCE-PORTFOLIO.md#L42"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-SOURCE-PORTFOLIO.md",
+      "evidence_refs": [],
+      "id": "MDOS-PORT-002",
+      "line": 42,
+      "owner_role": "SourcePortfolioOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "6c013aa9b1165f8bbb08170dbfbcd9a6d726ca6fafeb4694aeb7a574e3edd185"
+    },
+    {
+      "acceptance_ids": [
+        "AT-SRC7-01",
+        "AT-SRC7-02",
+        "AT-SRC7-03",
+        "AT-SRC7-04",
+        "AT-SRC7-05",
+        "AT-SRC7-06",
+        "AT-SRC7-07",
+        "AT-SRC7-08",
+        "AT-SRC7-09",
+        "AT-SRC7-10"
+      ],
+      "applicable_tiers": [
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P2",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-SOURCE-PORTFOLIO.md#L53"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-SOURCE-PORTFOLIO.md",
+      "evidence_refs": [],
+      "id": "MDOS-PORT-003",
+      "line": 53,
+      "owner_role": "SourcePortfolioOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "20a050c03be4c7525384f237faf83003643aad4287102202d514964a162e5199"
+    },
+    {
+      "acceptance_ids": [
+        "AT-SRC7-01",
+        "AT-SRC7-02",
+        "AT-SRC7-03",
+        "AT-SRC7-04",
+        "AT-SRC7-05",
+        "AT-SRC7-06",
+        "AT-SRC7-07",
+        "AT-SRC7-08",
+        "AT-SRC7-09",
+        "AT-SRC7-10"
+      ],
+      "applicable_tiers": [
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P2",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-SOURCE-PORTFOLIO.md#L65"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-SOURCE-PORTFOLIO.md",
+      "evidence_refs": [],
+      "id": "MDOS-PORT-004",
+      "line": 65,
+      "owner_role": "SourcePortfolioOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "df620ef77a0eb998c8ddbdb20fbb0b1c2f47357a9d886b9944ea23c0baba5b2a"
+    },
+    {
+      "acceptance_ids": [
+        "AT-SRC7-01",
+        "AT-SRC7-02",
+        "AT-SRC7-03",
+        "AT-SRC7-04",
+        "AT-SRC7-05",
+        "AT-SRC7-06",
+        "AT-SRC7-07",
+        "AT-SRC7-08",
+        "AT-SRC7-09",
+        "AT-SRC7-10"
+      ],
+      "applicable_tiers": [
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P2",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-SOURCE-PORTFOLIO.md#L74"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-SOURCE-PORTFOLIO.md",
+      "evidence_refs": [],
+      "id": "MDOS-PORT-005",
+      "line": 74,
+      "owner_role": "SourcePortfolioOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "584e136849582bf1565b7862507a22e675394d14bdde8d64b00de584ccbb01e3"
+    },
+    {
+      "acceptance_ids": [
+        "AT-SRC7-01",
+        "AT-SRC7-02",
+        "AT-SRC7-03",
+        "AT-SRC7-04",
+        "AT-SRC7-05",
+        "AT-SRC7-06",
+        "AT-SRC7-07",
+        "AT-SRC7-08",
+        "AT-SRC7-09",
+        "AT-SRC7-10"
+      ],
+      "applicable_tiers": [
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P2",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-SOURCE-PORTFOLIO.md#L84"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-SOURCE-PORTFOLIO.md",
+      "evidence_refs": [],
+      "id": "MDOS-PORT-006",
+      "line": 84,
+      "owner_role": "SourcePortfolioOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "fab2cf84a9b8f7ee1d786729dd9908b6223f754a7bd13171bf8a2b96228b5092"
+    },
+    {
+      "acceptance_ids": [
+        "AT-SRC7-01",
+        "AT-SRC7-02",
+        "AT-SRC7-03",
+        "AT-SRC7-04",
+        "AT-SRC7-05",
+        "AT-SRC7-06",
+        "AT-SRC7-07",
+        "AT-SRC7-08",
+        "AT-SRC7-09",
+        "AT-SRC7-10"
+      ],
+      "applicable_tiers": [
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P2",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-SOURCE-PORTFOLIO.md#L91"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-SOURCE-PORTFOLIO.md",
+      "evidence_refs": [],
+      "id": "MDOS-PORT-007",
+      "line": 91,
+      "owner_role": "SourcePortfolioOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "d055e2f9dd85fd9a868ee8589c01b449a00110ab9401a521597d7368d5bbb802"
+    },
+    {
+      "acceptance_ids": [
+        "AT-ASR-01",
+        "AT-ASR-02",
+        "AT-ASR-03",
+        "AT-ASR-04",
+        "AT-ASR-05",
+        "AT-ASR-06",
+        "AT-ASR-07",
+        "AT-ASR-08",
+        "AT-ASR-09",
+        "AT-ASR-10",
+        "AT-ASR-11",
+        "AT-ASR-12",
+        "AT-ASR-13",
+        "AT-ASR-14"
+      ],
+      "applicable_tiers": [
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P2",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DELIVERY-ASSURANCE.md#L50"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-DELIVERY-ASSURANCE.md",
+      "evidence_refs": [],
+      "id": "MDOS-PRG-001",
+      "line": 50,
+      "owner_role": "ProgramOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "ab272abe339b8aabe64539eb8d7d39f3a2d250cac9e07e5362f41b89780e9cae"
+    },
+    {
+      "acceptance_ids": [
+        "AT-ASR-01",
+        "AT-ASR-02",
+        "AT-ASR-03",
+        "AT-ASR-04",
+        "AT-ASR-05",
+        "AT-ASR-06",
+        "AT-ASR-07",
+        "AT-ASR-08",
+        "AT-ASR-09",
+        "AT-ASR-10",
+        "AT-ASR-11",
+        "AT-ASR-12",
+        "AT-ASR-13",
+        "AT-ASR-14"
+      ],
+      "applicable_tiers": [
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P2",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DELIVERY-ASSURANCE.md#L63"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-DELIVERY-ASSURANCE.md",
+      "evidence_refs": [],
+      "id": "MDOS-PRG-002",
+      "line": 63,
+      "owner_role": "ProgramOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "d45674b20750d76e9d63c949d969e865e771767b2acdd157068b63d1aa62efd2"
+    },
+    {
+      "acceptance_ids": [
+        "AT-ASR-01",
+        "AT-ASR-02",
+        "AT-ASR-03",
+        "AT-ASR-04",
+        "AT-ASR-05",
+        "AT-ASR-06",
+        "AT-ASR-07",
+        "AT-ASR-08",
+        "AT-ASR-09",
+        "AT-ASR-10",
+        "AT-ASR-11",
+        "AT-ASR-12",
+        "AT-ASR-13",
+        "AT-ASR-14"
+      ],
+      "applicable_tiers": [
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P2",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DELIVERY-ASSURANCE.md#L74"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-DELIVERY-ASSURANCE.md",
+      "evidence_refs": [],
+      "id": "MDOS-PRG-003",
+      "line": 74,
+      "owner_role": "ProgramOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "eef4fef29034bd8d9216b3a3533dd4ae18e65dee006f0c75ea08f1c6cdd0ee52"
+    },
+    {
+      "acceptance_ids": [
+        "AT-ASR-01",
+        "AT-ASR-02",
+        "AT-ASR-03",
+        "AT-ASR-04",
+        "AT-ASR-05",
+        "AT-ASR-06",
+        "AT-ASR-07",
+        "AT-ASR-08",
+        "AT-ASR-09",
+        "AT-ASR-10",
+        "AT-ASR-11",
+        "AT-ASR-12",
+        "AT-ASR-13",
+        "AT-ASR-14"
+      ],
+      "applicable_tiers": [
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P2",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DELIVERY-ASSURANCE.md#L87"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-DELIVERY-ASSURANCE.md",
+      "evidence_refs": [],
+      "id": "MDOS-PRG-004",
+      "line": 87,
+      "owner_role": "ProgramOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "47858077444b3893306646b26c4da9fec5d72381fbb5fc6adcf19b9ea12a0f56"
+    },
+    {
+      "acceptance_ids": [
+        "AT-ASR-01",
+        "AT-ASR-02",
+        "AT-ASR-03",
+        "AT-ASR-04",
+        "AT-ASR-05",
+        "AT-ASR-06",
+        "AT-ASR-07",
+        "AT-ASR-08",
+        "AT-ASR-09",
+        "AT-ASR-10",
+        "AT-ASR-11",
+        "AT-ASR-12",
+        "AT-ASR-13",
+        "AT-ASR-14"
+      ],
+      "applicable_tiers": [
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P2",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DELIVERY-ASSURANCE.md#L91"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-DELIVERY-ASSURANCE.md",
+      "evidence_refs": [],
+      "id": "MDOS-PRG-005",
+      "line": 91,
+      "owner_role": "ProgramOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "1b1d3a29a6003b167511bda128179196d00d1dd42d489abf31eb836cb96f4a7a"
+    },
+    {
+      "acceptance_ids": [
+        "AT-ASR-01",
+        "AT-ASR-02",
+        "AT-ASR-03",
+        "AT-ASR-04",
+        "AT-ASR-05",
+        "AT-ASR-06",
+        "AT-ASR-07",
+        "AT-ASR-08",
+        "AT-ASR-09",
+        "AT-ASR-10",
+        "AT-ASR-11",
+        "AT-ASR-12",
+        "AT-ASR-13",
+        "AT-ASR-14"
+      ],
+      "applicable_tiers": [
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P2",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DELIVERY-ASSURANCE.md#L95"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-DELIVERY-ASSURANCE.md",
+      "evidence_refs": [],
+      "id": "MDOS-PRG-006",
+      "line": 95,
+      "owner_role": "ProgramOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "9eb3d7efbc2b073a592a67466ad01765ab4217ddaaeaf8ca632323bbd98515d7"
+    },
+    {
+      "acceptance_ids": [
+        "AT-ASR-01",
+        "AT-ASR-02",
+        "AT-ASR-03",
+        "AT-ASR-04",
+        "AT-ASR-05",
+        "AT-ASR-06",
+        "AT-ASR-07",
+        "AT-ASR-08",
+        "AT-ASR-09",
+        "AT-ASR-10",
+        "AT-ASR-11",
+        "AT-ASR-12",
+        "AT-ASR-13",
+        "AT-ASR-14"
+      ],
+      "applicable_tiers": [
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P2",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DELIVERY-ASSURANCE.md#L99"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-DELIVERY-ASSURANCE.md",
+      "evidence_refs": [],
+      "id": "MDOS-PRG-007",
+      "line": 99,
+      "owner_role": "ProgramOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "eaf64a57b7d8db3cfcd4b7572c687b4bf8e46026f07583739fca6a74743cc1ae"
+    },
+    {
+      "acceptance_ids": [
+        "AT-ASR-01",
+        "AT-ASR-02",
+        "AT-ASR-03",
+        "AT-ASR-04",
+        "AT-ASR-05",
+        "AT-ASR-06",
+        "AT-ASR-07",
+        "AT-ASR-08",
+        "AT-ASR-09",
+        "AT-ASR-10",
+        "AT-ASR-11",
+        "AT-ASR-12",
+        "AT-ASR-13",
+        "AT-ASR-14"
+      ],
+      "applicable_tiers": [
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P2",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DELIVERY-ASSURANCE.md#L102"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-DELIVERY-ASSURANCE.md",
+      "evidence_refs": [],
+      "id": "MDOS-PRG-008",
+      "line": 102,
+      "owner_role": "ProgramOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "9c79a9ec103e390e4e1edd87bbdc737d37b0d1dee8a90a7891e098255df2c56e"
+    },
+    {
+      "acceptance_ids": [
+        "AT-ASR-01",
+        "AT-ASR-02",
+        "AT-ASR-03",
+        "AT-ASR-04",
+        "AT-ASR-05",
+        "AT-ASR-06",
+        "AT-ASR-07",
+        "AT-ASR-08",
+        "AT-ASR-09",
+        "AT-ASR-10",
+        "AT-ASR-11",
+        "AT-ASR-12",
+        "AT-ASR-13",
+        "AT-ASR-14"
+      ],
+      "applicable_tiers": [
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P2",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DELIVERY-ASSURANCE.md#L83"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-DELIVERY-ASSURANCE.md",
+      "evidence_refs": [],
+      "id": "MDOS-PRG-009",
+      "line": 83,
+      "owner_role": "ProgramOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "f23c71fd39a62fbb8b28f46dec583ad61d5a3d5a38a4b17a0e607a88a6241c7a"
+    },
+    {
+      "acceptance_ids": [
+        "AT-ASR-01",
+        "AT-ASR-02",
+        "AT-ASR-03",
+        "AT-ASR-04",
+        "AT-ASR-05",
+        "AT-ASR-06",
+        "AT-ASR-07",
+        "AT-ASR-08",
+        "AT-ASR-09",
+        "AT-ASR-10",
+        "AT-ASR-11",
+        "AT-ASR-12",
+        "AT-ASR-13",
+        "AT-ASR-14"
+      ],
+      "applicable_tiers": [
+        "G0",
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P0",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DELIVERY-ASSURANCE.md#L137"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-DELIVERY-ASSURANCE.md",
+      "evidence_refs": [],
+      "id": "MDOS-REL-001",
+      "line": 137,
+      "owner_role": "ReleaseManager",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "8691e49790811f16c9dabe216059e9437b3a438a47a7145245d488c8dc474024"
+    },
+    {
+      "acceptance_ids": [
+        "AT-ASR-01",
+        "AT-ASR-02",
+        "AT-ASR-03",
+        "AT-ASR-04",
+        "AT-ASR-05",
+        "AT-ASR-06",
+        "AT-ASR-07",
+        "AT-ASR-08",
+        "AT-ASR-09",
+        "AT-ASR-10",
+        "AT-ASR-11",
+        "AT-ASR-12",
+        "AT-ASR-13",
+        "AT-ASR-14"
+      ],
+      "applicable_tiers": [
+        "G0",
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P0",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DELIVERY-ASSURANCE.md#L151"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-DELIVERY-ASSURANCE.md",
+      "evidence_refs": [],
+      "id": "MDOS-REL-002",
+      "line": 151,
+      "owner_role": "ReleaseManager",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "1424fd9d24b6931a558339e568ce59b99e68e171dee6f87463aff21ab21fe43a"
+    },
+    {
+      "acceptance_ids": [
+        "AT-DI7-01",
+        "AT-DI7-02",
+        "AT-DI7-03",
+        "AT-DI7-04",
+        "AT-DI7-05",
+        "AT-DI7-06",
+        "AT-DI7-07",
+        "AT-DI7-08",
+        "AT-DI7-09",
+        "AT-DI7-10",
+        "AT-DI7-11",
+        "AT-DI7-12"
+      ],
+      "applicable_tiers": [
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P1",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DEMAND-INTELLIGENCE.md#L54"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-DEMAND-INTELLIGENCE.md",
+      "evidence_refs": [],
+      "id": "MDOS-RES-001",
+      "line": 54,
+      "owner_role": "ModelRiskOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "403b0d6d08ef42342ec0993260717df99e00b9ee049e5db542bfcb23c6eb9d8f"
+    },
+    {
+      "acceptance_ids": [
+        "AT-DI7-01",
+        "AT-DI7-02",
+        "AT-DI7-03",
+        "AT-DI7-04",
+        "AT-DI7-05",
+        "AT-DI7-06",
+        "AT-DI7-07",
+        "AT-DI7-08",
+        "AT-DI7-09",
+        "AT-DI7-10",
+        "AT-DI7-11",
+        "AT-DI7-12"
+      ],
+      "applicable_tiers": [
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P1",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DEMAND-INTELLIGENCE.md#L67"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-DEMAND-INTELLIGENCE.md",
+      "evidence_refs": [],
+      "id": "MDOS-RES-002",
+      "line": 67,
+      "owner_role": "ModelRiskOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "507e26db1a7275efe54fabb03b890c2ee27069d2b1ac8b95c3b272d02ec1acaf"
+    },
+    {
+      "acceptance_ids": [
+        "AT-DI7-01",
+        "AT-DI7-02",
+        "AT-DI7-03",
+        "AT-DI7-04",
+        "AT-DI7-05",
+        "AT-DI7-06",
+        "AT-DI7-07",
+        "AT-DI7-08",
+        "AT-DI7-09",
+        "AT-DI7-10",
+        "AT-DI7-11",
+        "AT-DI7-12"
+      ],
+      "applicable_tiers": [
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P1",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DEMAND-INTELLIGENCE.md#L71"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-DEMAND-INTELLIGENCE.md",
+      "evidence_refs": [],
+      "id": "MDOS-RES-003",
+      "line": 71,
+      "owner_role": "ModelRiskOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "81eec3969edc9ebbb38195b6b1e044a04bf602ea7ccfa40b5f3d7a6e5c00cdc5"
+    },
+    {
+      "acceptance_ids": [
+        "AT-DI7-01",
+        "AT-DI7-02",
+        "AT-DI7-03",
+        "AT-DI7-04",
+        "AT-DI7-05",
+        "AT-DI7-06",
+        "AT-DI7-07",
+        "AT-DI7-08",
+        "AT-DI7-09",
+        "AT-DI7-10",
+        "AT-DI7-11",
+        "AT-DI7-12"
+      ],
+      "applicable_tiers": [
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P1",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DEMAND-INTELLIGENCE.md#L75"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-DEMAND-INTELLIGENCE.md",
+      "evidence_refs": [],
+      "id": "MDOS-RES-004",
+      "line": 75,
+      "owner_role": "ModelRiskOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "7cf2ecb12b4110f13b368f9715568ae15727a738e35ab6d7d97768f8806da106"
+    },
+    {
+      "acceptance_ids": [
+        "AT-ASR-01",
+        "AT-ASR-02",
+        "AT-ASR-03",
+        "AT-ASR-04",
+        "AT-ASR-05",
+        "AT-ASR-06",
+        "AT-ASR-07",
+        "AT-ASR-08",
+        "AT-ASR-09",
+        "AT-ASR-10",
+        "AT-ASR-11",
+        "AT-ASR-12",
+        "AT-ASR-13",
+        "AT-ASR-14"
+      ],
+      "applicable_tiers": [
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P2",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DELIVERY-ASSURANCE.md#L123"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-DELIVERY-ASSURANCE.md",
+      "evidence_refs": [],
+      "id": "MDOS-REV-001",
+      "line": 123,
+      "owner_role": "ProgramOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "7a4be1f19d06cb10ea7d839d0773143d24abcf0d20821128def178237fac1ef6"
+    },
+    {
+      "acceptance_ids": [
+        "AT-ASR-01",
+        "AT-ASR-02",
+        "AT-ASR-03",
+        "AT-ASR-04",
+        "AT-ASR-05",
+        "AT-ASR-06",
+        "AT-ASR-07",
+        "AT-ASR-08",
+        "AT-ASR-09",
+        "AT-ASR-10",
+        "AT-ASR-11",
+        "AT-ASR-12",
+        "AT-ASR-13",
+        "AT-ASR-14"
+      ],
+      "applicable_tiers": [
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P2",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DELIVERY-ASSURANCE.md#L127"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-DELIVERY-ASSURANCE.md",
+      "evidence_refs": [],
+      "id": "MDOS-REV-002",
+      "line": 127,
+      "owner_role": "ProgramOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "e3fecef30ac64e302b10d88ab9dc7b9bf482f38d5fd337a80f673b7306047c3d"
+    },
+    {
+      "acceptance_ids": [
+        "AT-ASR-01",
+        "AT-ASR-02",
+        "AT-ASR-03",
+        "AT-ASR-04",
+        "AT-ASR-05",
+        "AT-ASR-06",
+        "AT-ASR-07",
+        "AT-ASR-08",
+        "AT-ASR-09",
+        "AT-ASR-10",
+        "AT-ASR-11",
+        "AT-ASR-12",
+        "AT-ASR-13",
+        "AT-ASR-14"
+      ],
+      "applicable_tiers": [
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P2",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DELIVERY-ASSURANCE.md#L131"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-DELIVERY-ASSURANCE.md",
+      "evidence_refs": [],
+      "id": "MDOS-REV-003",
+      "line": 131,
+      "owner_role": "ProgramOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "5f35b378eefbcae9ca2c868849bd85d4d6f81c57cd3bbaa6c8aaa0bada1f5ddf"
+    },
+    {
+      "acceptance_ids": [
+        "AT-DI7-01",
+        "AT-DI7-02",
+        "AT-DI7-03",
+        "AT-DI7-04",
+        "AT-DI7-05",
+        "AT-DI7-06",
+        "AT-DI7-07",
+        "AT-DI7-08",
+        "AT-DI7-09",
+        "AT-DI7-10",
+        "AT-DI7-11",
+        "AT-DI7-12"
+      ],
+      "applicable_tiers": [
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P2",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DEMAND-INTELLIGENCE.md#L81"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-DEMAND-INTELLIGENCE.md",
+      "evidence_refs": [],
+      "id": "MDOS-RSH-001",
+      "line": 81,
+      "owner_role": "ResearchOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "2b13b747dbc1489f1d0b1b0bb545431b131d8b0d3bced5544033a5523bcad5ca"
+    },
+    {
+      "acceptance_ids": [
+        "AT-DI7-01",
+        "AT-DI7-02",
+        "AT-DI7-03",
+        "AT-DI7-04",
+        "AT-DI7-05",
+        "AT-DI7-06",
+        "AT-DI7-07",
+        "AT-DI7-08",
+        "AT-DI7-09",
+        "AT-DI7-10",
+        "AT-DI7-11",
+        "AT-DI7-12"
+      ],
+      "applicable_tiers": [
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P2",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DEMAND-INTELLIGENCE.md#L85"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-DEMAND-INTELLIGENCE.md",
+      "evidence_refs": [],
+      "id": "MDOS-RSH-002",
+      "line": 85,
+      "owner_role": "ResearchOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "b03b1416625c022ce7ab9180e952dba962c01760fcf84e11914cd21a0fb3169e"
+    },
+    {
+      "acceptance_ids": [
+        "AT-DI7-01",
+        "AT-DI7-02",
+        "AT-DI7-03",
+        "AT-DI7-04",
+        "AT-DI7-05",
+        "AT-DI7-06",
+        "AT-DI7-07",
+        "AT-DI7-08",
+        "AT-DI7-09",
+        "AT-DI7-10",
+        "AT-DI7-11",
+        "AT-DI7-12"
+      ],
+      "applicable_tiers": [
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P2",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DEMAND-INTELLIGENCE.md#L90"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-DEMAND-INTELLIGENCE.md",
+      "evidence_refs": [],
+      "id": "MDOS-RSH-003",
+      "line": 90,
+      "owner_role": "ResearchOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "b1b60757b94b618ce11c0bc5c4ecef95a8a42b4390569d9633d466771396552c"
+    },
+    {
+      "acceptance_ids": [
+        "AT-COM-01",
+        "AT-COM-02",
+        "AT-COM-03",
+        "AT-COM-04",
+        "AT-COM-05",
+        "AT-COM-06",
+        "AT-COM-07",
+        "AT-COM-08",
+        "AT-COM-09",
+        "AT-COM-10",
+        "AT-COM-11",
+        "AT-COM-12",
+        "AT-COM-13",
+        "AT-COM-14",
+        "AT-COM-15",
+        "AT-COM-16"
+      ],
+      "applicable_tiers": [
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P2",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/CONTRACT.md#L41"
+      ],
+      "document": "docs/market_demand_os_v7/CONTRACT.md",
+      "evidence_refs": [],
+      "id": "MDOS-SCP-001",
+      "line": 41,
+      "owner_role": "BusinessOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "60810b2f5ccc902fc814e9ea6f9f436aff707fc095e95a3cb28849b0edee4776"
+    },
+    {
+      "acceptance_ids": [
+        "AT-COM-01",
+        "AT-COM-02",
+        "AT-COM-03",
+        "AT-COM-04",
+        "AT-COM-05",
+        "AT-COM-06",
+        "AT-COM-07",
+        "AT-COM-08",
+        "AT-COM-09",
+        "AT-COM-10",
+        "AT-COM-11",
+        "AT-COM-12",
+        "AT-COM-13",
+        "AT-COM-14",
+        "AT-COM-15",
+        "AT-COM-16"
+      ],
+      "applicable_tiers": [
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P2",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/CONTRACT.md#L55"
+      ],
+      "document": "docs/market_demand_os_v7/CONTRACT.md",
+      "evidence_refs": [],
+      "id": "MDOS-SCP-002",
+      "line": 55,
+      "owner_role": "BusinessOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "3d26bad8b50fd73eaf65a2f9daab63ab339914f4a37368d038312d7dfc00b6d2"
+    },
+    {
+      "acceptance_ids": [
+        "AT-COM-01",
+        "AT-COM-02",
+        "AT-COM-03",
+        "AT-COM-04",
+        "AT-COM-05",
+        "AT-COM-06",
+        "AT-COM-07",
+        "AT-COM-08",
+        "AT-COM-09",
+        "AT-COM-10",
+        "AT-COM-11",
+        "AT-COM-12",
+        "AT-COM-13",
+        "AT-COM-14",
+        "AT-COM-15",
+        "AT-COM-16"
+      ],
+      "applicable_tiers": [
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P2",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/CONTRACT.md#L59"
+      ],
+      "document": "docs/market_demand_os_v7/CONTRACT.md",
+      "evidence_refs": [],
+      "id": "MDOS-SCP-003",
+      "line": 59,
+      "owner_role": "BusinessOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "607cc9ed2b37ae4f213b1fad892b5be9e2d4b9f49b2533ea528cd5cfb7c316e1"
+    },
+    {
+      "acceptance_ids": [
+        "AT-COM-01",
+        "AT-COM-02",
+        "AT-COM-03",
+        "AT-COM-04",
+        "AT-COM-05",
+        "AT-COM-06",
+        "AT-COM-07",
+        "AT-COM-08",
+        "AT-COM-09",
+        "AT-COM-10",
+        "AT-COM-11",
+        "AT-COM-12",
+        "AT-COM-13",
+        "AT-COM-14",
+        "AT-COM-15",
+        "AT-COM-16"
+      ],
+      "applicable_tiers": [
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P2",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/CONTRACT.md#L63"
+      ],
+      "document": "docs/market_demand_os_v7/CONTRACT.md",
+      "evidence_refs": [],
+      "id": "MDOS-SCP-004",
+      "line": 63,
+      "owner_role": "BusinessOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "b5b09ae3b9ed0ceb3e1e7bf7877c38021bb41d2677789f2ae18828859e4ee1af"
+    },
+    {
+      "acceptance_ids": [
+        "AT-DI7-01",
+        "AT-DI7-02",
+        "AT-DI7-03",
+        "AT-DI7-04",
+        "AT-DI7-05",
+        "AT-DI7-06",
+        "AT-DI7-07",
+        "AT-DI7-08",
+        "AT-DI7-09",
+        "AT-DI7-10",
+        "AT-DI7-11",
+        "AT-DI7-12"
+      ],
+      "applicable_tiers": [
+        "G0",
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P0",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DEMAND-INTELLIGENCE.md#L110"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-DEMAND-INTELLIGENCE.md",
+      "evidence_refs": [],
+      "id": "MDOS-SEC-001",
+      "line": 110,
+      "owner_role": "SecurityOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "a3473e1da7ab1f92df0a468a494db2627a1ce4519aca4c9e310a5e6c1a7c9bc8"
+    },
+    {
+      "acceptance_ids": [
+        "AT-DI7-01",
+        "AT-DI7-02",
+        "AT-DI7-03",
+        "AT-DI7-04",
+        "AT-DI7-05",
+        "AT-DI7-06",
+        "AT-DI7-07",
+        "AT-DI7-08",
+        "AT-DI7-09",
+        "AT-DI7-10",
+        "AT-DI7-11",
+        "AT-DI7-12"
+      ],
+      "applicable_tiers": [
+        "G0",
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P0",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DEMAND-INTELLIGENCE.md#L113"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-DEMAND-INTELLIGENCE.md",
+      "evidence_refs": [],
+      "id": "MDOS-SEC-002",
+      "line": 113,
+      "owner_role": "SecurityOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "72e7701eedd3e5523ae9cd0cf730ef1f50517dbb1ff77286d1371317afa8b2c1"
+    },
+    {
+      "acceptance_ids": [
+        "AT-DI7-01",
+        "AT-DI7-02",
+        "AT-DI7-03",
+        "AT-DI7-04",
+        "AT-DI7-05",
+        "AT-DI7-06",
+        "AT-DI7-07",
+        "AT-DI7-08",
+        "AT-DI7-09",
+        "AT-DI7-10",
+        "AT-DI7-11",
+        "AT-DI7-12"
+      ],
+      "applicable_tiers": [
+        "G0",
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P0",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DEMAND-INTELLIGENCE.md#L117"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-DEMAND-INTELLIGENCE.md",
+      "evidence_refs": [],
+      "id": "MDOS-SEC-003",
+      "line": 117,
+      "owner_role": "SecurityOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "c13653820228d238a24fcab08346b56bb1f8c57597bd944b2aa4c2dae2b6975d"
+    },
+    {
+      "acceptance_ids": [
+        "AT-SRC7-01",
+        "AT-SRC7-02",
+        "AT-SRC7-03",
+        "AT-SRC7-04",
+        "AT-SRC7-05",
+        "AT-SRC7-06",
+        "AT-SRC7-07",
+        "AT-SRC7-08",
+        "AT-SRC7-09",
+        "AT-SRC7-10"
+      ],
+      "applicable_tiers": [
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P2",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-SOURCE-PORTFOLIO.md#L134"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-SOURCE-PORTFOLIO.md",
+      "evidence_refs": [],
+      "id": "MDOS-SLA-001",
+      "line": 134,
+      "owner_role": "SourcePortfolioOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "096f64c7d58b14f890d14bae76f1d6c9a02ae5266610472e1e0410549d01b017"
+    },
+    {
+      "acceptance_ids": [
+        "AT-SRC7-01",
+        "AT-SRC7-02",
+        "AT-SRC7-03",
+        "AT-SRC7-04",
+        "AT-SRC7-05",
+        "AT-SRC7-06",
+        "AT-SRC7-07",
+        "AT-SRC7-08",
+        "AT-SRC7-09",
+        "AT-SRC7-10"
+      ],
+      "applicable_tiers": [
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P2",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-SOURCE-PORTFOLIO.md#L138"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-SOURCE-PORTFOLIO.md",
+      "evidence_refs": [],
+      "id": "MDOS-SLA-002",
+      "line": 138,
+      "owner_role": "SourcePortfolioOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "163cb1daba7d9ee0933724799d50bbe67071785584eb55c9e818898f27768d70"
+    },
+    {
+      "acceptance_ids": [
+        "AT-SRC7-01",
+        "AT-SRC7-02",
+        "AT-SRC7-03",
+        "AT-SRC7-04",
+        "AT-SRC7-05",
+        "AT-SRC7-06",
+        "AT-SRC7-07",
+        "AT-SRC7-08",
+        "AT-SRC7-09",
+        "AT-SRC7-10"
+      ],
+      "applicable_tiers": [
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P2",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-SOURCE-PORTFOLIO.md#L142"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-SOURCE-PORTFOLIO.md",
+      "evidence_refs": [],
+      "id": "MDOS-SLA-003",
+      "line": 142,
+      "owner_role": "SourcePortfolioOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "2634c639861d653bcdb69efb846ca0d047bd4dccefe1f6964895492786b3820d"
+    },
+    {
+      "acceptance_ids": [
+        "AT-SRC7-01",
+        "AT-SRC7-02",
+        "AT-SRC7-03",
+        "AT-SRC7-04",
+        "AT-SRC7-05",
+        "AT-SRC7-06",
+        "AT-SRC7-07",
+        "AT-SRC7-08",
+        "AT-SRC7-09",
+        "AT-SRC7-10"
+      ],
+      "applicable_tiers": [
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P2",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-SOURCE-PORTFOLIO.md#L8"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-SOURCE-PORTFOLIO.md",
+      "evidence_refs": [],
+      "id": "MDOS-SRC-001",
+      "line": 8,
+      "owner_role": "SourceAuthority",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "e3ac19832b7761096a802660f04936f1d01cea972db907761b5baa4eec1127d0"
+    },
+    {
+      "acceptance_ids": [
+        "AT-SRC7-01",
+        "AT-SRC7-02",
+        "AT-SRC7-03",
+        "AT-SRC7-04",
+        "AT-SRC7-05",
+        "AT-SRC7-06",
+        "AT-SRC7-07",
+        "AT-SRC7-08",
+        "AT-SRC7-09",
+        "AT-SRC7-10"
+      ],
+      "applicable_tiers": [
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P2",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-SOURCE-PORTFOLIO.md#L14"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-SOURCE-PORTFOLIO.md",
+      "evidence_refs": [],
+      "id": "MDOS-SRC-002",
+      "line": 14,
+      "owner_role": "SourceAuthority",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "9067dd19d97141bbc361c15e093ee7c469ffa00f2fa5aed60acb7f51d0ea8a53"
+    },
+    {
+      "acceptance_ids": [
+        "AT-SRC7-01",
+        "AT-SRC7-02",
+        "AT-SRC7-03",
+        "AT-SRC7-04",
+        "AT-SRC7-05",
+        "AT-SRC7-06",
+        "AT-SRC7-07",
+        "AT-SRC7-08",
+        "AT-SRC7-09",
+        "AT-SRC7-10"
+      ],
+      "applicable_tiers": [
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P2",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-SOURCE-PORTFOLIO.md#L18"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-SOURCE-PORTFOLIO.md",
+      "evidence_refs": [],
+      "id": "MDOS-SRC-003",
+      "line": 18,
+      "owner_role": "SourceAuthority",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "c81ac7355abe75cacfac6e29afe99cd38e2831d1699da0dae4328c80e9e6e93d"
+    },
+    {
+      "acceptance_ids": [
+        "AT-SRC7-01",
+        "AT-SRC7-02",
+        "AT-SRC7-03",
+        "AT-SRC7-04",
+        "AT-SRC7-05",
+        "AT-SRC7-06",
+        "AT-SRC7-07",
+        "AT-SRC7-08",
+        "AT-SRC7-09",
+        "AT-SRC7-10"
+      ],
+      "applicable_tiers": [
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P2",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-SOURCE-PORTFOLIO.md#L23"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-SOURCE-PORTFOLIO.md",
+      "evidence_refs": [],
+      "id": "MDOS-SRC-004",
+      "line": 23,
+      "owner_role": "SourceAuthority",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "6146a40d87029a6e8ac1ae8556f1bf3b7b19b53fcd6a821180a522814485e334"
+    },
+    {
+      "acceptance_ids": [
+        "AT-ARC-01",
+        "AT-ARC-02",
+        "AT-ARC-03",
+        "AT-ARC-04",
+        "AT-ARC-05",
+        "AT-ARC-06",
+        "AT-ARC-07",
+        "AT-ARC-08",
+        "AT-ARC-09",
+        "AT-ARC-10",
+        "AT-ARC-11",
+        "AT-ARC-12",
+        "AT-ARC-13",
+        "AT-ARC-14",
+        "AT-ARC-15"
+      ],
+      "applicable_tiers": [
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P1",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-REFERENCE-ARCHITECTURE.md#L128"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-REFERENCE-ARCHITECTURE.md",
+      "evidence_refs": [],
+      "id": "MDOS-STO-001",
+      "line": 128,
+      "owner_role": "DataPlatformOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "6961fa1bc5edddca233f36d90495513511b2f41cd345ad4992db57396335c2ac"
+    },
+    {
+      "acceptance_ids": [
+        "AT-ARC-01",
+        "AT-ARC-02",
+        "AT-ARC-03",
+        "AT-ARC-04",
+        "AT-ARC-05",
+        "AT-ARC-06",
+        "AT-ARC-07",
+        "AT-ARC-08",
+        "AT-ARC-09",
+        "AT-ARC-10",
+        "AT-ARC-11",
+        "AT-ARC-12",
+        "AT-ARC-13",
+        "AT-ARC-14",
+        "AT-ARC-15"
+      ],
+      "applicable_tiers": [
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P1",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-REFERENCE-ARCHITECTURE.md#L141"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-REFERENCE-ARCHITECTURE.md",
+      "evidence_refs": [],
+      "id": "MDOS-STO-002",
+      "line": 141,
+      "owner_role": "DataPlatformOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "5719a5043f6c5ac130d745f9f1bf47e7b6a1ea6084cebe5ac29c6ea87ebc88b7"
+    },
+    {
+      "acceptance_ids": [
+        "AT-ARC-01",
+        "AT-ARC-02",
+        "AT-ARC-03",
+        "AT-ARC-04",
+        "AT-ARC-05",
+        "AT-ARC-06",
+        "AT-ARC-07",
+        "AT-ARC-08",
+        "AT-ARC-09",
+        "AT-ARC-10",
+        "AT-ARC-11",
+        "AT-ARC-12",
+        "AT-ARC-13",
+        "AT-ARC-14",
+        "AT-ARC-15"
+      ],
+      "applicable_tiers": [
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P1",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-REFERENCE-ARCHITECTURE.md#L145"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-REFERENCE-ARCHITECTURE.md",
+      "evidence_refs": [],
+      "id": "MDOS-STO-003",
+      "line": 145,
+      "owner_role": "DataPlatformOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "0e9bef6cd0bab18ac4fd2611b5f3faa1b21727693fa5d3df89df913afce5cbb7"
+    },
+    {
+      "acceptance_ids": [
+        "AT-ARC-01",
+        "AT-ARC-02",
+        "AT-ARC-03",
+        "AT-ARC-04",
+        "AT-ARC-05",
+        "AT-ARC-06",
+        "AT-ARC-07",
+        "AT-ARC-08",
+        "AT-ARC-09",
+        "AT-ARC-10",
+        "AT-ARC-11",
+        "AT-ARC-12",
+        "AT-ARC-13",
+        "AT-ARC-14",
+        "AT-ARC-15"
+      ],
+      "applicable_tiers": [
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P1",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-REFERENCE-ARCHITECTURE.md#L148"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-REFERENCE-ARCHITECTURE.md",
+      "evidence_refs": [],
+      "id": "MDOS-STO-004",
+      "line": 148,
+      "owner_role": "DataPlatformOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "55b0e1ba2c447bf90d6ae413e06eb9b3e341541461604facac1404ccf3148b7d"
+    },
+    {
+      "acceptance_ids": [
+        "AT-ARC-01",
+        "AT-ARC-02",
+        "AT-ARC-03",
+        "AT-ARC-04",
+        "AT-ARC-05",
+        "AT-ARC-06",
+        "AT-ARC-07",
+        "AT-ARC-08",
+        "AT-ARC-09",
+        "AT-ARC-10",
+        "AT-ARC-11",
+        "AT-ARC-12",
+        "AT-ARC-13",
+        "AT-ARC-14",
+        "AT-ARC-15"
+      ],
+      "applicable_tiers": [
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P1",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-REFERENCE-ARCHITECTURE.md#L152"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-REFERENCE-ARCHITECTURE.md",
+      "evidence_refs": [],
+      "id": "MDOS-STO-005",
+      "line": 152,
+      "owner_role": "DataPlatformOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "ca5f942e5ea0417e8f434e3d492e4b77773526898954f6b7ccdeb94cf9527784"
+    },
+    {
+      "acceptance_ids": [
+        "AT-DEC-01",
+        "AT-DEC-02",
+        "AT-DEC-03",
+        "AT-DEC-04",
+        "AT-DEC-05",
+        "AT-DEC-06",
+        "AT-DEC-07",
+        "AT-DEC-08",
+        "AT-DEC-09",
+        "AT-DEC-10",
+        "AT-DEC-11",
+        "AT-DEC-12",
+        "AT-DEC-13",
+        "AT-DEC-14",
+        "AT-DEC-15"
+      ],
+      "applicable_tiers": [
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P1",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/CONTRACT.md#L158"
+      ],
+      "document": "docs/market_demand_os_v7/CONTRACT.md",
+      "evidence_refs": [],
+      "id": "MDOS-SUC-001",
+      "line": 158,
+      "owner_role": "BusinessOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "7accecf0b312d969ba80ab70fedd80d1d110f77d5a65d200f7deb817b23a475a"
+    },
+    {
+      "acceptance_ids": [
+        "AT-DEC-01",
+        "AT-DEC-02",
+        "AT-DEC-03",
+        "AT-DEC-04",
+        "AT-DEC-05",
+        "AT-DEC-06",
+        "AT-DEC-07",
+        "AT-DEC-08",
+        "AT-DEC-09",
+        "AT-DEC-10",
+        "AT-DEC-11",
+        "AT-DEC-12",
+        "AT-DEC-13",
+        "AT-DEC-14",
+        "AT-DEC-15"
+      ],
+      "applicable_tiers": [
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P1",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/CONTRACT.md#L171"
+      ],
+      "document": "docs/market_demand_os_v7/CONTRACT.md",
+      "evidence_refs": [],
+      "id": "MDOS-SUC-002",
+      "line": 171,
+      "owner_role": "BusinessOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "6005b713d5294bb4c1694c0181f79bdb1f59a9d1618dbdf62029d63dcb873fc1"
+    },
+    {
+      "acceptance_ids": [
+        "AT-DEC-01",
+        "AT-DEC-02",
+        "AT-DEC-03",
+        "AT-DEC-04",
+        "AT-DEC-05",
+        "AT-DEC-06",
+        "AT-DEC-07",
+        "AT-DEC-08",
+        "AT-DEC-09",
+        "AT-DEC-10",
+        "AT-DEC-11",
+        "AT-DEC-12",
+        "AT-DEC-13",
+        "AT-DEC-14",
+        "AT-DEC-15"
+      ],
+      "applicable_tiers": [
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P1",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/CONTRACT.md#L175"
+      ],
+      "document": "docs/market_demand_os_v7/CONTRACT.md",
+      "evidence_refs": [],
+      "id": "MDOS-SUC-003",
+      "line": 175,
+      "owner_role": "BusinessOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "65192349aa4b7b008027f8b8e7e711cc3631f795702ef68074d11bc0f73a3778"
+    },
+    {
+      "acceptance_ids": [
+        "AT-DEC-01",
+        "AT-DEC-02",
+        "AT-DEC-03",
+        "AT-DEC-04",
+        "AT-DEC-05",
+        "AT-DEC-06",
+        "AT-DEC-07",
+        "AT-DEC-08",
+        "AT-DEC-09",
+        "AT-DEC-10",
+        "AT-DEC-11",
+        "AT-DEC-12",
+        "AT-DEC-13",
+        "AT-DEC-14",
+        "AT-DEC-15"
+      ],
+      "applicable_tiers": [
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P1",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/CONTRACT.md#L180"
+      ],
+      "document": "docs/market_demand_os_v7/CONTRACT.md",
+      "evidence_refs": [],
+      "id": "MDOS-SUC-004",
+      "line": 180,
+      "owner_role": "BusinessOwner",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "5a12ed0363b1e2c074bd519d7ac4e6725c22179cee9ef85dbdd1541575db884d"
+    },
+    {
+      "acceptance_ids": [
+        "AT-ASR-01",
+        "AT-ASR-02",
+        "AT-ASR-03",
+        "AT-ASR-04",
+        "AT-ASR-05",
+        "AT-ASR-06",
+        "AT-ASR-07",
+        "AT-ASR-08",
+        "AT-ASR-09",
+        "AT-ASR-10",
+        "AT-ASR-11",
+        "AT-ASR-12",
+        "AT-ASR-13",
+        "AT-ASR-14"
+      ],
+      "applicable_tiers": [
+        "G0",
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P0",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DELIVERY-ASSURANCE.md#L29"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-DELIVERY-ASSURANCE.md",
+      "evidence_refs": [],
+      "id": "MDOS-TRC-001",
+      "line": 29,
+      "owner_role": "ContractCustodian",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "d408eeafe885d7f4f7d190e92c46a69d2d13a827dfe072c6f333e5c1b4930586"
+    },
+    {
+      "acceptance_ids": [
+        "AT-ASR-01",
+        "AT-ASR-02",
+        "AT-ASR-03",
+        "AT-ASR-04",
+        "AT-ASR-05",
+        "AT-ASR-06",
+        "AT-ASR-07",
+        "AT-ASR-08",
+        "AT-ASR-09",
+        "AT-ASR-10",
+        "AT-ASR-11",
+        "AT-ASR-12",
+        "AT-ASR-13",
+        "AT-ASR-14"
+      ],
+      "applicable_tiers": [
+        "G0",
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P0",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DELIVERY-ASSURANCE.md#L33"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-DELIVERY-ASSURANCE.md",
+      "evidence_refs": [],
+      "id": "MDOS-TRC-002",
+      "line": 33,
+      "owner_role": "ContractCustodian",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "05be81b9226d3773a4af95e2d3812e76f90e58651d88fb3bdad5e00eb7d94747"
+    },
+    {
+      "acceptance_ids": [
+        "AT-ASR-01",
+        "AT-ASR-02",
+        "AT-ASR-03",
+        "AT-ASR-04",
+        "AT-ASR-05",
+        "AT-ASR-06",
+        "AT-ASR-07",
+        "AT-ASR-08",
+        "AT-ASR-09",
+        "AT-ASR-10",
+        "AT-ASR-11",
+        "AT-ASR-12",
+        "AT-ASR-13",
+        "AT-ASR-14"
+      ],
+      "applicable_tiers": [
+        "G0",
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P0",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DELIVERY-ASSURANCE.md#L36"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-DELIVERY-ASSURANCE.md",
+      "evidence_refs": [],
+      "id": "MDOS-TRC-003",
+      "line": 36,
+      "owner_role": "ContractCustodian",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "d08b7245feb7d1bda9d47eb94a6d27a14c06957b314c16b6ea588457a3272417"
+    },
+    {
+      "acceptance_ids": [
+        "AT-ASR-01",
+        "AT-ASR-02",
+        "AT-ASR-03",
+        "AT-ASR-04",
+        "AT-ASR-05",
+        "AT-ASR-06",
+        "AT-ASR-07",
+        "AT-ASR-08",
+        "AT-ASR-09",
+        "AT-ASR-10",
+        "AT-ASR-11",
+        "AT-ASR-12",
+        "AT-ASR-13",
+        "AT-ASR-14"
+      ],
+      "applicable_tiers": [
+        "G0",
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P0",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DELIVERY-ASSURANCE.md#L39"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-DELIVERY-ASSURANCE.md",
+      "evidence_refs": [],
+      "id": "MDOS-TRC-004",
+      "line": 39,
+      "owner_role": "ContractCustodian",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "978405d34fae38308435175f0f80cedcc2f8ff5a0347fb8700893eff67491108"
+    },
+    {
+      "acceptance_ids": [
+        "AT-ASR-01",
+        "AT-ASR-02",
+        "AT-ASR-03",
+        "AT-ASR-04",
+        "AT-ASR-05",
+        "AT-ASR-06",
+        "AT-ASR-07",
+        "AT-ASR-08",
+        "AT-ASR-09",
+        "AT-ASR-10",
+        "AT-ASR-11",
+        "AT-ASR-12",
+        "AT-ASR-13",
+        "AT-ASR-14"
+      ],
+      "applicable_tiers": [
+        "G0",
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P0",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/APP-MDOS-DELIVERY-ASSURANCE.md#L43"
+      ],
+      "document": "docs/market_demand_os_v7/APP-MDOS-DELIVERY-ASSURANCE.md",
+      "evidence_refs": [],
+      "id": "MDOS-TRC-005",
+      "line": 43,
+      "owner_role": "ContractCustodian",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "1de4fbe9b9755923aa9b6a6b06e569b112911d5e964199d679e1d51509d67679"
+    },
+    {
+      "acceptance_ids": [
+        "AT-ARC-01",
+        "AT-ARC-02",
+        "AT-ARC-03",
+        "AT-ARC-04",
+        "AT-ARC-05",
+        "AT-ARC-06",
+        "AT-ARC-07",
+        "AT-ARC-08",
+        "AT-ARC-09",
+        "AT-ARC-10",
+        "AT-ARC-11",
+        "AT-ARC-12",
+        "AT-ARC-13",
+        "AT-ARC-14",
+        "AT-ARC-15"
+      ],
+      "applicable_tiers": [
+        "G0",
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P0",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/CONTRACT.md#L68"
+      ],
+      "document": "docs/market_demand_os_v7/CONTRACT.md",
+      "evidence_refs": [],
+      "id": "MDOS-TRU-001",
+      "line": 68,
+      "owner_role": "QualityArbiter",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "06159cf9f73b877ac3e16cd8502ff280655d7eac2004a92157c6307238a94ffa"
+    },
+    {
+      "acceptance_ids": [
+        "AT-ARC-01",
+        "AT-ARC-02",
+        "AT-ARC-03",
+        "AT-ARC-04",
+        "AT-ARC-05",
+        "AT-ARC-06",
+        "AT-ARC-07",
+        "AT-ARC-08",
+        "AT-ARC-09",
+        "AT-ARC-10",
+        "AT-ARC-11",
+        "AT-ARC-12",
+        "AT-ARC-13",
+        "AT-ARC-14",
+        "AT-ARC-15"
+      ],
+      "applicable_tiers": [
+        "G0",
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P0",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/CONTRACT.md#L83"
+      ],
+      "document": "docs/market_demand_os_v7/CONTRACT.md",
+      "evidence_refs": [],
+      "id": "MDOS-TRU-002",
+      "line": 83,
+      "owner_role": "QualityArbiter",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "af6f0f4a00189993a1c890b78f6d7d0650960564b2f05d4eb4db55e9feadc681"
+    },
+    {
+      "acceptance_ids": [
+        "AT-ARC-01",
+        "AT-ARC-02",
+        "AT-ARC-03",
+        "AT-ARC-04",
+        "AT-ARC-05",
+        "AT-ARC-06",
+        "AT-ARC-07",
+        "AT-ARC-08",
+        "AT-ARC-09",
+        "AT-ARC-10",
+        "AT-ARC-11",
+        "AT-ARC-12",
+        "AT-ARC-13",
+        "AT-ARC-14",
+        "AT-ARC-15"
+      ],
+      "applicable_tiers": [
+        "G0",
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P0",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/CONTRACT.md#L87"
+      ],
+      "document": "docs/market_demand_os_v7/CONTRACT.md",
+      "evidence_refs": [],
+      "id": "MDOS-TRU-003",
+      "line": 87,
+      "owner_role": "QualityArbiter",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "3214bcc9135f10aa59d3a4be842c41d9e51c0e5afe542d0b6a9dbd76c2dc46ad"
+    },
+    {
+      "acceptance_ids": [
+        "AT-ARC-01",
+        "AT-ARC-02",
+        "AT-ARC-03",
+        "AT-ARC-04",
+        "AT-ARC-05",
+        "AT-ARC-06",
+        "AT-ARC-07",
+        "AT-ARC-08",
+        "AT-ARC-09",
+        "AT-ARC-10",
+        "AT-ARC-11",
+        "AT-ARC-12",
+        "AT-ARC-13",
+        "AT-ARC-14",
+        "AT-ARC-15"
+      ],
+      "applicable_tiers": [
+        "G0",
+        "G1",
+        "G2",
+        "PRODUCTION"
+      ],
+      "code_bindings": [],
+      "criticality": "P0",
+      "design_bindings": [
+        "DESIGN:docs/market_demand_os_v7/CONTRACT.md#L91"
+      ],
+      "document": "docs/market_demand_os_v7/CONTRACT.md",
+      "evidence_refs": [],
+      "id": "MDOS-TRU-004",
+      "line": 91,
+      "owner_role": "QualityArbiter",
+      "status": "DESIGNED",
+      "test_bindings": [],
+      "text_sha256": "e5aebde9ee8a1a37a376700d5a47c9f95d0a1b53e552a51881d1a8d07250a8bb"
+    }
+  ]
+}

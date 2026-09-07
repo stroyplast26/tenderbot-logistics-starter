@@ -1,0 +1,1722 @@
+{
+  "acceptance_cases": [
+    {
+      "case_sha256": "810cb80dfda12b1e1b302e37ef634a8dd94b72f8a7f60dbb21392c736fb3ca02",
+      "coverage": "PARTIAL",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-REFERENCE-ARCHITECTURE.md",
+      "evidence_refs": [
+        "EVIDENCE:docs/market_demand_os_v7_2/evidence/baseline-implementation-trace-overlay.v7.1.json",
+        "EVIDENCE:reports/market_demand_os_v7/g0-suppression-evidence.json",
+        "EVIDENCE:reports/market_demand_os_v7/g1-shadow-evidence.json",
+        "EVIDENCE:reports/market_demand_os_v7/g2-outbox-evidence.json"
+      ],
+      "execution_status": "SPECIFIED_NOT_IMPLEMENTED",
+      "expected_result": "Три deliveries, один business effect, полный trace.",
+      "id": "AT-ARC-01",
+      "line": 200,
+      "owner_role": "PlatformOwner",
+      "scenario": "Один source event повторно доставлен трижды.",
+      "test_bindings": [
+        "TEST:tests/test_mdos_v7_projection_outbox.py",
+        "TEST:tests/test_mdos_v7_suppression.py"
+      ]
+    },
+    {
+      "case_sha256": "a4ddba96b451cd6ab22a01e249486dd1f78aaa5ca6d24ff82bc6a15bdf85a4bb",
+      "coverage": "NONE",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-REFERENCE-ARCHITECTURE.md",
+      "evidence_refs": [],
+      "execution_status": "SPECIFIED_NOT_IMPLEMENTED",
+      "expected_result": "Новая claim revision; старый as-of отчёт воспроизводим.",
+      "id": "AT-ARC-02",
+      "line": 201,
+      "owner_role": "PlatformOwner",
+      "scenario": "Source исправил дату/участника задним числом.",
+      "test_bindings": []
+    },
+    {
+      "case_sha256": "7b94209f78fe9ee5d8bf6c9916872553c5415e9f93e4339dbc0854377950651e",
+      "coverage": "NONE",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-REFERENCE-ARCHITECTURE.md",
+      "evidence_refs": [],
+      "execution_status": "SPECIFIED_NOT_IMPLEMENTED",
+      "expected_result": "REVIEW до multi-feature evidence; auto-merge запрещён.",
+      "id": "AT-ARC-03",
+      "line": 202,
+      "owner_role": "PlatformOwner",
+      "scenario": "Similar company name и общий телефон.",
+      "test_bindings": []
+    },
+    {
+      "case_sha256": "311747eff368bdfe74825a8ca1e962e63cbda3ae31f8c5c418674a2d70180438",
+      "coverage": "NONE",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-REFERENCE-ARCHITECTURE.md",
+      "evidence_refs": [],
+      "execution_status": "SPECIFIED_NOT_IMPLEMENTED",
+      "expected_result": "Source records, DemandUnit и attribution пересчитаны с lineage.",
+      "id": "AT-ARC-04",
+      "line": 203,
+      "owner_role": "PlatformOwner",
+      "scenario": "Ошибочный merge разделён.",
+      "test_bindings": []
+    },
+    {
+      "case_sha256": "e3237a463b9299cebae0b1d083657e0c13358d9e5c48d24173e05c9aea0f2969",
+      "coverage": "NONE",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-REFERENCE-ARCHITECTURE.md",
+      "evidence_refs": [],
+      "execution_status": "SPECIFIED_NOT_IMPLEMENTED",
+      "expected_result": "Новый claim set; raw hash неизменен; оба producer versions видимы.",
+      "id": "AT-ARC-05",
+      "line": 204,
+      "owner_role": "PlatformOwner",
+      "scenario": "Raw page переобработана новой моделью.",
+      "test_bindings": []
+    },
+    {
+      "case_sha256": "5adccf92b09faed24a9dbb34808baf30a2ed0c6a174dae766c56a6473019a0fe",
+      "coverage": "PARTIAL",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-REFERENCE-ARCHITECTURE.md",
+      "evidence_refs": [
+        "EVIDENCE:docs/market_demand_os_v7_2/evidence/baseline-implementation-trace-overlay.v7.1.json",
+        "EVIDENCE:reports/market_demand_os_v7/g1-shadow-evidence.json",
+        "EVIDENCE:reports/market_demand_os_v7/g1-split-payment-shadow-evidence.json"
+      ],
+      "execution_status": "SPECIFIED_NOT_IMPLEMENTED",
+      "expected_result": "Payment conflict/quarantine; KPI не растёт.",
+      "id": "AT-ARC-06",
+      "line": 205,
+      "owner_role": "PlatformOwner",
+      "scenario": "CRM показывает PAID, а банковского/платёжного proof нет.",
+      "test_bindings": [
+        "TEST:tests/test_mdos_v7_adversarial.py",
+        "TEST:tests/test_mdos_v7_bitrix_crm_claims.py",
+        "TEST:tests/test_mdos_v7_g1.py",
+        "TEST:tests/test_mdos_v7_split_payments.py"
+      ]
+    },
+    {
+      "case_sha256": "67a6c5464ad3f6d0bbcf4d670f266d6bccc79045365b502987e83e9c37ed33ea",
+      "coverage": "PARTIAL",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-REFERENCE-ARCHITECTURE.md",
+      "evidence_refs": [
+        "EVIDENCE:docs/market_demand_os_v7_2/evidence/baseline-implementation-trace-overlay.v7.1.json",
+        "EVIDENCE:reports/market_demand_os_v7/g1-shadow-evidence.json",
+        "EVIDENCE:reports/market_demand_os_v7/g2-outbox-evidence.json"
+      ],
+      "execution_status": "SPECIFIED_NOT_IMPLEMENTED",
+      "expected_result": "Activity + новый distinct Deal; duplicate Company/Lead не создаётся.",
+      "id": "AT-ARC-07",
+      "line": 206,
+      "owner_role": "PlatformOwner",
+      "scenario": "Accepted existing account прислал второй RFQ.",
+      "test_bindings": [
+        "TEST:tests/test_mdos_v7_projection_outbox.py"
+      ]
+    },
+    {
+      "case_sha256": "09cbefd6c438ef4c76598637ca76996e377797ee6d3dbdbb3b17dffec8638f4b",
+      "coverage": "NONE",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-REFERENCE-ARCHITECTURE.md",
+      "evidence_refs": [],
+      "execution_status": "SPECIFIED_NOT_IMPLEMENTED",
+      "expected_result": "Promise/GDO/action blocked; research допускается.",
+      "id": "AT-ARC-08",
+      "line": 207,
+      "owner_role": "PlatformOwner",
+      "scenario": "Capacity snapshot просрочен.",
+      "test_bindings": []
+    },
+    {
+      "case_sha256": "f5ebc1ca04b4a3a96fc95e84c17864b7c44948a282ce0d45f64138fc94e368c8",
+      "coverage": "PARTIAL",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-REFERENCE-ARCHITECTURE.md",
+      "evidence_refs": [
+        "EVIDENCE:docs/market_demand_os_v7_2/evidence/baseline-implementation-trace-overlay.v7.1.json",
+        "EVIDENCE:reports/market_demand_os_v7/g0-suppression-evidence.json"
+      ],
+      "execution_status": "SPECIFIED_NOT_IMPLEMENTED",
+      "expected_result": "Deterministic/manual path; raw/event/legal ledgers сохранены.",
+      "id": "AT-ARC-09",
+      "line": 208,
+      "owner_role": "PlatformOwner",
+      "scenario": "AI provider недоступен.",
+      "test_bindings": [
+        "TEST:tests/test_mdos_v7_suppression.py"
+      ]
+    },
+    {
+      "case_sha256": "d8bc73c4772ff85474ba058843f9bea5977f64835891c8f4dded4ea44781365a",
+      "coverage": "NONE",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-REFERENCE-ARCHITECTURE.md",
+      "evidence_refs": [],
+      "execution_status": "SPECIFIED_NOT_IMPLEMENTED",
+      "expected_result": "Incident + automatic pause/rollback.",
+      "id": "AT-ARC-10",
+      "line": 209,
+      "owner_role": "PlatformOwner",
+      "scenario": "Deployed policy digest отличается от release.",
+      "test_bindings": []
+    },
+    {
+      "case_sha256": "2b444ab4967eba91946ca60c878a18951b12411446176e023ef451fc1245e0f0",
+      "coverage": "PARTIAL",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-REFERENCE-ARCHITECTURE.md",
+      "evidence_refs": [
+        "EVIDENCE:docs/market_demand_os_v7_2/evidence/baseline-implementation-trace-overlay.v7.1.json",
+        "EVIDENCE:reports/market_demand_os_v7/g1-shadow-evidence.json",
+        "EVIDENCE:reports/market_demand_os_v7/g1-split-payment-shadow-evidence.json"
+      ],
+      "execution_status": "SPECIFIED_NOT_IMPLEMENTED",
+      "expected_result": "Outcome schema reject; только claim/conflict.",
+      "id": "AT-ARC-11",
+      "line": 210,
+      "owner_role": "PlatformOwner",
+      "scenario": "Contract/invoice/акт указан как authoritative payment.",
+      "test_bindings": [
+        "TEST:tests/test_mdos_v7_adversarial.py",
+        "TEST:tests/test_mdos_v7_bitrix_crm_claims.py",
+        "TEST:tests/test_mdos_v7_g1.py",
+        "TEST:tests/test_mdos_v7_split_payments.py"
+      ]
+    },
+    {
+      "case_sha256": "b53a5ca934985e66951439413afdb53f0e765f8d6fd9b55cc6560d4ed6d01ed5",
+      "coverage": "NONE",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-REFERENCE-ARCHITECTURE.md",
+      "evidence_refs": [],
+      "execution_status": "SPECIFIED_NOT_IMPLEMENTED",
+      "expected_result": "Reconciliation conflict; KPI блокируется.",
+      "id": "AT-ARC-12",
+      "line": 211,
+      "owner_role": "PlatformOwner",
+      "scenario": "Valid PaymentProof связан с неизвестным OrderRecord.",
+      "test_bindings": []
+    },
+    {
+      "case_sha256": "dab75a95313f3e92e49a6342c8614436bebbab3d27c95aea5ba192048f777916",
+      "coverage": "PARTIAL",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-REFERENCE-ARCHITECTURE.md",
+      "evidence_refs": [
+        "EVIDENCE:docs/market_demand_os_v7_2/evidence/baseline-implementation-trace-overlay.v7.1.json",
+        "EVIDENCE:reports/market_demand_os_v7/g1-shadow-evidence.json",
+        "EVIDENCE:reports/market_demand_os_v7/g1-split-payment-shadow-evidence.json",
+        "EVIDENCE:reports/market_demand_os_v7/g2-outbox-evidence.json"
+      ],
+      "execution_status": "SPECIFIED_NOT_IMPLEMENTED",
+      "expected_result": "Projection обновляется; canonical PaymentProof неизменен.",
+      "id": "AT-ARC-13",
+      "line": 212,
+      "owner_role": "PlatformOwner",
+      "scenario": "Bitrix Deal изменён после банковской оплаты.",
+      "test_bindings": [
+        "TEST:tests/test_mdos_v7_adversarial.py",
+        "TEST:tests/test_mdos_v7_bitrix_crm_claims.py",
+        "TEST:tests/test_mdos_v7_g1.py",
+        "TEST:tests/test_mdos_v7_projection_outbox.py",
+        "TEST:tests/test_mdos_v7_split_payments.py"
+      ]
+    },
+    {
+      "case_sha256": "9bbb0950e461f9fa0c41739c7b9a8966ac1b6ffa26036aa1a194610aeea084fb",
+      "coverage": "NONE",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-REFERENCE-ARCHITECTURE.md",
+      "evidence_refs": [],
+      "execution_status": "SPECIFIED_NOT_IMPLEMENTED",
+      "expected_result": "DemandUnit schema rejects transition.",
+      "id": "AT-ARC-14",
+      "line": 213,
+      "owner_role": "PlatformOwner",
+      "scenario": "ACCEPTED_GDO не содержит GoldAcceptance reference.",
+      "test_bindings": []
+    },
+    {
+      "case_sha256": "cdf88706bc999b5e84724df9c4d8edd6c986529bcc595cd505318bbff72955f6",
+      "coverage": "PARTIAL",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-REFERENCE-ARCHITECTURE.md",
+      "evidence_refs": [
+        "EVIDENCE:docs/market_demand_os_v7_2/evidence/baseline-implementation-trace-overlay.v7.1.json",
+        "EVIDENCE:reports/market_demand_os_v7/g1-shadow-evidence.json",
+        "EVIDENCE:reports/market_demand_os_v7/g2-outbox-evidence.json"
+      ],
+      "execution_status": "SPECIFIED_NOT_IMPLEMENTED",
+      "expected_result": "Execution blocked before side effect.",
+      "id": "AT-ARC-15",
+      "line": 214,
+      "owner_role": "PlatformOwner",
+      "scenario": "External assignment содержит DENY/expired PermitDecision.",
+      "test_bindings": [
+        "TEST:tests/test_mdos_v7_projection_outbox.py"
+      ]
+    },
+    {
+      "case_sha256": "e9cdd24a4f0a141c311647d139c09b6971ec71fb863aba040aff4fae8aa26781",
+      "coverage": "NONE",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-DELIVERY-ASSURANCE.md",
+      "evidence_refs": [],
+      "execution_status": "SPECIFIED_NOT_IMPLEMENTED",
+      "expected_result": "Release blocked; статус не VERIFIED.",
+      "id": "AT-ASR-01",
+      "line": 176,
+      "owner_role": "AssuranceOwner",
+      "scenario": "Requirement P0 не имеет test/evidence.",
+      "test_bindings": []
+    },
+    {
+      "case_sha256": "d278c6a05f4a6e1b047989c456db4eaa79df7e9d456b462fe53b2831d3cce47e",
+      "coverage": "NONE",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-DELIVERY-ASSURANCE.md",
+      "evidence_refs": [],
+      "execution_status": "SPECIFIED_NOT_IMPLEMENTED",
+      "expected_result": "SoD reject.",
+      "id": "AT-ASR-02",
+      "line": 177,
+      "owner_role": "AssuranceOwner",
+      "scenario": "Developer пытается единолично проверить и выпустить свой код.",
+      "test_bindings": []
+    },
+    {
+      "case_sha256": "b8a4cfe2ec2430c05281d421a371d02c3d4186630a4b527f87fc5e5b29ec31de",
+      "coverage": "PARTIAL",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-DELIVERY-ASSURANCE.md",
+      "evidence_refs": [
+        "EVIDENCE:docs/market_demand_os_v7_2/evidence/baseline-implementation-trace-overlay.v7.1.json",
+        "EVIDENCE:reports/market_demand_os_v7/g0-suppression-evidence.json",
+        "EVIDENCE:reports/market_demand_os_v7/g2-manual-egress-evidence.json",
+        "EVIDENCE:reports/market_demand_os_v7/g2-owner-preflight-evidence.json",
+        "EVIDENCE:reports/market_demand_os_v7/test-summary.json"
+      ],
+      "execution_status": "SPECIFIED_NOT_IMPLEMENTED",
+      "expected_result": "0 send/call; immutable denial.",
+      "id": "AT-ASR-03",
+      "line": 178,
+      "owner_role": "AssuranceOwner",
+      "scenario": "Cold-contact action не имеет consent/legal permit.",
+      "test_bindings": [
+        "TEST:tests/test_mdos_v7_legacy_freeze.py",
+        "TEST:tests/test_mdos_v7_manual_egress.py",
+        "TEST:tests/test_mdos_v7_manual_egress_runner.py",
+        "TEST:tests/test_mdos_v7_owner_artifacts.py",
+        "TEST:tests/test_mdos_v7_owner_intent.py",
+        "TEST:tests/test_mdos_v7_owner_preflight_runner.py",
+        "TEST:tests/test_mdos_v7_ratification_preflight.py",
+        "TEST:tests/test_mdos_v7_suppression.py",
+        "TEST:tests/test_mdos_v7_verification_handoff.py"
+      ]
+    },
+    {
+      "case_sha256": "2e28406800630ffc99a30b256e797d2722cb41f1974d2575f7351f88d42543e8",
+      "coverage": "PARTIAL",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-DELIVERY-ASSURANCE.md",
+      "evidence_refs": [
+        "EVIDENCE:docs/market_demand_os_v7_2/evidence/baseline-implementation-trace-overlay.v7.1.json",
+        "EVIDENCE:reports/market_demand_os_v7/g0-suppression-evidence.json",
+        "EVIDENCE:reports/market_demand_os_v7/g2-manual-egress-evidence.json",
+        "EVIDENCE:reports/market_demand_os_v7/g2-owner-preflight-evidence.json",
+        "EVIDENCE:reports/market_demand_os_v7/test-summary.json"
+      ],
+      "execution_status": "SPECIFIED_NOT_IMPLEMENTED",
+      "expected_result": "PII удалена по lineage; scoped suppression tombstone отделён.",
+      "id": "AT-ASR-04",
+      "line": 179,
+      "owner_role": "AssuranceOwner",
+      "scenario": "Erasure затрагивает training dataset и graph.",
+      "test_bindings": [
+        "TEST:tests/test_mdos_v7_legacy_freeze.py",
+        "TEST:tests/test_mdos_v7_manual_egress.py",
+        "TEST:tests/test_mdos_v7_manual_egress_runner.py",
+        "TEST:tests/test_mdos_v7_owner_artifacts.py",
+        "TEST:tests/test_mdos_v7_owner_intent.py",
+        "TEST:tests/test_mdos_v7_owner_preflight_runner.py",
+        "TEST:tests/test_mdos_v7_ratification_preflight.py",
+        "TEST:tests/test_mdos_v7_suppression.py",
+        "TEST:tests/test_mdos_v7_verification_handoff.py"
+      ]
+    },
+    {
+      "case_sha256": "c9a7f8d2c7595ad58945af52d1eaf2fc91a6524c3ecc97889048ee9634f5a1fd",
+      "coverage": "PARTIAL",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-DELIVERY-ASSURANCE.md",
+      "evidence_refs": [
+        "EVIDENCE:docs/market_demand_os_v7_2/evidence/baseline-implementation-trace-overlay.v7.1.json",
+        "EVIDENCE:reports/market_demand_os_v7/g2-owner-preflight-evidence.json",
+        "EVIDENCE:reports/market_demand_os_v7/test-summary.json"
+      ],
+      "execution_status": "SPECIFIED_NOT_IMPLEMENTED",
+      "expected_result": "Exact events/claims/decision/action/payment воспроизводимы.",
+      "id": "AT-ASR-05",
+      "line": 180,
+      "owner_role": "AssuranceOwner",
+      "scenario": "Raw→Paid vertical slice replay.",
+      "test_bindings": [
+        "TEST:tests/test_mdos_v7_owner_artifacts.py",
+        "TEST:tests/test_mdos_v7_owner_intent.py",
+        "TEST:tests/test_mdos_v7_owner_preflight_runner.py",
+        "TEST:tests/test_mdos_v7_ratification_preflight.py",
+        "TEST:tests/test_mdos_v7_verification_handoff.py"
+      ]
+    },
+    {
+      "case_sha256": "d9604a8ab79cefd7fe524fb01eae7caa3ed5729b20a2ee40e66d2f5e72414b5a",
+      "coverage": "NONE",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-DELIVERY-ASSURANCE.md",
+      "evidence_refs": [],
+      "execution_status": "SPECIFIED_NOT_IMPLEMENTED",
+      "expected_result": "Bottleneck/capacity rule снижает приоритет parser.",
+      "id": "AT-ASR-06",
+      "line": 181,
+      "owner_role": "AssuranceOwner",
+      "scenario": "Backlog предлагает новый parser при очереди расчётов.",
+      "test_bindings": []
+    },
+    {
+      "case_sha256": "83f3a3d5c65223877c78156aa0013f77b30439572ee2d43a71c689a2e589ce0c",
+      "coverage": "NONE",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-DELIVERY-ASSURANCE.md",
+      "evidence_refs": [],
+      "execution_status": "SPECIFIED_NOT_IMPLEMENTED",
+      "expected_result": "Change gate blocks.",
+      "id": "AT-ASR-07",
+      "line": 182,
+      "owner_role": "AssuranceOwner",
+      "scenario": "Negative pilot повторно запускается без новой гипотезы.",
+      "test_bindings": []
+    },
+    {
+      "case_sha256": "85a380ab0ff970bcba1541ec2fea2cd1121a3dff904ad242188be676fe9ec186",
+      "coverage": "PARTIAL",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-DELIVERY-ASSURANCE.md",
+      "evidence_refs": [
+        "EVIDENCE:docs/market_demand_os_v7_2/evidence/baseline-implementation-trace-overlay.v7.1.json",
+        "EVIDENCE:reports/market_demand_os_v7/g1-shadow-evidence.json",
+        "EVIDENCE:reports/market_demand_os_v7/g2-outbox-evidence.json",
+        "EVIDENCE:reports/market_demand_os_v7/test-summary.json"
+      ],
+      "execution_status": "SPECIFIED_NOT_IMPLEMENTED",
+      "expected_result": "Auto-pause/rollback + incident.",
+      "id": "AT-ASR-08",
+      "line": 183,
+      "owner_role": "AssuranceOwner",
+      "scenario": "Canary теряет события/создаёт duplicates.",
+      "test_bindings": [
+        "TEST:tests/test_mdos_v7_projection_outbox.py",
+        "TEST:tests/test_mdos_v7_verification_handoff.py"
+      ]
+    },
+    {
+      "case_sha256": "938cda2557180d940e4c33021894ae2a76e47b319405acacbf4153c2d258e384",
+      "coverage": "PARTIAL",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-DELIVERY-ASSURANCE.md",
+      "evidence_refs": [
+        "EVIDENCE:docs/market_demand_os_v7_2/evidence/baseline-implementation-trace-overlay.v7.1.json",
+        "EVIDENCE:reports/market_demand_os_v7/test-summary.json"
+      ],
+      "execution_status": "SPECIFIED_NOT_IMPLEMENTED",
+      "expected_result": "Manifest test fails; release invalid.",
+      "id": "AT-ASR-09",
+      "line": 184,
+      "owner_role": "AssuranceOwner",
+      "scenario": "Contract package изменён без нового digest/version.",
+      "test_bindings": [
+        "TEST:tests/test_mdos_v7_verification_handoff.py"
+      ]
+    },
+    {
+      "case_sha256": "7921921b5f7e78fade95eae3cffe467ef2af5660a5a9b697a8460e7b77a39640",
+      "coverage": "NONE",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-DELIVERY-ASSURANCE.md",
+      "evidence_refs": [],
+      "execution_status": "SPECIFIED_NOT_IMPLEMENTED",
+      "expected_result": "Отдельная ratification blocked pending evidence.",
+      "id": "AT-ASR-10",
+      "line": 185,
+      "owner_role": "AssuranceOwner",
+      "scenario": "Owner просит включить PC10 без payment/capacity proof.",
+      "test_bindings": []
+    },
+    {
+      "case_sha256": "af1d733211554f2379850d0cf18cda4a45bd219b895e0253ce81e5851275cc2a",
+      "coverage": "PARTIAL",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-DELIVERY-ASSURANCE.md",
+      "evidence_refs": [
+        "EVIDENCE:docs/market_demand_os_v7_2/evidence/baseline-implementation-trace-overlay.v7.1.json",
+        "EVIDENCE:reports/market_demand_os_v7/g1-shadow-evidence.json",
+        "EVIDENCE:reports/market_demand_os_v7/g2-outbox-evidence.json",
+        "EVIDENCE:reports/market_demand_os_v7/test-summary.json"
+      ],
+      "execution_status": "SPECIFIED_NOT_IMPLEMENTED",
+      "expected_result": "Schema/policy deny; внешний эффект отсутствует.",
+      "id": "AT-ASR-11",
+      "line": 186,
+      "owner_role": "AssuranceOwner",
+      "scenario": "ActionAssignment содержит только произвольную строку permit_id.",
+      "test_bindings": [
+        "TEST:tests/test_mdos_v7_projection_outbox.py",
+        "TEST:tests/test_mdos_v7_verification_handoff.py"
+      ]
+    },
+    {
+      "case_sha256": "67f2b7bd5af75718781c679fd27c59d8085707347620faf5cbc023db6f984781",
+      "coverage": "PARTIAL",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-DELIVERY-ASSURANCE.md",
+      "evidence_refs": [
+        "EVIDENCE:docs/market_demand_os_v7_2/evidence/baseline-implementation-trace-overlay.v7.1.json",
+        "EVIDENCE:reports/market_demand_os_v7/g1-shadow-evidence.json",
+        "EVIDENCE:reports/market_demand_os_v7/g2-manual-egress-evidence.json",
+        "EVIDENCE:reports/market_demand_os_v7/g2-outbox-evidence.json",
+        "EVIDENCE:reports/market_demand_os_v7/g2-owner-preflight-evidence.json",
+        "EVIDENCE:reports/market_demand_os_v7/test-summary.json"
+      ],
+      "execution_status": "SPECIFIED_NOT_IMPLEMENTED",
+      "expected_result": "Just-in-time denial + immutable audit.",
+      "id": "AT-ASR-12",
+      "line": 187,
+      "owner_role": "AssuranceOwner",
+      "scenario": "PermitDecision просрочен или относится к другому channel/scope.",
+      "test_bindings": [
+        "TEST:tests/test_mdos_v7_legacy_freeze.py",
+        "TEST:tests/test_mdos_v7_manual_egress.py",
+        "TEST:tests/test_mdos_v7_manual_egress_runner.py",
+        "TEST:tests/test_mdos_v7_owner_artifacts.py",
+        "TEST:tests/test_mdos_v7_owner_intent.py",
+        "TEST:tests/test_mdos_v7_owner_preflight_runner.py",
+        "TEST:tests/test_mdos_v7_projection_outbox.py",
+        "TEST:tests/test_mdos_v7_ratification_preflight.py",
+        "TEST:tests/test_mdos_v7_verification_handoff.py"
+      ]
+    },
+    {
+      "case_sha256": "0b827cde6cda9cbb60228cffd70e59094addcef80f9dc4faf02b741ebbbe4c45",
+      "coverage": "NONE",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-DELIVERY-ASSURANCE.md",
+      "evidence_refs": [],
+      "execution_status": "SPECIFIED_NOT_IMPLEMENTED",
+      "expected_result": "Status не выше DESIGNED; production release blocked.",
+      "id": "AT-ASR-13",
+      "line": 188,
+      "owner_role": "AssuranceOwner",
+      "scenario": "P0 requirement имеет acceptance row, но нет code/test/evidence binding.",
+      "test_bindings": []
+    },
+    {
+      "case_sha256": "dbc332ee5b2e8221de9ec52611f557b15d2c12ff91541ccd50e6974b5db146fc",
+      "coverage": "PARTIAL",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-DELIVERY-ASSURANCE.md",
+      "evidence_refs": [
+        "EVIDENCE:docs/market_demand_os_v7_2/evidence/baseline-implementation-trace-overlay.v7.1.json",
+        "EVIDENCE:reports/market_demand_os_v7/test-summary.json"
+      ],
+      "execution_status": "SPECIFIED_NOT_IMPLEMENTED",
+      "expected_result": "Canary blocked; shadow/fixture path разрешён.",
+      "id": "AT-ASR-14",
+      "line": 189,
+      "owner_role": "AssuranceOwner",
+      "scenario": "G1 пытается использовать нератифицированный beachhead.",
+      "test_bindings": [
+        "TEST:tests/test_mdos_v7_verification_handoff.py"
+      ]
+    },
+    {
+      "case_sha256": "e267d06652998170b02d1fc96737fe556fd82df05183826dd7e0ede29062a3c9",
+      "coverage": "NONE",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-COMMERCIAL-MODEL.md",
+      "evidence_refs": [],
+      "execution_status": "SPECIFIED_NOT_IMPLEMENTED",
+      "expected_result": "Четыре роли; одна DemandUnit; роли не становятся четырьмя leads.",
+      "id": "AT-COM-01",
+      "line": 232,
+      "owner_role": "RevenueArchitect",
+      "scenario": "Один проект содержит инициатора, архитектора, дилера и плательщика.",
+      "test_bindings": []
+    },
+    {
+      "case_sha256": "20b727ce66dc9b4b095f906790e1ea711863decb4d54d452501f86c119d7d50d",
+      "coverage": "NONE",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-COMMERCIAL-MODEL.md",
+      "evidence_refs": [],
+      "execution_status": "SPECIFIED_NOT_IMPLEMENTED",
+      "expected_result": "RFQ_COMMITTED; 0 GDO до получения пригодного artifact.",
+      "id": "AT-COM-02",
+      "line": 233,
+      "owner_role": "RevenueArchitect",
+      "scenario": "Дилер обещал прислать КП через неделю.",
+      "test_bindings": []
+    },
+    {
+      "case_sha256": "a5441bdfef483528715818f042b201f9aeda5c538e79e84540ab128e72fc340f",
+      "coverage": "NONE",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-COMMERCIAL-MODEL.md",
+      "evidence_refs": [],
+      "execution_status": "SPECIFIED_NOT_IMPLEMENTED",
+      "expected_result": "SpecificationInfluence; 0 GDO; создан buyer-transition task.",
+      "id": "AT-COM-03",
+      "line": 234,
+      "owner_role": "RevenueArchitect",
+      "scenario": "Архитектор принял узел, закупщик ещё неизвестен.",
+      "test_bindings": []
+    },
+    {
+      "case_sha256": "aa8aa09ea38309d8b180117848c43545ef71131be7b8653fed897a6ae2c777d7",
+      "coverage": "NONE",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-COMMERCIAL-MODEL.md",
+      "evidence_refs": [],
+      "execution_status": "SPECIFIED_NOT_IMPLEMENTED",
+      "expected_result": "EvidenceEvent/Object watch; 0 lead и 0 GDO.",
+      "id": "AT-COM-04",
+      "line": 235,
+      "owner_role": "RevenueArchitect",
+      "scenario": "Вышло разрешение на строительство.",
+      "test_bindings": []
+    },
+    {
+      "case_sha256": "bfc2e1f0b666c863354b31a4b484fdba99733fe06df80393371e273e0858be85",
+      "coverage": "NONE",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-COMMERCIAL-MODEL.md",
+      "evidence_refs": [],
+      "execution_status": "SPECIFIED_NOT_IMPLEMENTED",
+      "expected_result": "Safe queue/reject; нет обещания и assignment.",
+      "id": "AT-COM-05",
+      "line": 236,
+      "owner_role": "RevenueArchitect",
+      "scenario": "Частник прислал размеры, но в регионе нет дилера/монтажа.",
+      "test_bindings": []
+    },
+    {
+      "case_sha256": "4bb3f8f623eba7a045e0a4fb93e02d39bbe3332eb7b8b8f9de3d2e0088fe2c5d",
+      "coverage": "NONE",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-COMMERCIAL-MODEL.md",
+      "evidence_refs": [],
+      "execution_status": "SPECIFIED_NOT_IMPLEMENTED",
+      "expected_result": "Один PaidOrder; 0 RepeatOrder.",
+      "id": "AT-COM-06",
+      "line": 237,
+      "owner_role": "RevenueArchitect",
+      "scenario": "Две части оплаты одного заказа.",
+      "test_bindings": []
+    },
+    {
+      "case_sha256": "1781887193bf2e7feee6a792c78b1731fd4bb39ee55a7f351c36dcce10977e6d",
+      "coverage": "NONE",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-COMMERCIAL-MODEL.md",
+      "evidence_refs": [],
+      "execution_status": "SPECIFIED_NOT_IMPLEMENTED",
+      "expected_result": "Второй DemandUnit; при cleared payment — RepeatDealer.",
+      "id": "AT-COM-07",
+      "line": 238,
+      "owner_role": "RevenueArchitect",
+      "scenario": "Дилер прислал новый объект после первого paid order.",
+      "test_bindings": []
+    },
+    {
+      "case_sha256": "a83a2531d6de4637b5f86ce580acdbcdc77a5705add4306b24401616be7dc1e8",
+      "coverage": "NONE",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-COMMERCIAL-MODEL.md",
+      "evidence_refs": [],
+      "execution_status": "SPECIFIED_NOT_IMPLEMENTED",
+      "expected_result": "Новый dealer motion с derivation; tender case не меняет тип.",
+      "id": "AT-COM-08",
+      "line": 239,
+      "owner_role": "RevenueArchitect",
+      "scenario": "Тендерный победитель повторно закупает алюминий на стороне.",
+      "test_bindings": []
+    },
+    {
+      "case_sha256": "b60d99716a3c699b6bc6b0533cf2bee1734e9eb082be1fa860c83cf4e15501dd",
+      "coverage": "NONE",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-COMMERCIAL-MODEL.md",
+      "evidence_refs": [],
+      "execution_status": "SPECIFIED_NOT_IMPLEMENTED",
+      "expected_result": "Block + collision case + audit.",
+      "id": "AT-COM-09",
+      "line": 240,
+      "owner_role": "RevenueArchitect",
+      "scenario": "Один routed object предложен второму дилеру при активной защите.",
+      "test_bindings": []
+    },
+    {
+      "case_sha256": "ce3acf387fbb8a72550a8b7992bc3ff67d2d0f5b63ec9d382991ee74640e6735",
+      "coverage": "NONE",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-COMMERCIAL-MODEL.md",
+      "evidence_refs": [],
+      "execution_status": "SPECIFIED_NOT_IMPLEMENTED",
+      "expected_result": "Offer/publication blocked.",
+      "id": "AT-COM-10",
+      "line": 241,
+      "owner_role": "RevenueArchitect",
+      "scenario": "Claim «20–30% дешевле» без свежего proof.",
+      "test_bindings": []
+    },
+    {
+      "case_sha256": "69afbed414c9f0d60a3349dc68706a4248319f42153e8df0b4f5b91c253048b2",
+      "coverage": "NONE",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-COMMERCIAL-MODEL.md",
+      "evidence_refs": [],
+      "execution_status": "SPECIFIED_NOT_IMPLEMENTED",
+      "expected_result": "Один Account, две DemandUnit/Site.",
+      "id": "AT-COM-11",
+      "line": 242,
+      "owner_role": "RevenueArchitect",
+      "scenario": "Один ИНН имеет две площадки с независимыми refit решениями.",
+      "test_bindings": []
+    },
+    {
+      "case_sha256": "395021eb6f1949bee3bc5fc8fc78a761086a9898e2b0169ed4bec7e02737b5ba",
+      "coverage": "NONE",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-COMMERCIAL-MODEL.md",
+      "evidence_refs": [],
+      "execution_status": "SPECIFIED_NOT_IMPLEMENTED",
+      "expected_result": "Interaction/intent only; PII/Lead не создаются.",
+      "id": "AT-COM-12",
+      "line": 243,
+      "owner_role": "RevenueArchitect",
+      "scenario": "Повторный визит к фасадной странице без идентификации.",
+      "test_bindings": []
+    },
+    {
+      "case_sha256": "dfa6f0d0089729f040c5f8fad97e58faa0fd1db24126ff5c294d7c05cc2ae3ad",
+      "coverage": "NONE",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-COMMERCIAL-MODEL.md",
+      "evidence_refs": [],
+      "execution_status": "SPECIFIED_NOT_IMPLEMENTED",
+      "expected_result": "Launch blocked; external flags остаются false.",
+      "id": "AT-COM-13",
+      "line": 244,
+      "owner_role": "RevenueArchitect",
+      "scenario": "Canary запускается без RATIFIED BeachheadProfile.",
+      "test_bindings": []
+    },
+    {
+      "case_sha256": "c444edd5a7fb7792cd8596ba8d98f85164cc6b9c3307978574ab7a93479d1a20",
+      "coverage": "NONE",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-COMMERCIAL-MODEL.md",
+      "evidence_refs": [],
+      "execution_status": "SPECIFIED_NOT_IMPLEMENTED",
+      "expected_result": "Две ячейки/denominator; blended proof запрещён.",
+      "id": "AT-COM-14",
+      "line": 245,
+      "owner_role": "RevenueArchitect",
+      "scenario": "Один пилот смешивает два региона и разные модели монтажа.",
+      "test_bindings": []
+    },
+    {
+      "case_sha256": "393bec8815fae259380328c3706a89db04df3dbd09e57206234bd8a9e6f28a17",
+      "coverage": "NONE",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-COMMERCIAL-MODEL.md",
+      "evidence_refs": [],
+      "execution_status": "SPECIFIED_NOT_IMPLEMENTED",
+      "expected_result": "Один scope fingerprint и один GDO; revision сохраняется.",
+      "id": "AT-COM-15",
+      "line": 246,
+      "owner_role": "RevenueArchitect",
+      "scenario": "Тот же объект повторно квалифицирован после правки файла.",
+      "test_bindings": []
+    },
+    {
+      "case_sha256": "c6679f7213d25aab09f19783c4e4b1fae4d0c697f973fc11979b8970f3a034a4",
+      "coverage": "NONE",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-COMMERCIAL-MODEL.md",
+      "evidence_refs": [],
+      "execution_status": "SPECIFIED_NOT_IMPLEMENTED",
+      "expected_result": "GoldAcceptance schema/gate rejects; GDO count не растёт.",
+      "id": "AT-COM-16",
+      "line": 247,
+      "owner_role": "RevenueArchitect",
+      "scenario": "Gold review не имеет permit/capacity/economics snapshot.",
+      "test_bindings": []
+    },
+    {
+      "case_sha256": "33aae40b2ac6a9a2792021f11c39af0f21f703380fcb12006bfd38c368f90f3f",
+      "coverage": "NONE",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-DECISION-OUTCOMES.md",
+      "evidence_refs": [],
+      "execution_status": "SPECIFIED_NOT_IMPLEMENTED",
+      "expected_result": "Не выбран; hard economics constraint.",
+      "id": "AT-DEC-01",
+      "line": 147,
+      "owner_role": "DecisionScienceOwner",
+      "scenario": "Highest propensity case имеет отрицательную margin.",
+      "test_bindings": []
+    },
+    {
+      "case_sha256": "827e63a75fe3d7160b3ef93fc3d43a8df6c78e16feaeccab3cc8390f8aa4232c",
+      "coverage": "NONE",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-DECISION-OUTCOMES.md",
+      "evidence_refs": [],
+      "execution_status": "SPECIFIED_NOT_IMPLEMENTED",
+      "expected_result": "Conversion не называется causal uplift без assignment ledger.",
+      "id": "AT-DEC-02",
+      "line": 148,
+      "owner_role": "DecisionScienceOwner",
+      "scenario": "Manager выбрал только лучшие accounts.",
+      "test_bindings": []
+    },
+    {
+      "case_sha256": "f02394ed84ed990dd72dc360a92909dc8ea71ca7b544b53739ae0cd1d0564e3a",
+      "coverage": "PARTIAL",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-DECISION-OUTCOMES.md",
+      "evidence_refs": [
+        "EVIDENCE:docs/market_demand_os_v7_2/evidence/baseline-implementation-trace-overlay.v7.1.json",
+        "EVIDENCE:reports/market_demand_os_v7/g1-shadow-evidence.json",
+        "EVIDENCE:reports/market_demand_os_v7/g1-split-payment-shadow-evidence.json"
+      ],
+      "execution_status": "SPECIFIED_NOT_IMPLEMENTED",
+      "expected_result": "0 PaidOrder/PC10.",
+      "id": "AT-DEC-03",
+      "line": 149,
+      "owner_role": "DecisionScienceOwner",
+      "scenario": "Quote accepted, payment отсутствует.",
+      "test_bindings": [
+        "TEST:tests/test_mdos_v7_adversarial.py",
+        "TEST:tests/test_mdos_v7_bitrix_crm_claims.py",
+        "TEST:tests/test_mdos_v7_g1.py",
+        "TEST:tests/test_mdos_v7_split_payments.py"
+      ]
+    },
+    {
+      "case_sha256": "ee7f042491a968bac500dd94102ebcbc3316309923d66ba99cc450a1948b6075",
+      "coverage": "NONE",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-DECISION-OUTCOMES.md",
+      "evidence_refs": [],
+      "execution_status": "SPECIFIED_NOT_IMPLEMENTED",
+      "expected_result": "Repeat/expansion, не NewPayingClient.",
+      "id": "AT-DEC-04",
+      "line": 150,
+      "owner_role": "DecisionScienceOwner",
+      "scenario": "Старый клиент оплатил новый объект.",
+      "test_bindings": []
+    },
+    {
+      "case_sha256": "9c3eb08b5dab5137b825ed1eb30486a9454d33fe56bbaeb44ebb53f650dced2c",
+      "coverage": "NONE",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-DECISION-OUTCOMES.md",
+      "evidence_refs": [],
+      "execution_status": "SPECIFIED_NOT_IMPLEMENTED",
+      "expected_result": "GDO10 gate fails.",
+      "id": "AT-DEC-05",
+      "line": 151,
+      "owner_role": "DecisionScienceOwner",
+      "scenario": "300 GDO получены за 30 дней, но только 18 successful days.",
+      "test_bindings": []
+    },
+    {
+      "case_sha256": "aadd71221ba13933686cf812efd075a2c52d64fde07d6f3b54b949477cab4187",
+      "coverage": "NONE",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-DECISION-OUTCOMES.md",
+      "evidence_refs": [],
+      "execution_status": "SPECIFIED_NOT_IMPLEMENTED",
+      "expected_result": "Один GDO; три source roles/claims.",
+      "id": "AT-DEC-06",
+      "line": 152,
+      "owner_role": "DecisionScienceOwner",
+      "scenario": "Один object попал из Яндекса, 2ГИС и TenderPlan.",
+      "test_bindings": []
+    },
+    {
+      "case_sha256": "5d67f291808652bb89f067839992726a041dafaec6bb862b285c2f6b0c2749c4",
+      "coverage": "NONE",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-DECISION-OUTCOMES.md",
+      "evidence_refs": [],
+      "execution_status": "SPECIFIED_NOT_IMPLEMENTED",
+      "expected_result": "Scale blocked/revise.",
+      "id": "AT-DEC-07",
+      "line": 153,
+      "owner_role": "DecisionScienceOwner",
+      "scenario": "Campaign увеличила forms, holdout Paid одинаков.",
+      "test_bindings": []
+    },
+    {
+      "case_sha256": "82afc75bdd143e82a26cc7793964e476157443a167af8ff1fa4abf5dfbc02d93",
+      "coverage": "NONE",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-DECISION-OUTCOMES.md",
+      "evidence_refs": [],
+      "execution_status": "SPECIFIED_NOT_IMPLEMENTED",
+      "expected_result": "Causal/adaptive production blocked.",
+      "id": "AT-DEC-08",
+      "line": 154,
+      "owner_role": "DecisionScienceOwner",
+      "scenario": "Adaptive policy не логирует propensity.",
+      "test_bindings": []
+    },
+    {
+      "case_sha256": "8066a2a6fdcb4ecaa6d94a55dc020c48ffac7a439312c7776631a81cc2dd7aac",
+      "coverage": "NONE",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-DECISION-OUTCOMES.md",
+      "evidence_refs": [],
+      "execution_status": "SPECIFIED_NOT_IMPLEMENTED",
+      "expected_result": "Commercial proof revoked/reopened.",
+      "id": "AT-DEC-09",
+      "line": 155,
+      "owner_role": "DecisionScienceOwner",
+      "scenario": "Fulfilment claims сделали contribution negative.",
+      "test_bindings": []
+    },
+    {
+      "case_sha256": "0a72ce48b2f6cb582ea041e348c377bb17ff14ac754921857e687d95b6f10179",
+      "coverage": "NONE",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-DECISION-OUTCOMES.md",
+      "evidence_refs": [],
+      "execution_status": "SPECIFIED_NOT_IMPLEMENTED",
+      "expected_result": "Dashboard показывает NOT_ACTIVE/NOT_PROVEN.",
+      "id": "AT-DEC-10",
+      "line": 156,
+      "owner_role": "DecisionScienceOwner",
+      "scenario": "PC10 не ратифицирован.",
+      "test_bindings": []
+    },
+    {
+      "case_sha256": "23d8dbdfb385d575e658ee7f8794bd488cdbcb225e7ee4c3c63d54e196dca74b",
+      "coverage": "PARTIAL",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-DECISION-OUTCOMES.md",
+      "evidence_refs": [
+        "EVIDENCE:docs/market_demand_os_v7_2/evidence/baseline-implementation-trace-overlay.v7.1.json",
+        "EVIDENCE:reports/market_demand_os_v7/g1-shadow-evidence.json",
+        "EVIDENCE:reports/market_demand_os_v7/g1-split-payment-shadow-evidence.json"
+      ],
+      "execution_status": "SPECIFIED_NOT_IMPLEMENTED",
+      "expected_result": "0 cleared payment; conflict/quarantine.",
+      "id": "AT-DEC-11",
+      "line": 157,
+      "owner_role": "DecisionScienceOwner",
+      "scenario": "CRM/менеджер пометил PAID без банковского PaymentProof.",
+      "test_bindings": [
+        "TEST:tests/test_mdos_v7_adversarial.py",
+        "TEST:tests/test_mdos_v7_bitrix_crm_claims.py",
+        "TEST:tests/test_mdos_v7_g1.py",
+        "TEST:tests/test_mdos_v7_split_payments.py"
+      ]
+    },
+    {
+      "case_sha256": "6d33fdfa94ae7c1de8a40b8685714d42625e1c4795a404e7c8a02881c5fa66dd",
+      "coverage": "NONE",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-DECISION-OUTCOMES.md",
+      "evidence_refs": [],
+      "execution_status": "SPECIFIED_NOT_IMPLEMENTED",
+      "expected_result": "Один idempotent outcome; Paid/PC10 не удваивается.",
+      "id": "AT-DEC-12",
+      "line": 158,
+      "owner_role": "DecisionScienceOwner",
+      "scenario": "Один provider payment event пришёл повторно.",
+      "test_bindings": []
+    },
+    {
+      "case_sha256": "15b049151b3991aff0628beb58afdba51f9b4cd078e3cacd967a6729257fe283",
+      "coverage": "NONE",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-DECISION-OUTCOMES.md",
+      "evidence_refs": [],
+      "execution_status": "SPECIFIED_NOT_IMPLEMENTED",
+      "expected_result": "Schema reject; daily count не растёт.",
+      "id": "AT-DEC-13",
+      "line": 159,
+      "owner_role": "DecisionScienceOwner",
+      "scenario": "ACCEPTED_GDO не имеет GoldAcceptance/fingerprint.",
+      "test_bindings": []
+    },
+    {
+      "case_sha256": "b9e0e5fa0f9f73db9ef81be7f709c5d561cc001925644ab61e3ace8d1a0e8681",
+      "coverage": "NONE",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-DECISION-OUTCOMES.md",
+      "evidence_refs": [],
+      "execution_status": "SPECIFIED_NOT_IMPLEMENTED",
+      "expected_result": "Acceptance denied and audited.",
+      "id": "AT-DEC-14",
+      "line": 160,
+      "owner_role": "DecisionScienceOwner",
+      "scenario": "Human reviewer принимает AI claim без evidence/permit.",
+      "test_bindings": []
+    },
+    {
+      "case_sha256": "5dde99f86b3cfe80485097f6d56206f2b3f80ae34a416938186ca060eafd9773",
+      "coverage": "NONE",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-DECISION-OUTCOMES.md",
+      "evidence_refs": [],
+      "execution_status": "SPECIFIED_NOT_IMPLEMENTED",
+      "expected_result": "Тот же PaidOrder; 0 RepeatOrder/NewPayingClient.",
+      "id": "AT-DEC-15",
+      "line": 161,
+      "owner_role": "DecisionScienceOwner",
+      "scenario": "Второй платёж — доплата по тому же order.",
+      "test_bindings": []
+    },
+    {
+      "case_sha256": "ff8b160125fe60719ba52d202a78ee9b0e585ab8174630aa3a7fcfeb3ef55d55",
+      "coverage": "NONE",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-DEMAND-INTELLIGENCE.md",
+      "evidence_refs": [],
+      "execution_status": "SPECIFIED_NOT_IMPLEMENTED",
+      "expected_result": "Content remains tainted data; 0 secret/tool/external effect.",
+      "id": "AT-DI7-01",
+      "line": 146,
+      "owner_role": "ContractAuthority",
+      "scenario": "HTML предлагает модели игнорировать policy и вызвать tool.",
+      "test_bindings": []
+    },
+    {
+      "case_sha256": "c99fd45e067673e979539c59d2a29be0d30db66cf5de7b828be04a5340460195",
+      "coverage": "NONE",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-DEMAND-INTELLIGENCE.md",
+      "evidence_refs": [],
+      "execution_status": "SPECIFIED_NOT_IMPLEMENTED",
+      "expected_result": "Conflict/critic; critical claim не принят.",
+      "id": "AT-DI7-02",
+      "line": 147,
+      "owner_role": "ContractAuthority",
+      "scenario": "Native PDF и OCR расходятся в количестве.",
+      "test_bindings": []
+    },
+    {
+      "case_sha256": "59d84c96fdd0264a6c72e4d6c755ae9c55c5100823db9be6ab4ede117dbbf8ba",
+      "coverage": "NONE",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-DEMAND-INTELLIGENCE.md",
+      "evidence_refs": [],
+      "execution_status": "SPECIFIED_NOT_IMPLEMENTED",
+      "expected_result": "Schema reject; world model не меняется.",
+      "id": "AT-DI7-03",
+      "line": 148,
+      "owner_role": "ContractAuthority",
+      "scenario": "Claim не содержит span/hash/producer.",
+      "test_bindings": []
+    },
+    {
+      "case_sha256": "ed399ae597f9d6afb0a43a77f99ecb521e665e46affcc29fd4a88046d47a7fa0",
+      "coverage": "NONE",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-DEMAND-INTELLIGENCE.md",
+      "evidence_refs": [],
+      "execution_status": "SPECIFIED_NOT_IMPLEMENTED",
+      "expected_result": "REVIEW; auto-link/merge отсутствует.",
+      "id": "AT-DI7-04",
+      "line": 149,
+      "owner_role": "ContractAuthority",
+      "scenario": "Match probability попала между thresholds.",
+      "test_bindings": []
+    },
+    {
+      "case_sha256": "7048c57f8ea4b41fb2dd2a55d02d30790fe4adfcc41adf0b175ba4f39b195258",
+      "coverage": "NONE",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-DEMAND-INTELLIGENCE.md",
+      "evidence_refs": [],
+      "execution_status": "SPECIFIED_NOT_IMPLEMENTED",
+      "expected_result": "Две DemandUnit; score aggregation не объединяет их.",
+      "id": "AT-DI7-05",
+      "line": 150,
+      "owner_role": "ContractAuthority",
+      "scenario": "Similar signals относятся к двум независимым scope.",
+      "test_bindings": []
+    },
+    {
+      "case_sha256": "44442f657f3ee2f0c670c57b1445906b1f77c12ec2fe801998b4583fa934aeef",
+      "coverage": "NONE",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-DEMAND-INTELLIGENCE.md",
+      "evidence_refs": [],
+      "execution_status": "SPECIFIED_NOT_IMPLEMENTED",
+      "expected_result": "Previous assessment revoked; Gold blocked.",
+      "id": "AT-DI7-06",
+      "line": 151,
+      "owner_role": "ContractAuthority",
+      "scenario": "Supplier selected подтверждён после positive assessment.",
+      "test_bindings": []
+    },
+    {
+      "case_sha256": "b2bc107fadaeb8aa29305be525b384a4976f72d9a9737f3bf06bccb57c5d6875",
+      "coverage": "NONE",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-DEMAND-INTELLIGENCE.md",
+      "evidence_refs": [],
+      "execution_status": "SPECIFIED_NOT_IMPLEMENTED",
+      "expected_result": "Point-in-time validation fails.",
+      "id": "AT-DI7-07",
+      "line": 152,
+      "owner_role": "ContractAuthority",
+      "scenario": "Dataset использует payment recorded после prediction.",
+      "test_bindings": []
+    },
+    {
+      "case_sha256": "f387e7d7129d69e37c3e4a82a98f5c19c32604ad8fcd62a2fb238f8df87943bd",
+      "coverage": "NONE",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-DEMAND-INTELLIGENCE.md",
+      "evidence_refs": [],
+      "execution_status": "SPECIFIED_NOT_IMPLEMENTED",
+      "expected_result": "Promotion blocked.",
+      "id": "AT-DI7-08",
+      "line": 153,
+      "owner_role": "ContractAuthority",
+      "scenario": "Model хороша на random split, плоха на temporal holdout.",
+      "test_bindings": []
+    },
+    {
+      "case_sha256": "d6f92057ed520c12adeebf19e27382368e6c54456b8362d7fd44bced2de5b23d",
+      "coverage": "NONE",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-DEMAND-INTELLIGENCE.md",
+      "evidence_refs": [],
+      "execution_status": "SPECIFIED_NOT_IMPLEMENTED",
+      "expected_result": "Dealer slice может остаться; refit переходит shadow/manual.",
+      "id": "AT-DI7-09",
+      "line": 154,
+      "owner_role": "ContractAuthority",
+      "scenario": "Calibration достаточна в dealer, недостаточна в refit.",
+      "test_bindings": []
+    },
+    {
+      "case_sha256": "b1e81a2f94941ae88df195d52189caa821110576144cce2807ab8624a9159214",
+      "coverage": "NONE",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-DEMAND-INTELLIGENCE.md",
+      "evidence_refs": [],
+      "execution_status": "SPECIFIED_NOT_IMPLEMENTED",
+      "expected_result": "Stop/lower-cost action; бесконечный crawl запрещён.",
+      "id": "AT-DI7-10",
+      "line": 155,
+      "owner_role": "ContractAuthority",
+      "scenario": "Research query дорогой и почти не меняет decision.",
+      "test_bindings": []
+    },
+    {
+      "case_sha256": "724c49b41b44eeb95158466e31b84239539b4efc5a831454b2112951d9d78ebf",
+      "coverage": "NONE",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-DEMAND-INTELLIGENCE.md",
+      "evidence_refs": [],
+      "execution_status": "SPECIFIED_NOT_IMPLEMENTED",
+      "expected_result": "Execution blocked.",
+      "id": "AT-DI7-11",
+      "line": 156,
+      "owner_role": "ContractAuthority",
+      "scenario": "Unknown model/prompt/tool digest.",
+      "test_bindings": []
+    },
+    {
+      "case_sha256": "07327d855c136956f8353b12b0f01566e87eccf59f7c429264c27bd8e32396f5",
+      "coverage": "NONE",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-DEMAND-INTELLIGENCE.md",
+      "evidence_refs": [],
+      "execution_status": "SPECIFIED_NOT_IMPLEMENTED",
+      "expected_result": "Commercial promotion запрещён.",
+      "id": "AT-DI7-12",
+      "line": 157,
+      "owner_role": "ContractAuthority",
+      "scenario": "Model нашла больше компаний, но не incremental Paid.",
+      "test_bindings": []
+    },
+    {
+      "case_sha256": "ba5b7992d674dd89e701aa0caa7cb1bdf14481dbe23a862c58f725ef31dd18c1",
+      "coverage": "NONE",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-MAIL-BITRIX-OBSERVER.md",
+      "evidence_refs": [],
+      "execution_status": "SPECIFIED_NOT_IMPLEMENTED",
+      "expected_result": "Observer находит projection и сохраняет local evidence; 0 Lead/Todo/Timeline/CRM writes.",
+      "id": "AT-MBO-01",
+      "line": 114,
+      "owner_role": "InboundMailObserverOwner",
+      "scenario": "Нативная почта Bitrix создала/привязала одну Activity.",
+      "test_bindings": []
+    },
+    {
+      "case_sha256": "e3e99b97a980b55a4b5ed35044d56ec132753a40f9be997bd885408c68e728a7",
+      "coverage": "NONE",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-MAIL-BITRIX-OBSERVER.md",
+      "evidence_refs": [],
+      "execution_status": "SPECIFIED_NOT_IMPLEMENTED",
+      "expected_result": "Только после второго poll local state становится RECONCILED; external writes = 0.",
+      "id": "AT-MBO-02",
+      "line": 115,
+      "owner_role": "InboundMailObserverOwner",
+      "scenario": "Один и тот же singleton виден в двух poll с интервалом пять минут.",
+      "test_bindings": []
+    },
+    {
+      "case_sha256": "e42117de3ec244867edbe32efba8b360efc335c45e5abb06ec0d2bc6740209fa",
+      "coverage": "NONE",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-MAIL-BITRIX-OBSERVER.md",
+      "evidence_refs": [],
+      "execution_status": "SPECIFIED_NOT_IMPLEMENTED",
+      "expected_result": "Пятиминутное окно сброшено либо открыт local review; старый candidate не подтверждён.",
+      "id": "AT-MBO-03",
+      "line": 116,
+      "owner_role": "InboundMailObserverOwner",
+      "scenario": "Singleton изменился или исчез до истечения stability window.",
+      "test_bindings": []
+    },
+    {
+      "case_sha256": "55ec1069a8c4b8fa899da2eaf5df3ec183b43625c43c0ebc671bf2288fd4b5e3",
+      "coverage": "NONE",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-MAIL-BITRIX-OBSERVER.md",
+      "evidence_refs": [],
+      "execution_status": "SPECIFIED_NOT_IMPLEMENTED",
+      "expected_result": "LOCAL_REVIEW_REQUIRED; Lead/Todo/Timeline/repair не создаются.",
+      "id": "AT-MBO-04",
+      "line": 117,
+      "owner_role": "InboundMailObserverOwner",
+      "scenario": "Нативная projection отсутствует 90 минут или кандидатов больше одного.",
+      "test_bindings": []
+    },
+    {
+      "case_sha256": "d204d12557bd860313ec5107b47feaeeb6cde47618d1c941552535f1a2b6b2ee",
+      "coverage": "NONE",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-MAIL-BITRIX-OBSERVER.md",
+      "evidence_refs": [],
+      "execution_status": "SPECIFIED_NOT_IMPLEMENTED",
+      "expected_result": "Вызов блокируется до transport; локальный invariant/incident сохранён.",
+      "id": "AT-MBO-05",
+      "line": 118,
+      "owner_role": "InboundMailObserverOwner",
+      "scenario": "Код пытается вызвать Bitrix write method или mutating IMAP operation.",
+      "test_bindings": []
+    },
+    {
+      "case_sha256": "9b5e854ef9af37902cf3c5fde4b30b5a5c244de523bf0eabe8afa9f2b47ec83f",
+      "coverage": "NONE",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-MAIL-BITRIX-OBSERVER.md",
+      "evidence_refs": [],
+      "execution_status": "SPECIFIED_NOT_IMPLEMENTED",
+      "expected_result": "Разрешённое наблюдение может продолжаться; task/call/reply/contact заблокированы до assignee, work item и permit.",
+      "id": "AT-MBO-06",
+      "line": 119,
+      "owner_role": "InboundMailObserverOwner",
+      "scenario": "Для mailbox scope ещё не назначен оператор.",
+      "test_bindings": []
+    },
+    {
+      "case_sha256": "827752b47da1989236fd8fa46951b7ef15944cb765a7175926885df1300b024f",
+      "coverage": "NONE",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-MAIL-BITRIX-OBSERVER.md",
+      "evidence_refs": [],
+      "execution_status": "SPECIFIED_NOT_IMPLEMENTED",
+      "expected_result": "Ровно 10 durable QUARANTINED, 0 dispatch; любой иной состав останавливает запуск.",
+      "id": "AT-MBO-07",
+      "line": 120,
+      "owner_role": "InboundMailObserverOwner",
+      "scenario": "Cutover видит пять OPERATOR_TODO и пять TIMELINE_MAIL V4 operations.",
+      "test_bindings": []
+    },
+    {
+      "case_sha256": "e4b2e7432ba85985bb9f4fd750d4dfcd5f14f103e90847710f71b7fc35c1f532",
+      "coverage": "NONE",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-MAIL-BITRIX-OBSERVER.md",
+      "evidence_refs": [],
+      "execution_status": "SPECIFIED_NOT_IMPLEMENTED",
+      "expected_result": "Один local effect; replay no-op, второй owner не получает lock.",
+      "id": "AT-MBO-08",
+      "line": 121,
+      "owner_role": "InboundMailObserverOwner",
+      "scenario": "Exact poll replay или второй concurrent observer.",
+      "test_bindings": []
+    },
+    {
+      "case_sha256": "7abc317a0dc37f84c4aad4b491bd267cf4c91c542d7281d1c0041b7b505cc299",
+      "coverage": "NONE",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-MAIL-BITRIX-OBSERVER.md",
+      "evidence_refs": [],
+      "execution_status": "SPECIFIED_NOT_IMPLEMENTED",
+      "expected_result": "Явный STOP; 0 side effects до отдельного successor/permit/release.",
+      "id": "AT-MBO-09",
+      "line": 122,
+      "owner_role": "InboundMailObserverOwner",
+      "scenario": "Предлагается включить MANGO, TenderPlan, UniSender, SMTP или outbound.",
+      "test_bindings": []
+    },
+    {
+      "case_sha256": "0d2899207c49d70d04a8e517f344e7a51d78869917aa9ee248604a7c873ed6ca",
+      "coverage": "NONE",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-MAIL-BITRIX-OBSERVER.md",
+      "evidence_refs": [],
+      "execution_status": "SPECIFIED_NOT_IMPLEMENTED",
+      "expected_result": "Manifest/release pin остаются DEFAULT_DENY, все live gates false, schedule не активирован.",
+      "id": "AT-MBO-10",
+      "line": 123,
+      "owner_role": "InboundMailObserverOwner",
+      "scenario": "Собран `7.2.0-rc.2` без ratification record.",
+      "test_bindings": []
+    },
+    {
+      "case_sha256": "9133038b01d7c72c1ba5415caa54a67708e07a1d6e0eb313159f1e8194c6ff68",
+      "coverage": "NONE",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-MAIL-BITRIX-OBSERVER.md",
+      "evidence_refs": [],
+      "execution_status": "SPECIFIED_NOT_IMPLEMENTED",
+      "expected_result": "Exact digest различается; normalization/truncation не создаёт match.",
+      "id": "AT-MBO-11",
+      "line": 124,
+      "owner_role": "InboundMailObserverOwner",
+      "scenario": "Два Subject отличаются только пробелом/tab, регистром или обрезанным хвостом.",
+      "test_bindings": []
+    },
+    {
+      "case_sha256": "1c37b5709fbc2b70d404ba4083dce0c61e6d6757fcd3f01cb1fd443df8e9f2e0",
+      "coverage": "NONE",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-MAIL-BITRIX-OBSERVER.md",
+      "evidence_refs": [],
+      "execution_status": "SPECIFIED_NOT_IMPLEMENTED",
+      "expected_result": "Candidate не подтверждён; OWNER и unrelated COMMUNICATIONS не identity.",
+      "id": "AT-MBO-12",
+      "line": 125,
+      "owner_role": "InboundMailObserverOwner",
+      "scenario": "OWNER совпал, но sender отсутствует либо COMMUNICATIONS содержит unrelated value.",
+      "test_bindings": []
+    },
+    {
+      "case_sha256": "727d7909e3252552317cb83c95247d0607d165bb63d37006ebc8af1db2af41a0",
+      "coverage": "NONE",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-MAIL-BITRIX-OBSERVER.md",
+      "evidence_refs": [],
+      "execution_status": "SPECIFIED_NOT_IMPLEMENTED",
+      "expected_result": "READ_UNKNOWN/LOCAL_REVIEW; singleton из partial page не принимается.",
+      "id": "AT-MBO-13",
+      "line": 126,
+      "owner_role": "InboundMailObserverOwner",
+      "scenario": "Bitrix pagination вернула повторный/убывающий/malformed next или оборвалась до полного набора.",
+      "test_bindings": []
+    },
+    {
+      "case_sha256": "4e9901fb0441a937f2820ece3ca8a0a62a0a25e5c4ea44bfb1455801efcbedfa",
+      "coverage": "NONE",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-MAIL-BITRIX-OBSERVER.md",
+      "evidence_refs": [],
+      "execution_status": "SPECIFIED_NOT_IMPLEMENTED",
+      "expected_result": "Исходная observation остаётся LOCAL_REVIEW_REQUIRED и не может стать RECONCILED автоматически.",
+      "id": "AT-MBO-14",
+      "line": 127,
+      "owner_role": "InboundMailObserverOwner",
+      "scenario": "Stable singleton впервые появился после 90-минутного deadline.",
+      "test_bindings": []
+    },
+    {
+      "case_sha256": "a37b2204c180b17e9a8bcbfd5b83108a9b6f2ca53c3a78025474620bafe955ef",
+      "coverage": "NONE",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-MAIL-BITRIX-OBSERVER.md",
+      "evidence_refs": [],
+      "execution_status": "SPECIFIED_NOT_IMPLEMENTED",
+      "expected_result": "Phase/error audit и receipt сохранены; после initialize нет executable Todo/Timeline.",
+      "id": "AT-MBO-15",
+      "line": 128,
+      "owner_role": "InboundMailObserverOwner",
+      "scenario": "Cutover/legacy initialize обрабатывает V4 Todo/Timeline rows.",
+      "test_bindings": []
+    },
+    {
+      "case_sha256": "ba6efcfabcc3ec84ace744c7f923ef9d54451423cff4ee9bd02048c3e0c7d722",
+      "coverage": "NONE",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-MAIL-BITRIX-OBSERVER.md",
+      "evidence_refs": [],
+      "execution_status": "SPECIFIED_NOT_IMPLEMENTED",
+      "expected_result": "Response отброшен, следующий call не выполняется, local STOP/review сохранён.",
+      "id": "AT-MBO-16",
+      "line": 129,
+      "owner_role": "InboundMailObserverOwner",
+      "scenario": "Authority generation или TTL изменились во время remote call.",
+      "test_bindings": []
+    },
+    {
+      "case_sha256": "3740924ffd581d13e8e854d9ea1f617a410da26a67ce663a4635d72f8d15b2d3",
+      "coverage": "FULL",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-OPERATOR-TELEPHONY.md",
+      "evidence_refs": [
+        "EVIDENCE:docs/market_demand_os_v7_2/evidence/operator-telephony-offline-evidence.json"
+      ],
+      "execution_status": "IMPLEMENTED_NOT_VERIFIED",
+      "expected_result": "Один call effect; replay no-op.",
+      "id": "AT-OPT-01",
+      "line": 140,
+      "owner_role": "SalesOperationsOwner",
+      "scenario": "Один provider event доставлен повторно.",
+      "test_bindings": [
+        "TEST:tests/test_lead_factory_operator_call_workflow.py#OperatorCallWorkflowTests.test_provider_call_exact_replay_has_one_business_effect"
+      ]
+    },
+    {
+      "case_sha256": "c1a58cbc90384b17efe74dbbecbba4bee04e32e3a6cef2fa1f92e9af3ddca5cb",
+      "coverage": "FULL",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-OPERATOR-TELEPHONY.md",
+      "evidence_refs": [
+        "EVIDENCE:docs/market_demand_os_v7_2/evidence/operator-telephony-offline-evidence.json"
+      ],
+      "execution_status": "IMPLEMENTED_NOT_VERIFIED",
+      "expected_result": "Evidence сохраняется unbound и позже однозначно связывается.",
+      "id": "AT-OPT-02",
+      "line": 141,
+      "owner_role": "SalesOperationsOwner",
+      "scenario": "Recording пришёл раньше call metadata.",
+      "test_bindings": [
+        "TEST:tests/test_lead_factory_operator_call_workflow.py#OperatorCallWorkflowTests.test_out_of_order_evidence_and_multiple_recordings_converge_after_binding"
+      ]
+    },
+    {
+      "case_sha256": "cc694d35d7a7d6c0929c49ba62dca4580252f82674609293916215f450cc848f",
+      "coverage": "FULL",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-OPERATOR-TELEPHONY.md",
+      "evidence_refs": [
+        "EVIDENCE:docs/market_demand_os_v7_2/evidence/operator-telephony-offline-evidence.json"
+      ],
+      "execution_status": "IMPLEMENTED_NOT_VERIFIED",
+      "expected_result": "Одна session, все segments сохранены отдельно, без дубля Activity.",
+      "id": "AT-OPT-03",
+      "line": 142,
+      "owner_role": "SalesOperationsOwner",
+      "scenario": "Transfer создал две legs и две recordings.",
+      "test_bindings": [
+        "TEST:tests/test_lead_factory_operator_call_workflow.py#OperatorCallWorkflowTests.test_out_of_order_evidence_and_multiple_recordings_converge_after_binding",
+        "TEST:tests/test_lead_factory_operator_call_workflow.py#OperatorCallWorkflowTests.test_transfer_legs_share_one_session_and_one_activity_binding"
+      ]
+    },
+    {
+      "case_sha256": "cde3322a52536ae83bc06a66b179dbb3400398e8d9b48cb9f04c7ec3457e134a",
+      "coverage": "FULL",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-OPERATOR-TELEPHONY.md",
+      "evidence_refs": [
+        "EVIDENCE:docs/market_demand_os_v7_2/evidence/operator-telephony-offline-evidence.json"
+      ],
+      "execution_status": "IMPLEMENTED_NOT_VERIFIED",
+      "expected_result": "Вторая связь отклонена conflict-ом.",
+      "id": "AT-OPT-04",
+      "line": 143,
+      "owner_role": "SalesOperationsOwner",
+      "scenario": "Один Bitrix call/activity ID предложен двум sessions.",
+      "test_bindings": [
+        "TEST:tests/test_lead_factory_operator_call_workflow.py#OperatorCallWorkflowTests.test_bitrix_identity_is_one_to_one_and_binding_replay_is_terminal_safe",
+        "TEST:tests/test_lead_factory_operator_call_workflow.py#OperatorCallWorkflowTests.test_crm_activity_identity_cannot_bind_two_call_sessions"
+      ]
+    },
+    {
+      "case_sha256": "9014429f7c02a43ea091608797ee680aa2980781e48534afcdf90617068e7987",
+      "coverage": "FULL",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-OPERATOR-TELEPHONY.md",
+      "evidence_refs": [
+        "EVIDENCE:docs/market_demand_os_v7_2/evidence/operator-telephony-offline-evidence.json"
+      ],
+      "execution_status": "IMPLEMENTED_NOT_VERIFIED",
+      "expected_result": "REVIEW; автоматической привязки нет.",
+      "id": "AT-OPT-05",
+      "line": 144,
+      "owner_role": "SalesOperationsOwner",
+      "scenario": "Телефон соответствует нескольким CRM-кандидатам.",
+      "test_bindings": [
+        "TEST:tests/test_lead_factory_operator_call_workflow.py#OperatorCallWorkflowTests.test_ambiguous_crm_candidates_require_review_before_exact_binding"
+      ]
+    },
+    {
+      "case_sha256": "7bff88755aa2c2f8e7398aa2d63579acd66ee1748eb9ab83787dd11069aef0a5",
+      "coverage": "FULL",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-OPERATOR-TELEPHONY.md",
+      "evidence_refs": [
+        "EVIDENCE:docs/market_demand_os_v7_2/evidence/operator-telephony-offline-evidence.json"
+      ],
+      "execution_status": "IMPLEMENTED_NOT_VERIFIED",
+      "expected_result": "Оператор подтверждает вручную; звонок не теряется.",
+      "id": "AT-OPT-06",
+      "line": 145,
+      "owner_role": "SalesOperationsOwner",
+      "scenario": "AI недоступен или не разрешён.",
+      "test_bindings": [
+        "TEST:tests/test_lead_factory_operator_call_workflow.py#OperatorCallWorkflowTests.test_ai_denied_or_unavailable_does_not_block_manual_confirmation",
+        "TEST:tests/test_lead_factory_operator_call_workflow.py#OperatorCallWorkflowTests.test_manual_confirmation_succeeds_without_ai_draft"
+      ]
+    },
+    {
+      "case_sha256": "f8d0a7d1ae407e121ba751ceae916a5e9c017572799b0de127369c0cc3151ee0",
+      "coverage": "FULL",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-OPERATOR-TELEPHONY.md",
+      "evidence_refs": [
+        "EVIDENCE:docs/market_demand_os_v7_2/evidence/operator-telephony-offline-evidence.json"
+      ],
+      "execution_status": "IMPLEMENTED_NOT_VERIFIED",
+      "expected_result": "Подтверждение draft блокируется как stale/conflict.",
+      "id": "AT-OPT-07",
+      "line": 146,
+      "owner_role": "SalesOperationsOwner",
+      "scenario": "Draft не соответствует persisted transcript digest.",
+      "test_bindings": [
+        "TEST:tests/test_lead_factory_operator_call_workflow.py#OperatorCallWorkflowTests.test_transcript_revision_makes_prior_analysis_draft_stale"
+      ]
+    },
+    {
+      "case_sha256": "460c4dfa71242963efae013228443e7cc78f2c7ca6e269908f64291bb169c735",
+      "coverage": "FULL",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-OPERATOR-TELEPHONY.md",
+      "evidence_refs": [
+        "EVIDENCE:docs/market_demand_os_v7_2/evidence/operator-telephony-offline-evidence.json"
+      ],
+      "execution_status": "IMPLEMENTED_NOT_VERIFIED",
+      "expected_result": "Work item остаётся активным с owner/due time.",
+      "id": "AT-OPT-08",
+      "line": 147,
+      "owner_role": "SalesOperationsOwner",
+      "scenario": "Оператор выбрал callback.",
+      "test_bindings": [
+        "TEST:tests/test_lead_factory_operator_call_workflow.py#OperatorCallWorkflowTests.test_callback_keeps_task_active_and_projects_owner_due_and_binding_ids"
+      ]
+    },
+    {
+      "case_sha256": "194062df1627b23165fa604c8673da62ef0a7e69719a1bc3449b1a865653152a",
+      "coverage": "FULL",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-OPERATOR-TELEPHONY.md",
+      "evidence_refs": [
+        "EVIDENCE:docs/market_demand_os_v7_2/evidence/operator-telephony-offline-evidence.json"
+      ],
+      "execution_status": "IMPLEMENTED_NOT_VERIFIED",
+      "expected_result": "Только Gold review; canonical Gold не меняется.",
+      "id": "AT-OPT-09",
+      "line": 148,
+      "owner_role": "SalesOperationsOwner",
+      "scenario": "Оператор запросил Gold.",
+      "test_bindings": [
+        "TEST:tests/test_lead_factory_operator_call_workflow.py#OperatorCallWorkflowTests.test_analysis_and_gold_confirmation_are_idempotent_and_review_only"
+      ]
+    },
+    {
+      "case_sha256": "ef81ab04be80c808ece82972ef390c0e0be6ce0895a35cd5cc6953b65fada89c",
+      "coverage": "FULL",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-OPERATOR-TELEPHONY.md",
+      "evidence_refs": [
+        "EVIDENCE:docs/market_demand_os_v7_2/evidence/operator-telephony-offline-evidence.json"
+      ],
+      "execution_status": "IMPLEMENTED_NOT_VERIFIED",
+      "expected_result": "Только suppression review; повторный контакт не планируется.",
+      "id": "AT-OPT-10",
+      "line": 149,
+      "owner_role": "SalesOperationsOwner",
+      "scenario": "Клиент потребовал не связываться.",
+      "test_bindings": [
+        "TEST:tests/test_lead_factory_operator_call_workflow.py#OperatorCallWorkflowTests.test_manual_dnc_creates_suppression_review_without_canonical_suppression"
+      ]
+    },
+    {
+      "case_sha256": "970acf99e44ae9ace8c2c22b6ee60a36c64030f1d9e77c55c5d98fc836bbd970",
+      "coverage": "FULL",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-OPERATOR-TELEPHONY.md",
+      "evidence_refs": [
+        "EVIDENCE:docs/market_demand_os_v7_2/evidence/operator-telephony-offline-evidence.json"
+      ],
+      "execution_status": "IMPLEMENTED_NOT_VERIFIED",
+      "expected_result": "Restart/reconciliation достраивает проекцию без второго effect.",
+      "id": "AT-OPT-11",
+      "line": 150,
+      "owner_role": "SalesOperationsOwner",
+      "scenario": "Crash после event, до обновления задачи.",
+      "test_bindings": [
+        "TEST:tests/test_lead_factory_operator_call_workflow.py#OperatorCallWorkflowTests.test_reconciliation_repairs_crash_after_confirmation_event"
+      ]
+    },
+    {
+      "case_sha256": "9498dad3ef86fedc421d6cab8286a2b629667236d329623e699a6907790cb0c6",
+      "coverage": "FULL",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-OPERATOR-TELEPHONY.md",
+      "evidence_refs": [
+        "EVIDENCE:docs/market_demand_os_v7_2/evidence/operator-telephony-offline-evidence.json"
+      ],
+      "execution_status": "IMPLEMENTED_NOT_VERIFIED",
+      "expected_result": "Safe no-op; terminal задача не открывается.",
+      "id": "AT-OPT-12",
+      "line": 151,
+      "owner_role": "SalesOperationsOwner",
+      "scenario": "Binding повторён после terminal task.",
+      "test_bindings": [
+        "TEST:tests/test_lead_factory_operator_call_workflow.py#OperatorCallWorkflowTests.test_bitrix_identity_is_one_to_one_and_binding_replay_is_terminal_safe"
+      ]
+    },
+    {
+      "case_sha256": "6ffce953d014389f0879b57578a83787d256674bc66ba6f9d50c6f7a5e64a598",
+      "coverage": "FULL",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-OPERATOR-TELEPHONY.md",
+      "evidence_refs": [
+        "EVIDENCE:docs/market_demand_os_v7_2/evidence/operator-telephony-offline-evidence.json"
+      ],
+      "execution_status": "IMPLEMENTED_NOT_VERIFIED",
+      "expected_result": "URL отклонён до canonical event/log.",
+      "id": "AT-OPT-13",
+      "line": 152,
+      "owner_role": "SalesOperationsOwner",
+      "scenario": "Signed recording URL попал во входной payload.",
+      "test_bindings": [
+        "TEST:tests/test_lead_factory_operator_call_workflow.py#OperatorCallWorkflowTests.test_canonical_events_contain_no_raw_audio_transcript_or_temporary_url"
+      ]
+    },
+    {
+      "case_sha256": "86422a7e2043cba27b330c26fe3ad5215c69e2349da1f7cd4a8ea800e1bdb921",
+      "coverage": "FULL",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-OPERATOR-TELEPHONY.md",
+      "evidence_refs": [
+        "EVIDENCE:docs/market_demand_os_v7_2/evidence/operator-telephony-offline-evidence.json"
+      ],
+      "execution_status": "IMPLEMENTED_NOT_VERIFIED",
+      "expected_result": "Отказ; состояние не меняется.",
+      "id": "AT-OPT-14",
+      "line": 153,
+      "owner_role": "SalesOperationsOwner",
+      "scenario": "Не назначенный actor подтверждает звонок.",
+      "test_bindings": [
+        "TEST:tests/test_lead_factory_operator_call_workflow.py#OperatorCallWorkflowTests.test_task_reassignment_invalidates_operator_binding",
+        "TEST:tests/test_lead_factory_operator_call_workflow.py#OperatorCallWorkflowTests.test_wrong_actor_rejection_leaves_events_task_and_state_unchanged"
+      ]
+    },
+    {
+      "case_sha256": "081910355760df12b034117395f986a8790e43bbc28a5731495f0a40049adafe",
+      "coverage": "NONE",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-OPERATOR-TELEPHONY.md",
+      "evidence_refs": [],
+      "execution_status": "SPECIFIED_NOT_IMPLEMENTED",
+      "expected_result": "Только local observation; task/call/reply/contact запрещены до assignee, work item и permit.",
+      "id": "AT-OPT-15",
+      "line": 154,
+      "owner_role": "SalesOperationsOwner",
+      "scenario": "Mail observer видит inbound, но оператор ещё не назначен.",
+      "test_bindings": []
+    },
+    {
+      "case_sha256": "a130cc01a5a0391aaf650f34035a88d2b96c86ca817c7dd597b28d64cff22f32",
+      "coverage": "NONE",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-SOURCE-PORTFOLIO.md",
+      "evidence_refs": [],
+      "execution_status": "SPECIFIED_NOT_IMPLEMENTED",
+      "expected_result": "Cache/TTL enforcement; CRM persistence blocked.",
+      "id": "AT-SRC7-01",
+      "line": 159,
+      "owner_role": "ContractAuthority",
+      "scenario": "Places API разрешает поиск, но не постоянное хранение.",
+      "test_bindings": []
+    },
+    {
+      "case_sha256": "6305214bf1b88e35bf96273d8e36b5972d44d1fe490a5cea00389c4d20163033",
+      "coverage": "NONE",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-SOURCE-PORTFOLIO.md",
+      "evidence_refs": [],
+      "execution_status": "SPECIFIED_NOT_IMPLEMENTED",
+      "expected_result": "Ingest только в contract scope с provenance/retention.",
+      "id": "AT-SRC7-02",
+      "line": 160,
+      "owner_role": "ContractAuthority",
+      "scenario": "Data.2GIS договор разрешает XLSX client base.",
+      "test_bindings": []
+    },
+    {
+      "case_sha256": "e1ae5026eaf8f23609d6aabb4b157138bdad8819ba7db2def524977b30f49ec0",
+      "coverage": "NONE",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-SOURCE-PORTFOLIO.md",
+      "evidence_refs": [],
+      "execution_status": "SPECIFIED_NOT_IMPLEMENTED",
+      "expected_result": "Pilot proposal; production adapter и volume promise blocked.",
+      "id": "AT-SRC7-03",
+      "line": 161,
+      "owner_role": "ContractAuthority",
+      "scenario": "Avito RFQ category/API не подтверждены.",
+      "test_bindings": []
+    },
+    {
+      "case_sha256": "05f44dbc2286f7e851a6fa444ab0cf4288a595a10847150c2f8e2ae4bda4944d",
+      "coverage": "PARTIAL",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-SOURCE-PORTFOLIO.md",
+      "evidence_refs": [
+        "EVIDENCE:docs/market_demand_os_v7_2/evidence/baseline-implementation-trace-overlay.v7.1.json",
+        "EVIDENCE:reports/market_demand_os_v7/g0-suppression-evidence.json",
+        "EVIDENCE:reports/market_demand_os_v7/g2-manual-egress-evidence.json",
+        "EVIDENCE:reports/market_demand_os_v7/g2-owner-preflight-evidence.json"
+      ],
+      "execution_status": "SPECIFIED_NOT_IMPLEMENTED",
+      "expected_result": "Raw candidates only; 0 lead/contact action до downstream gates.",
+      "id": "AT-SRC7-04",
+      "line": 162,
+      "owner_role": "ContractAuthority",
+      "scenario": "Apify Actor вернул 10000 contacts.",
+      "test_bindings": [
+        "TEST:tests/test_mdos_v7_legacy_freeze.py",
+        "TEST:tests/test_mdos_v7_manual_egress.py",
+        "TEST:tests/test_mdos_v7_manual_egress_runner.py",
+        "TEST:tests/test_mdos_v7_owner_artifacts.py",
+        "TEST:tests/test_mdos_v7_owner_intent.py",
+        "TEST:tests/test_mdos_v7_owner_preflight_runner.py",
+        "TEST:tests/test_mdos_v7_ratification_preflight.py",
+        "TEST:tests/test_mdos_v7_suppression.py"
+      ]
+    },
+    {
+      "case_sha256": "23c9531fd79a5c03e6c13259c2c4b7c382da2ee73064df534986e20abfbddba9",
+      "coverage": "NONE",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-SOURCE-PORTFOLIO.md",
+      "evidence_refs": [],
+      "execution_status": "SPECIFIED_NOT_IMPLEMENTED",
+      "expected_result": "Field eval/conflict; critical claim rejected.",
+      "id": "AT-SRC7-05",
+      "line": 163,
+      "owner_role": "ContractAuthority",
+      "scenario": "ScrapeGraph извлёк неверную quantity.",
+      "test_bindings": []
+    },
+    {
+      "case_sha256": "6eb026bc91ebcb11bb02ca021a1767ce726f88423783faa064f0fe7ef104d2ff",
+      "coverage": "NONE",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-SOURCE-PORTFOLIO.md",
+      "evidence_refs": [],
+      "execution_status": "SPECIFIED_NOT_IMPLEMENTED",
+      "expected_result": "Permit expires; adapter/derived actions paused for review.",
+      "id": "AT-SRC7-06",
+      "line": 164,
+      "owner_role": "ContractAuthority",
+      "scenario": "Source terms изменились.",
+      "test_bindings": []
+    },
+    {
+      "case_sha256": "d694e4ac502ef3c84a249246a8ac336b7d606d954deadcb7c2611127d4a8b77a",
+      "coverage": "PARTIAL",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-SOURCE-PORTFOLIO.md",
+      "evidence_refs": [
+        "EVIDENCE:docs/market_demand_os_v7_2/evidence/baseline-implementation-trace-overlay.v7.1.json",
+        "EVIDENCE:reports/market_demand_os_v7/g0-suppression-evidence.json",
+        "EVIDENCE:reports/market_demand_os_v7/g2-manual-egress-evidence.json",
+        "EVIDENCE:reports/market_demand_os_v7/g2-owner-preflight-evidence.json"
+      ],
+      "execution_status": "SPECIFIED_NOT_IMPLEMENTED",
+      "expected_result": "Discovery evidence; advertising consent не создан.",
+      "id": "AT-SRC7-07",
+      "line": 165,
+      "owner_role": "ContractAuthority",
+      "scenario": "Public corporate phone найден в реестре.",
+      "test_bindings": [
+        "TEST:tests/test_mdos_v7_legacy_freeze.py",
+        "TEST:tests/test_mdos_v7_manual_egress.py",
+        "TEST:tests/test_mdos_v7_manual_egress_runner.py",
+        "TEST:tests/test_mdos_v7_owner_artifacts.py",
+        "TEST:tests/test_mdos_v7_owner_intent.py",
+        "TEST:tests/test_mdos_v7_owner_preflight_runner.py",
+        "TEST:tests/test_mdos_v7_ratification_preflight.py",
+        "TEST:tests/test_mdos_v7_suppression.py"
+      ]
+    },
+    {
+      "case_sha256": "ac55b3c291fbc3097817b7f8a3c825bbc9181399b6d3280fb411dd59a2124f1c",
+      "coverage": "NONE",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-SOURCE-PORTFOLIO.md",
+      "evidence_refs": [],
+      "execution_status": "SPECIFIED_NOT_IMPLEMENTED",
+      "expected_result": "Market plan update; 0 individual lead.",
+      "id": "AT-SRC7-08",
+      "line": 166,
+      "owner_role": "ContractAuthority",
+      "scenario": "Wordstat показывает рост запроса.",
+      "test_bindings": []
+    },
+    {
+      "case_sha256": "63998d64b1a8a38df175730c6d3f3ab347d10e621d1e73a1cfbb4a685bccd6bc",
+      "coverage": "NONE",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-SOURCE-PORTFOLIO.md",
+      "evidence_refs": [],
+      "execution_status": "SPECIFIED_NOT_IMPLEMENTED",
+      "expected_result": "Один dependency family в concentration/failover metric.",
+      "id": "AT-SRC7-09",
+      "line": 167,
+      "owner_role": "ContractAuthority",
+      "scenario": "Один provider питает пять adapters.",
+      "test_bindings": []
+    },
+    {
+      "case_sha256": "83050ce8222e8d4123af57e49f174b0be5231fd517a39d8f9e08645bccc05850",
+      "coverage": "NONE",
+      "document": "docs/market_demand_os_v7_2/APP-MDOS-SOURCE-PORTFOLIO.md",
+      "evidence_refs": [],
+      "execution_status": "SPECIFIED_NOT_IMPLEMENTED",
+      "expected_result": "Stop/revise; scale запрещён.",
+      "id": "AT-SRC7-10",
+      "line": 168,
+      "owner_role": "ContractAuthority",
+      "scenario": "Source дал много forms, но 0 incremental Paid.",
+      "test_bindings": []
+    }
+  ],
+  "contract_id": "AK-MDOS-V7",
+  "manifest_id": "MDOS-V7-ACCEPTANCE",
+  "manifest_version": "1.2.0",
+  "package_version": "7.2.0-rc.2"
+}

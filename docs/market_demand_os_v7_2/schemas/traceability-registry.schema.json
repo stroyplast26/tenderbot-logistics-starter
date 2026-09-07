@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://alumkomplekt-rf.ru/schemas/mdos/v7.2/traceability-registry.schema.json",
+  "title": "MDOS v7.2 traceability registry",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["registry_id", "registry_version", "contract_id", "package_version", "created_at", "edges"],
+  "properties": {
+    "registry_id": {"const": "MDOS-V7-TRACEABILITY"},
+    "registry_version": {"type": "string"},
+    "contract_id": {"const": "AK-MDOS-V7"},
+    "package_version": {"const": "7.2.0-rc.2"},
+    "created_at": {"type": "string", "format": "date-time"},
+    "edges": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "edge_id",
+          "from_id",
+          "from_kind",
+          "from_digest",
+          "edge_type",
+          "to_id",
+          "to_kind",
+          "to_digest",
+          "status",
+          "coverage",
+          "verification_level"
+        ],
+        "properties": {
+          "edge_id": {"type": "string"},
+          "from_id": {"type": "string"},
+          "from_kind": {"enum": ["REQUIREMENT", "ACCEPTANCE"]},
+          "from_digest": {"$ref": "#/$defs/digest"},
+          "edge_type": {"enum": ["SATISFIED_BY", "IMPLEMENTED_BY", "VERIFIED_BY", "PRODUCED_EVIDENCE"]},
+          "to_id": {"type": "string"},
+          "to_kind": {"enum": ["DESIGN", "CODE", "TEST", "EVIDENCE", "ACCEPTANCE"]},
+          "to_digest": {"$ref": "#/$defs/digest"},
+          "status": {"enum": ["SPECIFIED", "ACTIVE", "REVOKED"]},
+          "coverage": {"enum": ["PLANNED", "PARTIAL", "FULL"]},
+          "verification_level": {"enum": ["SPECIFIED", "LOCAL_NOT_INDEPENDENT", "INDEPENDENT"]}
+        }
+      }
+    }
+  },
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
+  }
+}

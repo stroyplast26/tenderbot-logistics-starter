@@ -1,0 +1,738 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://alumkomplekt-rf.ru/schemas/mdos/v7/delivery/owner-ratification-access-preflight.schema.json",
+  "title": "MDOS v7.1 local owner ratification and access preflight packet",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "schema_version",
+    "record_type",
+    "status",
+    "authority_capability",
+    "contract_binding",
+    "payload",
+    "payload_sha256",
+    "attestations"
+  ],
+  "properties": {
+    "$schema": {
+      "const": "https://alumkomplekt-rf.ru/schemas/mdos/v7/delivery/owner-ratification-access-preflight.schema.json"
+    },
+    "schema_version": {"const": "1.0.0"},
+    "record_type": {"const": "OWNER_RATIFICATION_ACCESS_PREFLIGHT"},
+    "status": {"const": "NOT_RATIFIED"},
+    "authority_capability": {"const": "NONE"},
+    "contract_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract_id",
+        "package_version",
+        "package_root_sha256",
+        "manifest_sha256",
+        "manifest_status",
+        "active_beachhead_profile",
+        "ratification",
+        "target_profile_id",
+        "target_profile_sha256"
+      ],
+      "properties": {
+        "contract_id": {"const": "AK-MDOS-V7"},
+        "package_version": {"const": "7.1.0-rc.1"},
+        "package_root_sha256": {
+          "const": "d4da97bd47ed1bf76a52826a852e3a158611d18adf32a901b814a864e862d97e"
+        },
+        "manifest_sha256": {"$ref": "#/$defs/sha256"},
+        "manifest_status": {"const": "RELEASE_CANDIDATE_FOR_OWNER_RATIFICATION"},
+        "active_beachhead_profile": {"type": "null"},
+        "ratification": {"type": "null"},
+        "target_profile_id": {"const": "GDO10"},
+        "target_profile_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "preflight_id",
+        "revision",
+        "issued_at",
+        "valid_until",
+        "beachhead",
+        "offer",
+        "capacity",
+        "legal_boundary",
+        "website_form_boundary",
+        "payment_truth_format",
+        "bitrix_projection",
+        "manual_egress_control",
+        "separation_of_duties",
+        "authority_effect"
+      ],
+      "properties": {
+        "preflight_id": {"$ref": "#/$defs/opaque_id"},
+        "revision": {"type": "integer", "minimum": 1},
+        "issued_at": {"$ref": "#/$defs/timestamp"},
+        "valid_until": {"$ref": "#/$defs/timestamp"},
+        "beachhead": {"$ref": "#/$defs/beachhead"},
+        "offer": {"$ref": "#/$defs/offer"},
+        "capacity": {"$ref": "#/$defs/capacity"},
+        "legal_boundary": {"$ref": "#/$defs/legal_boundary"},
+        "website_form_boundary": {"$ref": "#/$defs/website_form_boundary"},
+        "payment_truth_format": {"$ref": "#/$defs/payment_truth_format"},
+        "bitrix_projection": {"$ref": "#/$defs/bitrix_projection"},
+        "manual_egress_control": {"$ref": "#/$defs/manual_egress_control"},
+        "separation_of_duties": {"$ref": "#/$defs/separation_of_duties"},
+        "authority_effect": {"$ref": "#/$defs/authority_effect"}
+      }
+    },
+    "payload_sha256": {"$ref": "#/$defs/sha256"},
+    "attestations": {
+      "type": "array",
+      "minItems": 0,
+      "maxItems": 4,
+      "items": {"$ref": "#/$defs/attestation"}
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "opaque_id": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]+$"
+    },
+    "version": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]+)?Z$"
+    },
+    "artifact_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["artifact_id", "version", "sha256"],
+      "properties": {
+        "artifact_id": {"$ref": "#/$defs/opaque_id"},
+        "version": {"$ref": "#/$defs/version"},
+        "sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "beachhead": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile_id",
+        "profile_version",
+        "profile_state",
+        "product_scope_ids",
+        "region_code",
+        "fulfilment_model_id",
+        "icp_profile",
+        "exclusions_profile",
+        "allowed_motions",
+        "allowed_channels",
+        "stop_conditions",
+        "profile_payload_sha256",
+        "content_sha256"
+      ],
+      "properties": {
+        "profile_id": {"$ref": "#/$defs/opaque_id"},
+        "profile_version": {"type": "integer", "minimum": 1},
+        "profile_state": {
+          "enum": ["PENDING_OWNER_INPUT", "OWNER_PROPOSED_NOT_ACTIVE"]
+        },
+        "product_scope_ids": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 16,
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/opaque_id"}
+        },
+        "region_code": {"$ref": "#/$defs/opaque_id"},
+        "fulfilment_model_id": {"$ref": "#/$defs/opaque_id"},
+        "icp_profile": {"$ref": "#/$defs/artifact_binding"},
+        "exclusions_profile": {"$ref": "#/$defs/artifact_binding"},
+        "allowed_motions": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "EXISTING_ACCOUNT_EXPANSION",
+              "DEALER_AND_INSTALLER_ACTIVATION",
+              "HIGH_INTENT_INBOUND"
+            ]
+          }
+        },
+        "allowed_channels": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "FIXTURE_SHADOW",
+              "HUMAN_REVIEW_QUEUE",
+              "WEBSITE_FORM_INBOUND",
+              "BITRIX_PROJECTION"
+            ]
+          }
+        },
+        "stop_conditions": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/opaque_id"}
+        },
+        "profile_payload_sha256": {"$ref": "#/$defs/sha256"},
+        "content_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "offer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "offer_id",
+        "offer_version",
+        "promise_registry",
+        "pricing_model",
+        "price_list",
+        "public_claims",
+        "currency",
+        "minimum_contribution_margin_bps",
+        "valid_from",
+        "valid_until",
+        "content_sha256"
+      ],
+      "properties": {
+        "offer_id": {"$ref": "#/$defs/opaque_id"},
+        "offer_version": {"$ref": "#/$defs/version"},
+        "promise_registry": {"$ref": "#/$defs/artifact_binding"},
+        "pricing_model": {"$ref": "#/$defs/artifact_binding"},
+        "price_list": {"$ref": "#/$defs/artifact_binding"},
+        "public_claims": {"$ref": "#/$defs/artifact_binding"},
+        "currency": {"type": "string", "pattern": "^[A-Z]{3}$"},
+        "minimum_contribution_margin_bps": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000
+        },
+        "valid_from": {"$ref": "#/$defs/timestamp"},
+        "valid_until": {"$ref": "#/$defs/timestamp"},
+        "content_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "capacity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "snapshot_id",
+        "snapshot_version",
+        "capacity_unit_id",
+        "max_wip",
+        "estimator_daily_capacity",
+        "production_daily_capacity",
+        "fulfilment_daily_capacity",
+        "p90_quote_sla_hours",
+        "p90_fulfilment_sla_days",
+        "observed_at",
+        "valid_until",
+        "evidence",
+        "owner_role",
+        "content_sha256"
+      ],
+      "properties": {
+        "snapshot_id": {"$ref": "#/$defs/opaque_id"},
+        "snapshot_version": {"$ref": "#/$defs/version"},
+        "capacity_unit_id": {"$ref": "#/$defs/opaque_id"},
+        "max_wip": {"type": "integer", "minimum": 1},
+        "estimator_daily_capacity": {"type": "integer", "minimum": 1},
+        "production_daily_capacity": {"type": "integer", "minimum": 1},
+        "fulfilment_daily_capacity": {"type": "integer", "minimum": 1},
+        "p90_quote_sla_hours": {"type": "integer", "minimum": 1},
+        "p90_fulfilment_sla_days": {"type": "integer", "minimum": 1},
+        "observed_at": {"$ref": "#/$defs/timestamp"},
+        "valid_until": {"$ref": "#/$defs/timestamp"},
+        "evidence": {"$ref": "#/$defs/artifact_binding"},
+        "owner_role": {"const": "OperationsOwner"},
+        "content_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "legal_boundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "decision_state",
+        "jurisdiction_codes",
+        "legal_policy",
+        "consent_policy",
+        "suppression_policy",
+        "retention_policy",
+        "transfer_policy",
+        "allowed_purpose_ids",
+        "allowed_data_classes",
+        "allowed_action_classes",
+        "unknown_basis_disposition",
+        "effective_from",
+        "review_due_at",
+        "content_sha256"
+      ],
+      "properties": {
+        "decision_state": {
+          "enum": ["PENDING_OWNER_DECISION", "OWNER_LEGAL_BOUNDARY_APPROVED"]
+        },
+        "jurisdiction_codes": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Z0-9][A-Z0-9._-]{1,15}$"
+          }
+        },
+        "legal_policy": {"$ref": "#/$defs/artifact_binding"},
+        "consent_policy": {"$ref": "#/$defs/artifact_binding"},
+        "suppression_policy": {"$ref": "#/$defs/artifact_binding"},
+        "retention_policy": {"$ref": "#/$defs/artifact_binding"},
+        "transfer_policy": {"$ref": "#/$defs/artifact_binding"},
+        "allowed_purpose_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/opaque_id"}
+        },
+        "allowed_data_classes": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "NON_PII_ATTRIBUTION",
+              "PRIVATE_REQUEST_PII",
+              "PRIVATE_REQUEST_TEXT",
+              "PAYMENT_EVIDENCE_PRIVATE"
+            ]
+          }
+        },
+        "allowed_action_classes": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "FIXTURE_SHADOW_PROCESSING",
+              "OWNER_REQUESTED_INBOUND_HANDLING",
+              "HUMAN_REVIEW",
+              "PROJECTION_PREPARATION"
+            ]
+          }
+        },
+        "unknown_basis_disposition": {"const": "DENY"},
+        "effective_from": {"$ref": "#/$defs/timestamp"},
+        "review_due_at": {"$ref": "#/$defs/timestamp"},
+        "content_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "website_form_boundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "form_id",
+        "form_version",
+        "form_schema",
+        "site_origin_sha256",
+        "lawful_basis_state",
+        "lawful_basis_document",
+        "privacy_notice",
+        "consent_capture_state",
+        "private_raw_store_only",
+        "analytics_contains_pii",
+        "evidence_reports_contain_pii",
+        "metrika_identifiers_rule",
+        "attribution_contract",
+        "decided_at",
+        "valid_until",
+        "content_sha256"
+      ],
+      "properties": {
+        "form_id": {"$ref": "#/$defs/opaque_id"},
+        "form_version": {"$ref": "#/$defs/version"},
+        "form_schema": {"$ref": "#/$defs/artifact_binding"},
+        "site_origin_sha256": {"$ref": "#/$defs/sha256"},
+        "lawful_basis_state": {
+          "enum": [
+            "PENDING_OWNER_DECISION",
+            "CONSENT",
+            "CONTRACT_OR_PRECONTRACTUAL_REQUEST",
+            "LEGAL_OBLIGATION",
+            "OTHER_OWNER_COUNSEL_APPROVED"
+          ]
+        },
+        "lawful_basis_document": {"$ref": "#/$defs/artifact_binding"},
+        "privacy_notice": {"$ref": "#/$defs/artifact_binding"},
+        "consent_capture_state": {
+          "enum": [
+            "PENDING_OWNER_DECISION",
+            "REQUIRED",
+            "NOT_REQUIRED_BY_SIGNED_LEGAL_DECISION"
+          ]
+        },
+        "private_raw_store_only": {"const": true},
+        "analytics_contains_pii": {"const": false},
+        "evidence_reports_contain_pii": {"const": false},
+        "metrika_identifiers_rule": {"const": "LAWFULLY_SUPPLIED_ONLY"},
+        "attribution_contract": {"$ref": "#/$defs/artifact_binding"},
+        "decided_at": {"$ref": "#/$defs/timestamp"},
+        "valid_until": {"$ref": "#/$defs/timestamp"},
+        "content_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "payment_truth_format": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "format_state",
+        "source_type",
+        "provider_fingerprint_sha256",
+        "format_contract",
+        "verification_method",
+        "required_field_ids",
+        "deduplication_key_field_ids",
+        "accepted_currency_codes",
+        "raw_artifact_class",
+        "one_c_dependency",
+        "verified_at",
+        "valid_until",
+        "content_sha256"
+      ],
+      "properties": {
+        "format_state": {
+          "enum": ["PENDING_OWNER_INPUT", "OWNER_FORMAT_APPROVED"]
+        },
+        "source_type": {
+          "enum": [
+            "PENDING_OWNER_INPUT",
+            "BANK_API",
+            "PAYMENT_PROVIDER",
+            "SIGNED_BANK_STATEMENT"
+          ]
+        },
+        "provider_fingerprint_sha256": {"$ref": "#/$defs/sha256"},
+        "format_contract": {"$ref": "#/$defs/artifact_binding"},
+        "verification_method": {
+          "enum": [
+            "PENDING_OWNER_INPUT",
+            "PROVIDER_SIGNATURE",
+            "DETACHED_BANK_SIGNATURE",
+            "SIGNED_STATEMENT_HASH_AND_HUMAN_VERIFICATION"
+          ]
+        },
+        "required_field_ids": {
+          "type": "array",
+          "minItems": 8,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "PROVIDER_EVENT_ID",
+              "PAYER_REF",
+              "RECIPIENT_REF",
+              "AMOUNT_MINOR",
+              "CURRENCY",
+              "VALUE_DATE",
+              "STATUS",
+              "SOURCE_ARTIFACT_SHA256",
+              "PROVIDER_SIGNATURE_REF",
+              "ORDER_CORRELATION_REF"
+            ]
+          }
+        },
+        "deduplication_key_field_ids": {
+          "type": "array",
+          "minItems": 2,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "PROVIDER_FINGERPRINT_SHA256",
+              "PROVIDER_EVENT_ID",
+              "SOURCE_ARTIFACT_SHA256",
+              "AMOUNT_MINOR",
+              "VALUE_DATE"
+            ]
+          }
+        },
+        "accepted_currency_codes": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"type": "string", "pattern": "^[A-Z]{3}$"}
+        },
+        "raw_artifact_class": {"const": "PRIVATE_PAYMENT_EVIDENCE"},
+        "one_c_dependency": {"const": "NONE"},
+        "verified_at": {"$ref": "#/$defs/timestamp"},
+        "valid_until": {"$ref": "#/$defs/timestamp"},
+        "content_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "bitrix_field_mapping": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "semantic_field",
+        "bitrix_entity",
+        "bitrix_field_code",
+        "data_class",
+        "write_role"
+      ],
+      "properties": {
+        "semantic_field": {
+          "enum": [
+            "OPAQUE_CORRELATION_ID",
+            "DEMAND_UNIT_ID",
+            "PERMIT_DECISION_ID",
+            "ORIGIN_CHANNEL",
+            "LANDING_PATH",
+            "PRIOR_PATH",
+            "REFERRER_CLASSIFICATION",
+            "ATTRIBUTION_STATUS",
+            "UTM_SOURCE",
+            "UTM_MEDIUM",
+            "UTM_CAMPAIGN",
+            "UTM_CONTENT",
+            "UTM_TERM"
+          ]
+        },
+        "bitrix_entity": {"enum": ["LEAD", "DEAL", "ACTIVITY"]},
+        "bitrix_field_code": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 64,
+          "pattern": "^[A-Z][A-Z0-9_]+$"
+        },
+        "data_class": {"const": "NON_PII"},
+        "write_role": {"const": "PROJECTION_ONLY"}
+      }
+    },
+    "bitrix_projection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mapping_state",
+        "tenant_fingerprint_sha256",
+        "mapping_version",
+        "field_mappings",
+        "requested_api_scope_ids",
+        "access_declaration_state",
+        "secret_material_absent",
+        "live_probe_performed",
+        "source_of_truth_role",
+        "live_writes_enabled",
+        "verified_at",
+        "valid_until",
+        "mapping_sha256",
+        "content_sha256"
+      ],
+      "properties": {
+        "mapping_state": {
+          "enum": ["PENDING_OWNER_INPUT", "OWNER_MAPPING_APPROVED"]
+        },
+        "tenant_fingerprint_sha256": {"$ref": "#/$defs/sha256"},
+        "mapping_version": {"$ref": "#/$defs/version"},
+        "field_mappings": {
+          "type": "array",
+          "minItems": 8,
+          "maxItems": 13,
+          "items": {"$ref": "#/$defs/bitrix_field_mapping"}
+        },
+        "requested_api_scope_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/opaque_id"}
+        },
+        "access_declaration_state": {
+          "enum": [
+            "PENDING_OWNER_INPUT",
+            "OUT_OF_BAND_NOT_EXERCISED"
+          ]
+        },
+        "secret_material_absent": {"const": true},
+        "live_probe_performed": {"const": false},
+        "source_of_truth_role": {"const": "PROJECTION_ONLY"},
+        "live_writes_enabled": {"const": false},
+        "verified_at": {"$ref": "#/$defs/timestamp"},
+        "valid_until": {"$ref": "#/$defs/timestamp"},
+        "mapping_sha256": {"$ref": "#/$defs/sha256"},
+        "content_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "manual_egress_control": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "attestation_state",
+        "control_id",
+        "control_version",
+        "protected_scope",
+        "control_types",
+        "default_deny_enforced",
+        "unknown_writer_denied",
+        "allowlist_sha256",
+        "test_evidence",
+        "tested_at",
+        "valid_until",
+        "content_sha256"
+      ],
+      "properties": {
+        "attestation_state": {
+          "enum": ["PENDING_OWNER_ATTESTATION", "ATTESTED_DEFAULT_DENY"]
+        },
+        "control_id": {"$ref": "#/$defs/opaque_id"},
+        "control_version": {"$ref": "#/$defs/version"},
+        "protected_scope": {"const": "TENDERBOT_MDOS_V7"},
+        "control_types": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "HOST_EGRESS_POLICY",
+              "PROCESS_ALLOWLIST",
+              "JOB_FREEZE",
+              "APPLICATION_NETWORK_GUARD"
+            ]
+          }
+        },
+        "default_deny_enforced": {"type": "boolean"},
+        "unknown_writer_denied": {"type": "boolean"},
+        "allowlist_sha256": {"$ref": "#/$defs/sha256"},
+        "test_evidence": {"$ref": "#/$defs/artifact_binding"},
+        "tested_at": {"$ref": "#/$defs/timestamp"},
+        "valid_until": {"$ref": "#/$defs/timestamp"},
+        "content_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "role_key_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["role", "public_key_sha256", "key_origin"],
+      "properties": {
+        "role": {
+          "enum": [
+            "BusinessOwner",
+            "ContractAuthority",
+            "PrivacyLegalOwner",
+            "IndependentEvidenceVerifier"
+          ]
+        },
+        "public_key_sha256": {"$ref": "#/$defs/sha256"},
+        "key_origin": {"const": "OWNER_SUPPLIED_OUT_OF_BAND"}
+      }
+    },
+    "separation_of_duties": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "role_key_bindings",
+        "implementation_author_key_fingerprints",
+        "all_approver_keys_must_be_distinct",
+        "independent_verifier_must_not_be_implementation_author",
+        "ai_signer_allowed",
+        "content_sha256"
+      ],
+      "properties": {
+        "role_key_bindings": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "items": {"$ref": "#/$defs/role_key_binding"}
+        },
+        "implementation_author_key_fingerprints": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/sha256"}
+        },
+        "all_approver_keys_must_be_distinct": {"const": true},
+        "independent_verifier_must_not_be_implementation_author": {"const": true},
+        "ai_signer_allowed": {"const": false},
+        "content_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "authority_effect": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "external_reads_enabled",
+        "external_writers_enabled",
+        "contact_enabled",
+        "spend_enabled",
+        "live_bitrix_writes_enabled",
+        "pc10_enabled",
+        "mutates_manifest",
+        "mutates_freeze",
+        "authorizes_live"
+      ],
+      "properties": {
+        "external_reads_enabled": {"const": false},
+        "external_writers_enabled": {"const": false},
+        "contact_enabled": {"const": false},
+        "spend_enabled": {"const": false},
+        "live_bitrix_writes_enabled": {"const": false},
+        "pc10_enabled": {"const": false},
+        "mutates_manifest": {"const": false},
+        "mutates_freeze": {"const": false},
+        "authorizes_live": {"const": false}
+      }
+    },
+    "attestation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "attestation_id",
+        "role",
+        "signature_algorithm",
+        "public_key_ed25519_b64",
+        "public_key_sha256",
+        "signed_payload_sha256",
+        "signature_ed25519_b64",
+        "signed_at"
+      ],
+      "properties": {
+        "attestation_id": {"$ref": "#/$defs/opaque_id"},
+        "role": {
+          "enum": [
+            "BusinessOwner",
+            "ContractAuthority",
+            "PrivacyLegalOwner",
+            "IndependentEvidenceVerifier"
+          ]
+        },
+        "signature_algorithm": {"const": "ED25519"},
+        "public_key_ed25519_b64": {
+          "type": "string",
+          "minLength": 44,
+          "maxLength": 44,
+          "pattern": "^[A-Za-z0-9+/]{43}=$"
+        },
+        "public_key_sha256": {"$ref": "#/$defs/sha256"},
+        "signed_payload_sha256": {"$ref": "#/$defs/sha256"},
+        "signature_ed25519_b64": {
+          "type": "string",
+          "minLength": 88,
+          "maxLength": 88,
+          "pattern": "^[A-Za-z0-9+/]{86}==$"
+        },
+        "signed_at": {"$ref": "#/$defs/timestamp"}
+      }
+    }
+  }
+}

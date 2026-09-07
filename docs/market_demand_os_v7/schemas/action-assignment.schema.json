@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://alumkomplekt-rf.ru/schemas/mdos/v7/action-assignment.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "assignment_id", "demand_unit_id", "action_type", "eligibility_cohort_id", "treatment_id", "assignment_probability", "policy_version", "permit_decision_ref", "permit_decision_sha256", "actor_id", "assigned_at", "capacity_snapshot_ref", "cost", "currency", "outcome_window_end", "status"],
+  "properties": {
+    "schema_version": {"const": "1.1.0"},
+    "assignment_id": {"type": "string"},
+    "demand_unit_id": {"type": "string"},
+    "action_type": {"enum": ["RESEARCH_QUERY", "HUMAN_VERIFY", "WAIT", "CREATE_CRM_TASK", "RESPOND_TO_INBOUND", "ROUTE_TO_DEALER", "ADVERTISEMENT", "CONTACT", "STOP"]},
+    "eligibility_cohort_id": {"type": "string"},
+    "treatment_id": {"type": "string"},
+    "assignment_probability": {"type": "number", "exclusiveMinimum": 0, "maximum": 1},
+    "policy_version": {"type": "string"},
+    "offer_content_version": {"type": ["string", "null"]},
+    "permit_decision_ref": {"type": "string", "minLength": 1},
+    "permit_decision_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "actor_id": {"type": "string"},
+    "assigned_at": {"type": "string", "format": "date-time"},
+    "capacity_snapshot_ref": {"type": "string"},
+    "cost": {"type": "number", "minimum": 0},
+    "currency": {"type": "string", "pattern": "^[A-Z]{3}$"},
+    "outcome_window_end": {"type": "string", "format": "date-time"},
+    "interference_cluster_id": {"type": ["string", "null"]},
+    "status": {"enum": ["PROPOSED", "APPROVED", "EXECUTED", "DENIED", "CANCELLED", "EXPIRED"]}
+  }
+}

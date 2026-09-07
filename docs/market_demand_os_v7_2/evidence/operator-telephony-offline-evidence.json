@@ -1,0 +1,23 @@
+{
+  "command": ".venv/Scripts/python.exe -m pytest -q -p no:cacheprovider tests/test_lead_factory_operator_call_workflow.py",
+  "evidence_id": "MDOS-V7.2-OPERATOR-TELEPHONY-OFFLINE-20260831",
+  "executed_at_utc": "2026-08-31T20:33:11Z",
+  "external_effect_count": 0,
+  "failed": 0,
+  "independent_verification": false,
+  "passed": 28,
+  "record_type": "LOCAL_RELEASE_EVIDENCE",
+  "result": "PASSED",
+  "schema_version": "1.0.0",
+  "scope": "OPERATOR_TELEPHONY_OFFLINE",
+  "source_digests": [
+    {
+      "path": "lead_factory/operator_call_workflow.py",
+      "sha256": "c735fef85dfadbad87d395fe080b1516751a338e33e558c18e0aa94dbfdfd54e"
+    },
+    {
+      "path": "tests/test_lead_factory_operator_call_workflow.py",
+      "sha256": "ba6246306c70f9991de808569a0e3a14b0565a670f7e2825ed2e4dc71dab2c90"
+    }
+  ]
+}

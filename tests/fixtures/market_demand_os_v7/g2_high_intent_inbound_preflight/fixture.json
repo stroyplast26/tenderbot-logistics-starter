@@ -1,0 +1,50 @@
+{
+  "schema_version": "1.0.0",
+  "fixture_id": "fixture:g2-high-intent-inbound-preflight-001",
+  "classification": "SYNTHETIC_FIXTURE_NON_CANONICAL_NON_KPI",
+  "contract_id": "AK-MDOS-V7",
+  "package_version": "7.1.0-rc.1",
+  "package_root_sha256": "d4da97bd47ed1bf76a52826a852e3a158611d18adf32a901b814a864e862d97e",
+  "evaluated_at": "2026-08-25T20:02:00Z",
+  "profile_binding": {
+    "profile_set_id": "AK-MDOS-V7-G2-NEAR-MONEY-SHADOW-2026-08-25",
+    "profile_id": "G2-MOTION-HIGH-INTENT-INBOUND",
+    "normative_motion": "HIGH_INTENT_INBOUND",
+    "profile_file_sha256": "b5584e86adaade926d4ae8e3cff40ed73550e25575598a5abd5ce9fc079b1b8f",
+    "profile_set_sha256": "eb132626212f168eadfa34afad99aaf8ab389e0e9cfee663f87e742dc2fa77e9",
+    "profile_sha256": "4d67c9cd16995b3346572202d31509353ffb306255f55124a0cdefd531ed9fee"
+  },
+  "source": {
+    "kind": "SYNTHETIC_FIXTURE",
+    "source_passport_ref": "fixture:g2-high-intent-inbound",
+    "lawful_purpose": "FIXTURE_SHADOW_PREFLIGHT_ONLY",
+    "contains_raw_pii": false,
+    "contains_request_text": false
+  },
+  "candidate": {
+    "synthetic": true,
+    "canonical_kpi_eligible": false,
+    "external_read": false,
+    "external_write": false,
+    "contact": false,
+    "spend": false,
+    "live_bitrix_write": false,
+    "inbound_source_artifact_ref": "fixture:inbound-artifact-001",
+    "private_inbound_payload_ref": "private:fixture-inbound-payload-001",
+    "website_attribution_evidence_ref": "fixture:website-attribution-evidence-001",
+    "website_attribution_status": "ATTRIBUTED",
+    "opaque_form_correlation_id": "lf_web_v1_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "identity_decision_ref": "fixture:identity-inbound-001",
+    "current_need_evidence_ref": "fixture:evidence-inbound-current-need-001",
+    "object_or_site_ref": "fixture:site-inbound-001",
+    "product_scope": [
+      "ALUMINIUM_PROFILE_6060"
+    ],
+    "region": "FIXTURE_REGION_MOSCOW_OBLAST",
+    "dimensions_or_specification_ref": "fixture:specification-inbound-001",
+    "decision_horizon": "fixture:horizon-d0-7",
+    "capacity_snapshot_ref": "fixture:capacity-inbound-001",
+    "responsible_human_id": "fixture-human-inbound-reviewer"
+  },
+  "permit_decision": null
+}

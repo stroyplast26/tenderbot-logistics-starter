@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://alumkomplekt-rf.ru/schemas/mdos/v7.2/call-evidence.schema.json",
+  "title": "MDOS v7.2 CallEvidence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "record_type",
+    "call_evidence_id",
+    "call_session_id",
+    "provider",
+    "provider_recording_id",
+    "evidence_type",
+    "revision",
+    "content_sha256",
+    "data_policy_id",
+    "retention_until_utc",
+    "access_class",
+    "purpose_code",
+    "legal_basis_code",
+    "notice_policy_id",
+    "notice_status",
+    "recorded_at_utc",
+    "evidence_ref"
+  ],
+  "properties": {
+    "schema_version": {"const": "1.0.0"},
+    "record_type": {"const": "CALL_EVIDENCE"},
+    "call_evidence_id": {"$ref": "#/$defs/id"},
+    "call_session_id": {"$ref": "#/$defs/id"},
+    "provider": {"const": "MANGO"},
+    "provider_recording_id": {"$ref": "#/$defs/id"},
+    "evidence_type": {"enum": ["RECORDING", "TRANSCRIPT"]},
+    "revision": {"type": "integer", "minimum": 1},
+    "content_sha256": {"$ref": "#/$defs/digest"},
+    "data_policy_id": {"$ref": "#/$defs/id"},
+    "retention_until_utc": {"$ref": "#/$defs/utc"},
+    "access_class": {"enum": ["RESTRICTED_TELEPHONY", "RESTRICTED_TRANSCRIPT"]},
+    "purpose_code": {"$ref": "#/$defs/id"},
+    "legal_basis_code": {"$ref": "#/$defs/id"},
+    "notice_policy_id": {"$ref": "#/$defs/id"},
+    "notice_status": {"enum": ["CONFIRMED", "NOT_APPLICABLE", "UNKNOWN"]},
+    "recorded_at_utc": {"$ref": "#/$defs/utc"},
+    "evidence_ref": {"$ref": "#/$defs/evidence"}
+  },
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,159}$"},
+    "digest": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "evidence": {"type": "string", "pattern": "^evidence://[A-Za-z0-9][A-Za-z0-9._:/-]{0,2028}$"},
+    "utc": {"type": "string", "format": "date-time", "pattern": "Z$"}
+  }
+}

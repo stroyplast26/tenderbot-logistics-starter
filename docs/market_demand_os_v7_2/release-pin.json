@@ -1,0 +1,19 @@
+{
+  "artifact_count": 45,
+  "authority_status": "DEFAULT_DENY_NOT_RATIFIED",
+  "contract_id": "AK-MDOS-V7",
+  "live_gates": {
+    "bitrix": false,
+    "mail": false,
+    "mango": false,
+    "tenderplan": false,
+    "unisender": false
+  },
+  "manifest_path": "docs/market_demand_os_v7_2/contract-manifest.json",
+  "manifest_sha256": "ca2d1164d87bb5a23bfdfe97f2f4327eb5d63b4ce7c95e5d7e557ca3a4119a60",
+  "package_dir": "docs/market_demand_os_v7_2",
+  "package_root_sha256": "f5d05e55656add49222f3539ff2afbde178c211227853da7709d322a07542bfa",
+  "package_version": "7.2.0-rc.2",
+  "record_type": "EXACT_RELEASE_PIN",
+  "schema_version": "1.0.0"
+}

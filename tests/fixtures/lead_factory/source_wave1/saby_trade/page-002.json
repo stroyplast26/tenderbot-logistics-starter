@@ -1,0 +1,35 @@
+{
+  "fixture_page_version": "wave1-fixture-page-v1",
+  "provider": "SABY_TRADE",
+  "product_code": "SABY_TRADE",
+  "source_id": "wave1:saby_trade",
+  "contract_version": "wave1-business-public-v1",
+  "mapping_version": "saby_trade-draft-mapping-v1",
+  "receipt_key": "saby-trade-page-002",
+  "page_sequence": 2,
+  "cursor_before": {
+    "position": 50,
+    "opaque_value": "fixture_saby_trade_page_2"
+  },
+  "next_cursor": null,
+  "has_more": false,
+  "received_at_utc": "2026-08-20T05:59:00Z",
+  "upstream_receipt_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+  "cost_minor": 0,
+  "records": [
+    {
+      "trade_id": "saby-synthetic-002",
+      "revision": "1",
+      "publication_time": "2026-08-18T06:00:00Z",
+      "change_time": "2026-08-20T05:10:00Z",
+      "buyer": "АО СИНТЕТИЧЕСКИЙ ПОКУПАТЕЛЬ Г",
+      "buyer_inn": "6600000004",
+      "region_code": "66",
+      "subject": "Синтетические работы по витражному остеклению",
+      "state": "OPEN",
+      "price_minor": 175000000,
+      "currency_code": "RUB",
+      "bid_until": "2026-09-01T09:00:00Z"
+    }
+  ]
+}

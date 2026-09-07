@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://alumkomplekt-rf.ru/schemas/mdos/v7.2/release-pin.schema.json",
+  "title": "MDOS v7.2 exact release pin",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "record_type",
+    "contract_id",
+    "package_version",
+    "package_dir",
+    "manifest_path",
+    "manifest_sha256",
+    "package_root_sha256",
+    "artifact_count",
+    "authority_status",
+    "live_gates"
+  ],
+  "properties": {
+    "schema_version": {"const": "1.0.0"},
+    "record_type": {"const": "EXACT_RELEASE_PIN"},
+    "contract_id": {"const": "AK-MDOS-V7"},
+    "package_version": {"const": "7.2.0-rc.2"},
+    "package_dir": {"const": "docs/market_demand_os_v7_2"},
+    "manifest_path": {"const": "docs/market_demand_os_v7_2/contract-manifest.json"},
+    "manifest_sha256": {"$ref": "#/$defs/digest"},
+    "package_root_sha256": {"$ref": "#/$defs/digest"},
+    "artifact_count": {"type": "integer", "minimum": 1},
+    "authority_status": {"const": "DEFAULT_DENY_NOT_RATIFIED"},
+    "live_gates": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["bitrix", "mango", "mail", "unisender", "tenderplan"],
+      "properties": {
+        "bitrix": {"const": false},
+        "mango": {"const": false},
+        "mail": {"const": false},
+        "unisender": {"const": false},
+        "tenderplan": {"const": false}
+      }
+    }
+  },
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
+  }
+}

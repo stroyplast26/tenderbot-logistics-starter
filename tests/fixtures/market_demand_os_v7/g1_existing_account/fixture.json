@@ -1,0 +1,169 @@
+{
+  "fixture_id": "g1-existing-account-shadow-001",
+  "classification": "SYNTHETIC_FIXTURE_NON_CANONICAL_NON_KPI",
+  "contract_id": "AK-MDOS-V7",
+  "package_version": "7.1.0-rc.1",
+  "package_root_sha256": "d4da97bd47ed1bf76a52826a852e3a158611d18adf32a901b814a864e862d97e",
+  "notice": "All human decisions below are pre-sealed synthetic test inputs. They are not real Gold, payment, order, consent, promise, KPI or independent verification.",
+  "actors": {
+    "fixture-source-adapter": {
+      "actor_type": "SYSTEM",
+      "roles": ["LEDGER_WRITER", "SOURCE_ADAPTER", "CLAIM_PRODUCER"],
+      "registered_at_utc": "2026-08-25T08:00:00Z"
+    },
+    "fixture-claim-reviewer": {
+      "actor_type": "HUMAN",
+      "roles": ["LEDGER_WRITER", "CLAIM_REVIEWER"],
+      "registered_at_utc": "2026-08-25T08:00:00Z"
+    },
+    "fixture-identity-steward": {
+      "actor_type": "HUMAN",
+      "roles": ["LEDGER_WRITER", "IDENTITY_STEWARD"],
+      "registered_at_utc": "2026-08-25T08:00:00Z"
+    },
+    "fixture-demand-steward": {
+      "actor_type": "HUMAN",
+      "roles": ["LEDGER_WRITER", "DEMAND_STEWARD", "DATA_STEWARD"],
+      "registered_at_utc": "2026-08-25T08:00:00Z"
+    },
+    "fixture-gold-reviewer": {
+      "actor_type": "HUMAN",
+      "roles": ["LEDGER_WRITER", "GOLD_REVIEWER"],
+      "registered_at_utc": "2026-08-25T08:00:00Z"
+    },
+    "fixture-policy-authority": {
+      "actor_type": "HUMAN",
+      "roles": ["LEDGER_WRITER", "POLICY_AUTHORITY"],
+      "registered_at_utc": "2026-08-25T08:00:00Z"
+    },
+    "fixture-sales-operator": {
+      "actor_type": "HUMAN",
+      "roles": ["LEDGER_WRITER", "SALES_OPERATOR"],
+      "registered_at_utc": "2026-08-25T08:00:00Z"
+    },
+    "fixture-bitrix-projector": {
+      "actor_type": "SYSTEM",
+      "roles": ["LEDGER_WRITER", "BITRIX_PROJECTION_WRITER"],
+      "registered_at_utc": "2026-08-25T08:00:00Z"
+    },
+    "fixture-order-approver": {
+      "actor_type": "HUMAN",
+      "roles": ["LEDGER_WRITER", "ORDER_APPROVER"],
+      "registered_at_utc": "2026-08-25T08:00:00Z"
+    },
+    "fixture-bank-adapter": {
+      "actor_type": "SYSTEM",
+      "roles": ["LEDGER_WRITER", "BANK_ADAPTER"],
+      "registered_at_utc": "2026-08-25T08:00:00Z"
+    },
+    "fixture-bank-verifier": {
+      "actor_type": "HUMAN",
+      "roles": ["LEDGER_WRITER", "PAYMENT_VERIFIER"],
+      "registered_at_utc": "2026-08-25T08:00:00Z"
+    },
+    "fixture-fulfilment-writer": {
+      "actor_type": "HUMAN",
+      "roles": ["LEDGER_WRITER", "FULFILMENT_WRITER"],
+      "registered_at_utc": "2026-08-25T08:00:00Z"
+    },
+    "fixture-reconciler": {
+      "actor_type": "SYSTEM",
+      "roles": ["LEDGER_WRITER", "RECONCILER"],
+      "registered_at_utc": "2026-08-25T08:00:00Z"
+    },
+    "fixture-conflict-arbitrator": {
+      "actor_type": "HUMAN",
+      "roles": ["LEDGER_WRITER", "CONFLICT_ARBITRATOR"],
+      "registered_at_utc": "2026-08-25T08:00:00Z"
+    },
+    "fixture-backup-operator": {
+      "actor_type": "HUMAN",
+      "roles": ["LEDGER_WRITER", "BACKUP_OPERATOR"],
+      "registered_at_utc": "2026-08-25T08:00:00Z"
+    }
+  },
+  "business": {
+    "account_id": "acct-fixture-alum-001",
+    "raw_account_ref": "legacy-account-fixture-001",
+    "object_or_site_ref": "site-fixture-warehouse-001",
+    "demand_unit_id": "du-fixture-existing-001",
+    "need": "Повторная закупка алюминиевого профиля для расширения складской зоны",
+    "product_scope": ["ALUMINIUM_PROFILE_6060", "POWDER_COATING_RAL9005"],
+    "region": "Москва и Московская область",
+    "amount": 125000.0,
+    "currency": "RUB",
+    "payer_identity_ref": "payer-fixture-001",
+    "recipient_identity_ref": "alumkomplekt-fixture-legal-entity",
+    "distinct_order_id": "order-fixture-001"
+  },
+  "raw_trigger_payload": {
+    "fixture": true,
+    "source": "known-account-history",
+    "legacy_account_ref": "legacy-account-fixture-001",
+    "account_name": "ООО Фикстура Монтаж",
+    "inn": "7700000001",
+    "email_domain": "fixture.invalid",
+    "phone_suffix": "0101",
+    "message": "Нужен повторный расчёт профиля 6060 с окраской для расширения склада.",
+    "object_ref": "site-fixture-warehouse-001"
+  },
+  "signed_bank_statement_payload": {
+    "fixture": true,
+    "signed": true,
+    "provider": "fixture-signed-bank-statement",
+    "provider_event_id": "bank-fixture-event-001",
+    "distinct_order_id": "order-fixture-001",
+    "canonical_account_id": "acct-fixture-alum-001",
+    "payer_identity_ref": "payer-fixture-001",
+    "recipient_identity_ref": "alumkomplekt-fixture-legal-entity",
+    "amount": 125000.0,
+    "currency": "RUB",
+    "value_at": "2026-08-25T09:12:00Z"
+  },
+  "fulfilment_document_payload": {
+    "fixture": true,
+    "document_type": "SIGNED_UPD",
+    "document_ref": "upd-fixture-001",
+    "distinct_order_id": "order-fixture-001",
+    "accepted_by_customer": true,
+    "event_at": "2026-08-25T09:20:00Z"
+  },
+  "human_inputs": {
+    "claim_adjudication": {
+      "reviewer_id": "fixture-claim-reviewer",
+      "decision": "ACCEPTED",
+      "sealed_input_sha256": "4e5b4de8c10f284ed3e3df282ac3977d6a8c87dcad614050ab11384c4044f6b1"
+    },
+    "identity_adjudication": {
+      "reviewer_id": "fixture-identity-steward",
+      "decision": "AUTO_LINK",
+      "sealed_input_sha256": "33276a53564d00f83ae7e091d5a0af23648645027f840b8f0e39a259bbed6353"
+    },
+    "gold_review": {
+      "reviewer_id": "fixture-gold-reviewer",
+      "decision": "ACCEPTED",
+      "reason_codes": ["SYNTHETIC_KNOWN_ACCOUNT", "CURRENT_NEED", "SCOPE_VERIFIED"],
+      "attestation_sha256": "365a94cc02c1f5b07834756057e8bdb23d78ecb13f43159175e2399c3344642e"
+    },
+    "permit_authorization": {
+      "issuer_id": "fixture-policy-authority",
+      "decision_scope": "LOCAL_SHADOW_ONLY",
+      "sealed_input_sha256": "8ad7b0d8142ba7227c72087173a1e8ec226de6cc7f10574bebb22ae950ac3609"
+    },
+    "order_approval": {
+      "approver_id": "fixture-order-approver",
+      "decision": "APPROVED",
+      "sealed_input_sha256": "67f37a2d3a632d48f92c8e60054245b5e873a094a4699973e8d2d40b9c3bb508"
+    },
+    "payment_verification": {
+      "verifier_id": "fixture-bank-verifier",
+      "decision": "RECONCILED",
+      "sealed_input_sha256": "18386c46a2ab824d636a5966cf040b1e67542e33b69d17d60acc878ed2748a6b"
+    },
+    "fulfilment_attestation": {
+      "actor_id": "fixture-fulfilment-writer",
+      "decision": "ACCEPTED_BY_CUSTOMER",
+      "sealed_input_sha256": "09a8e07e9097104a18130d0610f61fe1764e1457ca1bfd40e81c40bdd6ed23ca"
+    }
+  }
+}

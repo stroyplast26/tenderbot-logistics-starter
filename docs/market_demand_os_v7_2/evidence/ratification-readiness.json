@@ -1,0 +1,38 @@
+{
+  "authority_effect": false,
+  "blockers": [
+    "Exact owner approval for one beachhead profile is missing.",
+    "Operator assignment is intentionally deferred for observation; an exact active assignee, backup ownership, SLO and MaxWIP are still required before any contact.",
+    "Recording notice, legal basis, retention and access policy are not approved.",
+    "Exact mailbox and Bitrix portal scope, native Bitrix Mail sole-writer proof, read-only observer credentials, singleton schedule and 5m/90m evidence are not verified.",
+    "The V4 cutover cohort of exactly five OPERATOR_TODO and five TIMELINE_MAIL operations has no independent durable-quarantine evidence.",
+    "MANGO, TenderPlan, UniSender/SMTP and outbound remain behind an explicit STOP and have no release permit.",
+    "Independent verification of the successor package is missing."
+  ],
+  "contract_id": "AK-MDOS-V7",
+  "live_gates": {
+    "bitrix": false,
+    "mail": false,
+    "mango": false,
+    "tenderplan": false,
+    "unisender": false
+  },
+  "package_version": "7.2.0-rc.2",
+  "proposed_beachhead_profile": {
+    "fulfilment_model_id": "FACTORY_DELIVERY_NO_INSTALLATION",
+    "installation_scope": "EXCLUDED",
+    "motion_id": "EXISTING_ACCOUNT_EXPANSION",
+    "product_scope_id": "ALUMINIUM_WINDOWS",
+    "region_code": "RU-MOS"
+  },
+  "record_type": "RATIFICATION_READINESS",
+  "required_roles": [
+    {"role": "BusinessOwner", "state": "UNASSIGNED_OR_UNSIGNED"},
+    {"role": "ContractAuthority", "state": "UNASSIGNED_OR_UNSIGNED"},
+    {"role": "PrivacyLegalOwner", "state": "UNASSIGNED_OR_UNSIGNED"},
+    {"role": "IndependentEvidenceVerifier", "state": "UNASSIGNED_OR_UNSIGNED"}
+  ],
+  "schema_version": "1.0.0",
+  "status": "BLOCKED_PENDING_OWNER_INPUT",
+  "tenderplan_stop": true
+}

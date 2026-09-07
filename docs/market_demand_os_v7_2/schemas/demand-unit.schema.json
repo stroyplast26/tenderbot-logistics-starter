@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://alumkomplekt-rf.ru/schemas/mdos/v7/demand-unit.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "demand_unit_id", "account_ref", "motion", "need", "product_scope", "object_or_site_ref", "buying_group", "decision_horizon", "supplier_state", "evidence_claim_ids", "scope_fingerprint", "gold_acceptance_ref", "state", "version", "recorded_at"],
+  "properties": {
+    "schema_version": {"const": "1.1.0"},
+    "demand_unit_id": {"type": "string"},
+    "account_ref": {"type": "string"},
+    "motion": {"enum": ["EXISTING_ACCOUNT_EXPANSION", "DEALER_AND_INSTALLER_ACTIVATION", "HIGH_INTENT_INBOUND", "PARTNER_AND_REFERRAL", "COMMERCIAL_OPENING_AND_REFIT", "PROJECT_SPECIFICATION_INFLUENCE", "PROJECT_BUYER_PURSUIT", "INSTALLED_BASE_SERVICE_AND_REPLACEMENT", "ROUTED_PREMIUM_CONSUMER", "TENDER_AND_FORMAL_PROCUREMENT", "MARKET_SHAPING_AND_EDUCATION"]},
+    "need": {"type": "string", "minLength": 1},
+    "product_scope": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+    "object_or_site_ref": {"type": "string"},
+    "installed_asset_refs": {"type": "array", "items": {"type": "string"}},
+    "buying_group": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["actor_ref", "role", "confidence", "claim_ids"], "properties": {"actor_ref": {"type": "string"}, "role": {"enum": ["NEED_INITIATOR", "SPECIFIER", "TECHNICAL_APPROVER", "ECONOMIC_BUYER", "PROCUREMENT", "PAYER", "INSTALLER", "REFERRER", "CHANNEL_OWNER", "END_USER"]}, "confidence": {"type": "number", "minimum": 0, "maximum": 1}, "claim_ids": {"type": "array", "items": {"type": "string"}}}}},
+    "decision_horizon": {"type": "object", "additionalProperties": false, "required": ["as_of", "maturity", "probabilities"], "properties": {"as_of": {"type": "string", "format": "date-time"}, "maturity": {"enum": ["IMMATURE", "MATURE", "CENSORED"]}, "probabilities": {"type": "object", "additionalProperties": false, "required": ["D0_7", "D8_30", "D31_60", "D61_90", "GT90", "UNKNOWN"], "properties": {"D0_7": {"type": "number", "minimum": 0, "maximum": 1}, "D8_30": {"type": "number", "minimum": 0, "maximum": 1}, "D31_60": {"type": "number", "minimum": 0, "maximum": 1}, "D61_90": {"type": "number", "minimum": 0, "maximum": 1}, "GT90": {"type": "number", "minimum": 0, "maximum": 1}, "UNKNOWN": {"type": "number", "minimum": 0, "maximum": 1}}}}},
+    "supplier_state": {"enum": ["OPEN", "SWITCH_PATH_VERIFIED", "OVERFLOW_VERIFIED", "SELECTED_OTHER", "OWN_PRODUCTION_NO_OVERFLOW", "UNKNOWN"]},
+    "artifact_refs": {"type": "array", "items": {"type": "string"}},
+    "evidence_claim_ids": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string"}},
+    "negative_claim_ids": {"type": "array", "items": {"type": "string"}},
+    "scope_fingerprint": {"type": ["string", "null"], "pattern": "^[a-f0-9]{64}$"},
+    "gold_acceptance_ref": {"type": ["string", "null"]},
+    "state": {"enum": ["OBSERVED", "RESEARCH", "REVIEW", "QUALIFIED_NOT_GOLD", "ELIGIBLE_FOR_GOLD_REVIEW", "ACCEPTED_GDO", "REJECTED", "EXPIRED", "CONVERTED", "LOST"]},
+    "lawful_next_action_ref": {"type": ["string", "null"]},
+    "capacity_snapshot_ref": {"type": ["string", "null"]},
+    "economics_snapshot_ref": {"type": ["string", "null"]},
+    "version": {"type": "integer", "minimum": 1},
+    "recorded_at": {"type": "string", "format": "date-time"}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"state": {"const": "ACCEPTED_GDO"}}, "required": ["state"]},
+      "then": {
+        "properties": {
+          "scope_fingerprint": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+          "gold_acceptance_ref": {"type": "string", "minLength": 1},
+          "lawful_next_action_ref": {"type": "string", "minLength": 1},
+          "capacity_snapshot_ref": {"type": "string", "minLength": 1},
+          "economics_snapshot_ref": {"type": "string", "minLength": 1}
+        },
+        "required": ["lawful_next_action_ref", "capacity_snapshot_ref", "economics_snapshot_ref"]
+      }
+    }
+  ]
+}

@@ -1,0 +1,38 @@
+{
+  "fixture_page_version": "wave1-fixture-page-v1",
+  "provider": "TENDERPLAN",
+  "product_code": "TENDERPLAN",
+  "source_id": "wave1:tenderplan",
+  "contract_version": "wave1-business-public-v1",
+  "mapping_version": "tenderplan-draft-mapping-v1",
+  "receipt_key": "tenderplan-page-001",
+  "page_sequence": 1,
+  "cursor_before": {
+    "position": 0,
+    "opaque_value": ""
+  },
+  "next_cursor": {
+    "position": 100,
+    "opaque_value": "fixture_tenderplan_page_2"
+  },
+  "has_more": true,
+  "received_at_utc": "2026-08-20T05:58:00Z",
+  "upstream_receipt_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+  "cost_minor": 0,
+  "records": [
+    {
+      "tender_id": "tp-synthetic-001",
+      "version": "1",
+      "published_at": "2026-08-19T08:00:00Z",
+      "updated_at": "2026-08-20T05:00:00Z",
+      "customer_name": "ООО СИНТЕТИЧЕСКИЙ ЗАКАЗЧИК А",
+      "customer_inn": "7700000001",
+      "region": "77",
+      "name": "Синтетическая закупка алюминиевых конструкций",
+      "stage": "OPEN",
+      "amount_kopecks": 125000000,
+      "currency": "RUB",
+      "submission_deadline": "2026-08-29T12:00:00Z"
+    }
+  ]
+}

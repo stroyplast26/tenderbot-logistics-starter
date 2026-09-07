@@ -1,0 +1,240 @@
+{
+  "$schema": "schemas/contract-manifest.schema.json",
+  "advisory_documents": [
+    {
+      "id": "LF-V6-README",
+      "path": "docs/lead_factory_contract_v6/README.md",
+      "sha256": "a2a1f5115c3107b2ef375a377091c419e48d7065e44e437c92f7da5a036280c7",
+      "version": "1.1.0"
+    },
+    {
+      "id": "ADR-LF-V6",
+      "path": "docs/lead_factory_contract_v6/ADR-LF-V6.md",
+      "sha256": "df7d2d276242226800830f2cd360f99d64e9bdfb1514fb1353a5586f1e19fa55",
+      "version": "1.0.0"
+    }
+  ],
+  "base_contract": {
+    "import_map": "docs/lead_factory_contract_v6/APP-LF-SAFETY-KERNEL-IMPORT.md",
+    "path": "docs/LEAD_FACTORY_CONTRACT.md",
+    "revision": "5.2",
+    "role": "HASH_LOCKED_IMPORTED_SAFETY_KERNEL",
+    "sha256": "84b61a956bae970d0d7baf61985256ae15d1775474512d71f5c2d74d64974afb"
+  },
+  "contract_id": "LF-OUTCOME-V6",
+  "defaults_pending_ratification": {
+    "b2c_routing_only": "DISABLED",
+    "commercial_priority": "DEALER_FIRST",
+    "dealer_active_window_days": 30,
+    "external_reads_enabled": false,
+    "external_writers_enabled": false,
+    "gold_decision_window_days": 30
+  },
+  "fixed_at": "2026-08-25",
+  "normative_documents": [
+    {
+      "id": "LF-V6-ROOT",
+      "path": "docs/lead_factory_contract_v6/CONTRACT.md",
+      "sha256": "603cca0cb71d6be8f3a131755e8dcd2a01b9e84138d6bf458caf7c161f35292b",
+      "version": "1.1.0"
+    },
+    {
+      "id": "APP-LF-FUNNELS",
+      "path": "docs/lead_factory_contract_v6/APP-LF-FUNNELS.md",
+      "sha256": "9b5f515ed2d75fab1b8639641323f29302e9d74e2f89130b6adc2f1ee7159448",
+      "version": "1.0.0"
+    },
+    {
+      "id": "APP-LF-G10-EVIDENCE",
+      "path": "docs/lead_factory_contract_v6/APP-LF-G10-EVIDENCE.md",
+      "sha256": "3b3dd29012c190f8a509c72b7e5eb3fe659ac8d32b73cf39da25fa54aa6db44f",
+      "version": "1.0.0"
+    },
+    {
+      "id": "APP-LF-METHOD-LAB",
+      "path": "docs/lead_factory_contract_v6/APP-LF-METHOD-LAB.md",
+      "sha256": "c88e3a40b685e0bf47d4f5c0a9afa9b0c53364c779ba636b987accd404546966",
+      "version": "1.0.0"
+    },
+    {
+      "id": "APP-LF-SOURCE-CRM",
+      "path": "docs/lead_factory_contract_v6/APP-LF-SOURCE-CRM.md",
+      "sha256": "904c8656e82ffa3d9afde08a5aac74a84f99be496c819857f6793f24bde625c0",
+      "version": "1.0.0"
+    },
+    {
+      "id": "APP-LF-DEVELOPMENT-PROGRAM",
+      "path": "docs/lead_factory_contract_v6/APP-LF-DEVELOPMENT-PROGRAM.md",
+      "sha256": "9d98ea9a45b5b390ecfe1fa345fb96cf0d5de23f64dc72f23f3bba61d8a50714",
+      "version": "1.1.0"
+    },
+    {
+      "id": "APP-LF-DEMAND-INTELLIGENCE",
+      "path": "docs/lead_factory_contract_v6/APP-LF-DEMAND-INTELLIGENCE.md",
+      "sha256": "ddb2e7e31be2f7b7bc864aa35be596c9492a13cb98d2fe1bc81191baf6326ebd",
+      "version": "1.0.0"
+    },
+    {
+      "id": "APP-LF-PLATFORM-ARCHITECTURE",
+      "path": "docs/lead_factory_contract_v6/APP-LF-PLATFORM-ARCHITECTURE.md",
+      "sha256": "29e702c3353cc4076db0a279330e5d404285235c48027c1234da4b45955297fa",
+      "version": "1.0.0"
+    },
+    {
+      "id": "APP-LF-DEALER-NETWORK-ECONOMICS",
+      "path": "docs/lead_factory_contract_v6/APP-LF-DEALER-NETWORK-ECONOMICS.md",
+      "sha256": "20738d4d3c799f79fdba564b06cb2c46b9b1b3eff7043804497ba9671f691272",
+      "version": "1.0.0"
+    },
+    {
+      "id": "APP-LF-DECISION-SCIENCE",
+      "path": "docs/lead_factory_contract_v6/APP-LF-DECISION-SCIENCE.md",
+      "sha256": "f25aea7a1a69f6c2eb856dd7bac2bafc1adfc5daf6de833870c346551d9f52ad",
+      "version": "1.0.0"
+    },
+    {
+      "id": "APP-LF-GOVERNANCE-RELEASE",
+      "path": "docs/lead_factory_contract_v6/APP-LF-GOVERNANCE-RELEASE.md",
+      "sha256": "f0dfe2cc74fdf0e4485fb94363a6beb00424e4f8782f0c6fabac59bad4ae187f",
+      "version": "1.0.0"
+    },
+    {
+      "id": "APP-LF-SAFETY-KERNEL-IMPORT",
+      "path": "docs/lead_factory_contract_v6/APP-LF-SAFETY-KERNEL-IMPORT.md",
+      "sha256": "a3bc5365fa8027dcddea5ff70740b06ea8975bf3776cf0f41ec35afbe6fe598b",
+      "version": "1.0.0"
+    },
+    {
+      "id": "APP-LF-QUALITY-ARBITRATION",
+      "path": "docs/lead_factory_contract_v6/APP-LF-QUALITY-ARBITRATION.md",
+      "sha256": "b82e01894acfce253fedfc06a9bc15b56eb8bfa5c43a8b24f7f96adde8f258c8",
+      "version": "1.0.0"
+    }
+  ],
+  "package_digest_algorithm": "sha256(canonical-json(sorted(path,sha256)))",
+  "package_root_sha256": "13ffb471439f21df31aa627a2d8c9d464c88dc3bc45d7fde12c985422244b55e",
+  "package_version": "6.1.0-rc.1",
+  "policies": [
+    {
+      "id": "POLICY-LF-RBAC-SOD",
+      "path": "docs/lead_factory_contract_v6/policies/rbac-sod-policy.json",
+      "sha256": "e8172bff26d41dd00d2beb3a1c395300944ef61abe1dc5198f5e121c32f002af",
+      "version": "1.0.0"
+    }
+  ],
+  "ratification": null,
+  "registries": [
+    {
+      "id": "LF-V6-REQUIREMENTS",
+      "path": "docs/lead_factory_contract_v6/registries/requirements-registry.json",
+      "sha256": "90588571f9d703dc5e80fb23fbbe215f63d7eea0374c0ac7d2e08b97cfc445ea",
+      "version": "1.0.0"
+    },
+    {
+      "id": "LF-V6-ACCEPTANCE",
+      "path": "docs/lead_factory_contract_v6/registries/acceptance-manifest.json",
+      "sha256": "a2ab9a1fae8d15876731f0b6d7cfe5453a2cfb0fed3ac0ab1dd9bd42c8ce1bb9",
+      "version": "1.0.0"
+    }
+  ],
+  "required_approver_roles": [
+    "BusinessOwner",
+    "ContractAuthority",
+    "IndependentAuditor"
+  ],
+  "schema_version": "1.1.0",
+  "schemas": [
+    {
+      "id": "SCHEMA-ACCEPTANCE-MANIFEST.SCHEMA",
+      "path": "docs/lead_factory_contract_v6/schemas/acceptance-manifest.schema.json",
+      "sha256": "f33db5b897907d82c87f8db429245f811690d8de6006ed77e4a69fe90520399d",
+      "version": "1.0.0"
+    },
+    {
+      "id": "SCHEMA-COMMAND-ENVELOPE.SCHEMA",
+      "path": "docs/lead_factory_contract_v6/schemas/command-envelope.schema.json",
+      "sha256": "31f1bcfe179477b5e8dd280fc79c0ccd979588af0569872c32ac8c602c2390bb",
+      "version": "1.0.0"
+    },
+    {
+      "id": "SCHEMA-CONTRACT-MANIFEST.SCHEMA",
+      "path": "docs/lead_factory_contract_v6/schemas/contract-manifest.schema.json",
+      "sha256": "788f447fae34c993963afc041f270b5c034d600218a017ada45e03ccba2aa381",
+      "version": "1.0.0"
+    },
+    {
+      "id": "SCHEMA-DEMAND-INTELLIGENCE-ASSESSMENT.SCHEMA",
+      "path": "docs/lead_factory_contract_v6/schemas/demand-intelligence-assessment.schema.json",
+      "sha256": "9adac00b15b7dbe02524282fc8950f8e28e540d7ac90107e81d464a62018628b",
+      "version": "1.0.0"
+    },
+    {
+      "id": "SCHEMA-EVENT-ENVELOPE.SCHEMA",
+      "path": "docs/lead_factory_contract_v6/schemas/event-envelope.schema.json",
+      "sha256": "426b95111cf07d8805fa66565e62cdcf6351fe7351c8cc944878eff191c897d1",
+      "version": "1.0.0"
+    },
+    {
+      "id": "SCHEMA-EVIDENCE-BUNDLE.SCHEMA",
+      "path": "docs/lead_factory_contract_v6/schemas/evidence-bundle.schema.json",
+      "sha256": "104a68c310222a40233b79b3796fefd8a4c848285a67f142dc9df4fec2605874",
+      "version": "1.0.0"
+    },
+    {
+      "id": "SCHEMA-METHOD-PROPOSAL.SCHEMA",
+      "path": "docs/lead_factory_contract_v6/schemas/method-proposal.schema.json",
+      "sha256": "d521f3217b416715e494b6323c1fd8d1a9516b5e0d1d8cf8b9bd43ee8a3dbbef",
+      "version": "1.0.0"
+    },
+    {
+      "id": "SCHEMA-MODEL-CARD.SCHEMA",
+      "path": "docs/lead_factory_contract_v6/schemas/model-card.schema.json",
+      "sha256": "9e250d5a4f9697a5b91e347e74b963a3aa54b25a7a7636bf633d044f40d283e8",
+      "version": "1.0.0"
+    },
+    {
+      "id": "SCHEMA-QUALITY-CONFLICT.SCHEMA",
+      "path": "docs/lead_factory_contract_v6/schemas/quality-conflict.schema.json",
+      "sha256": "eadf8d20c04024ab3d87e788054d3bc0c6e9828abfda733060435f890461a3fa",
+      "version": "1.0.0"
+    },
+    {
+      "id": "SCHEMA-RBAC-SOD-POLICY.SCHEMA",
+      "path": "docs/lead_factory_contract_v6/schemas/rbac-sod-policy.schema.json",
+      "sha256": "5db4c31ce5bbd220ba11484e663e4a733843064b1529d2c327bc432a755f7020",
+      "version": "1.0.0"
+    },
+    {
+      "id": "SCHEMA-RELEASE-EVIDENCE.SCHEMA",
+      "path": "docs/lead_factory_contract_v6/schemas/release-evidence.schema.json",
+      "sha256": "a02ffd81ce1ddac17679d358a23be0198cdc01cc56b4e8bc129186eceea0abf5",
+      "version": "1.0.0"
+    },
+    {
+      "id": "SCHEMA-REQUIREMENT-REGISTRY.SCHEMA",
+      "path": "docs/lead_factory_contract_v6/schemas/requirement-registry.schema.json",
+      "sha256": "2f1995b410f723fb1d9ae878ecb8dda1d5cefe8055515da3e2c517bd60d79262",
+      "version": "1.0.0"
+    },
+    {
+      "id": "SCHEMA-SOURCE-PASSPORT-V2.SCHEMA",
+      "path": "docs/lead_factory_contract_v6/schemas/source-passport-v2.schema.json",
+      "sha256": "0853ed1a238ef276f07a595db1b50173220798a08e46dde20818808df1179e7d",
+      "version": "1.0.0"
+    }
+  ],
+  "status": "RELEASE_CANDIDATE_FOR_OWNER_RATIFICATION",
+  "supersedes": {
+    "package_version": "6.0.0",
+    "status": "SUPERSEDED_DRAFT"
+  },
+  "target_profile": {
+    "evaluation_workdays": 30,
+    "id": "GCO10",
+    "lower_confidence_bound": 0.95,
+    "minimum_total": 300,
+    "new_paying_clients_profile": "SEPARATE_NOT_ACTIVE",
+    "target_per_workday": 10,
+    "unit": "AcceptedGoldenClientOpportunity"
+  }
+}

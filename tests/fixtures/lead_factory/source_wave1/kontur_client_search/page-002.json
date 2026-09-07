@@ -1,0 +1,36 @@
+{
+  "fixture_page_version": "wave1-fixture-page-v1",
+  "provider": "KONTUR_CLIENT_SEARCH",
+  "product_code": "KONTUR_CLIENT_SEARCH",
+  "source_id": "wave1:kontur_client_search",
+  "contract_version": "wave1-business-public-v1",
+  "mapping_version": "kontur_client_search-draft-mapping-v1",
+  "receipt_key": "kontur-search-page-002",
+  "page_sequence": 2,
+  "cursor_before": {
+    "position": 75,
+    "opaque_value": "fixture_kontur_search_page_2"
+  },
+  "next_cursor": null,
+  "has_more": false,
+  "received_at_utc": "2026-08-20T05:59:00Z",
+  "upstream_receipt_sha256": "4242424242424242424242424242424242424242424242424242424242424242",
+  "cost_minor": 0,
+  "records": [
+    {
+      "company_id": "kontur-synthetic-002",
+      "revision": "2",
+      "first_seen_at": "2026-08-11T09:00:00Z",
+      "updated_at": "2026-08-20T05:15:00Z",
+      "legal_name": "АО СИНТЕТИЧЕСКИЙ ФАСАДНЫЙ ПАРТНЁР З",
+      "inn": "0200000008",
+      "region_code": "02",
+      "profile_summary": "Синтетическая компания по производству светопрозрачных конструкций",
+      "company_state": "ACTIVE",
+      "okved_codes": [
+        "25.12",
+        "43.32"
+      ]
+    }
+  ]
+}

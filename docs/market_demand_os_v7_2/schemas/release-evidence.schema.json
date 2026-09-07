@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://alumkomplekt-rf.ru/schemas/mdos/v7.2/release-evidence.schema.json",
+  "title": "MDOS v7.2 LocalReleaseEvidence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "record_type",
+    "evidence_id",
+    "scope",
+    "command",
+    "result",
+    "passed",
+    "failed",
+    "executed_at_utc",
+    "source_digests",
+    "external_effect_count",
+    "independent_verification"
+  ],
+  "properties": {
+    "schema_version": {"const": "1.0.0"},
+    "record_type": {"const": "LOCAL_RELEASE_EVIDENCE"},
+    "evidence_id": {"$ref": "#/$defs/id"},
+    "scope": {"$ref": "#/$defs/id"},
+    "command": {"type": "string", "minLength": 1},
+    "result": {"enum": ["PASSED", "FAILED"]},
+    "passed": {"type": "integer", "minimum": 0},
+    "failed": {"type": "integer", "minimum": 0},
+    "executed_at_utc": {"$ref": "#/$defs/utc"},
+    "source_digests": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "sha256"],
+        "properties": {
+          "path": {"type": "string", "minLength": 1},
+          "sha256": {"$ref": "#/$defs/digest"}
+        }
+      }
+    },
+    "external_effect_count": {"const": 0},
+    "independent_verification": {"const": false}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"result": {"const": "PASSED"}}},
+      "then": {"properties": {"failed": {"const": 0}}}
+    },
+    {
+      "if": {"properties": {"result": {"const": "FAILED"}}},
+      "then": {"properties": {"failed": {"minimum": 1}}}
+    }
+  ],
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,159}$"},
+    "digest": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "utc": {"type": "string", "format": "date-time", "pattern": "Z$"}
+  }
+}

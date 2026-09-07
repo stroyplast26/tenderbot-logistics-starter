@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://alumkomplekt-rf.ru/schemas/mdos/v7/beachhead-profile.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "beachhead_profile_id", "version", "status", "product_scope", "regions", "fulfilment_model", "icp", "exclusions", "offer_version", "promise_version", "minimum_contribution_margin", "currency", "max_wip", "capacity_snapshot_ref", "sla_profile_ref", "owner_roles", "allowed_motions", "allowed_channels", "stop_conditions", "ratified_by", "ratified_at", "evidence_refs"],
+  "properties": {
+    "schema_version": {"const": "1.0.0"},
+    "beachhead_profile_id": {"type": "string", "minLength": 1},
+    "version": {"type": "integer", "minimum": 1},
+    "status": {"enum": ["DRAFT", "RATIFIED", "PAUSED", "REVOKED"]},
+    "product_scope": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string"}},
+    "regions": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string"}},
+    "fulfilment_model": {"type": "string", "minLength": 1},
+    "icp": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+    "exclusions": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+    "offer_version": {"type": "string", "minLength": 1},
+    "promise_version": {"type": "string", "minLength": 1},
+    "minimum_contribution_margin": {"type": "number"},
+    "currency": {"type": "string", "pattern": "^[A-Z]{3}$"},
+    "max_wip": {"type": "integer", "minimum": 1},
+    "capacity_snapshot_ref": {"type": "string", "minLength": 1},
+    "sla_profile_ref": {"type": "string", "minLength": 1},
+    "owner_roles": {"type": "array", "minItems": 2, "uniqueItems": true, "items": {"type": "string"}},
+    "allowed_motions": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string"}},
+    "allowed_channels": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string"}},
+    "stop_conditions": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+    "ratified_by": {"type": "array", "minItems": 2, "uniqueItems": true, "items": {"type": "string"}},
+    "ratified_at": {"type": "string", "format": "date-time"},
+    "evidence_refs": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string"}}
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://alumkomplekt-rf.ru/schemas/mdos/v7/source-policy.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "source_id", "terms_version", "effective_at", "expires_at", "source_roles", "purposes", "permissions", "retention", "data_classes", "dependency_family", "review_status", "approved_by"],
+  "properties": {
+    "schema_version": {"const": "1.0.0"},
+    "source_id": {"type": "string"},
+    "vendor": {"type": "string"},
+    "terms_version": {"type": "string"},
+    "effective_at": {"type": "string", "format": "date-time"},
+    "expires_at": {"type": "string", "format": "date-time"},
+    "source_roles": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"enum": ["DISCOVERY", "TRIGGER", "INTENT", "RFQ", "OUTCOME", "EVIDENCE_SUPPORT"]}},
+    "purposes": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string"}},
+    "permissions": {"type": "object", "additionalProperties": false, "required": ["read", "store", "derive", "export", "train", "contact"], "properties": {"read": {"type": "boolean"}, "store": {"type": "boolean"}, "derive": {"type": "boolean"}, "export": {"type": "boolean"}, "train": {"type": "boolean"}, "contact": {"type": "boolean"}}},
+    "retention": {"type": "object", "additionalProperties": false, "required": ["mode", "max_days"], "properties": {"mode": {"enum": ["NO_STORE", "TEMP_CACHE", "PERSISTENT_CONTRACT_SCOPE"]}, "max_days": {"type": "integer", "minimum": 0}}},
+    "data_classes": {"type": "array", "items": {"type": "string"}},
+    "allowed_model_providers": {"type": "array", "items": {"type": "string"}},
+    "dependency_family": {"type": "string"},
+    "quota": {"type": ["object", "null"]},
+    "review_status": {"enum": ["PROPOSED", "APPROVED", "SUSPENDED", "EXPIRED", "REJECTED"]},
+    "approved_by": {"type": "array", "items": {"type": "string"}},
+    "evidence_refs": {"type": "array", "items": {"type": "string"}}
+  }
+}

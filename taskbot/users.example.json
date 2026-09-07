@@ -1,0 +1,7 @@
+{
+  "users": [
+    {"tg_id": 123456789, "bitrix_id": 1, "alias": "owner", "aliases": ["владелец"], "display_name": "Владелец", "role": "owner"},
+    {"tg_id": 234567890, "bitrix_id": 2, "alias": "partner", "aliases": ["партнёр", "фамилия"], "display_name": "Партнёр", "role": "partner"},
+    {"tg_id": 345678901, "bitrix_id": 3, "alias": "employee", "aliases": ["сотрудник"], "display_name": "Сотрудник", "role": "employee"}
+  ]
+}

@@ -1,0 +1,9 @@
+-r requirements.txt
+
+# Exact verification toolchain from the MDOS v7 offline foundation manifest.
+pytest==9.0.2
+pytest-subtests==0.15.0
+ruff==0.15.17
+
+# Used only to regenerate the platform-specific exact-version lock files.
+pip-tools==7.6.1

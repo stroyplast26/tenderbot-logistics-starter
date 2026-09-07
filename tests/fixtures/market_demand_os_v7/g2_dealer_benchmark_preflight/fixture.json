@@ -1,0 +1,48 @@
+{
+  "schema_version": "1.0.0",
+  "fixture_id": "fixture:g2-dealer-benchmark-preflight-001",
+  "classification": "SYNTHETIC_FIXTURE_NON_CANONICAL_NON_KPI",
+  "contract_id": "AK-MDOS-V7",
+  "package_version": "7.1.0-rc.1",
+  "package_root_sha256": "d4da97bd47ed1bf76a52826a852e3a158611d18adf32a901b814a864e862d97e",
+  "evaluated_at": "2026-08-25T20:01:00Z",
+  "profile_binding": {
+    "profile_set_id": "AK-MDOS-V7-G2-NEAR-MONEY-SHADOW-2026-08-25",
+    "profile_id": "G2-MOTION-DEALER-BENCHMARK-RFQ",
+    "normative_motion": "DEALER_AND_INSTALLER_ACTIVATION",
+    "profile_file_sha256": "b5584e86adaade926d4ae8e3cff40ed73550e25575598a5abd5ce9fc079b1b8f",
+    "profile_set_sha256": "eb132626212f168eadfa34afad99aaf8ab389e0e9cfee663f87e742dc2fa77e9",
+    "profile_sha256": "dcf596984130672b314f7c1f17c52c5132e8f47ae8cb3b6e56f9efca0bb8617f"
+  },
+  "source": {
+    "kind": "SYNTHETIC_FIXTURE",
+    "source_passport_ref": "fixture:g2-dealer-benchmark-rfq",
+    "lawful_purpose": "FIXTURE_SHADOW_PREFLIGHT_ONLY",
+    "contains_raw_pii": false,
+    "contains_request_text": false
+  },
+  "candidate": {
+    "synthetic": true,
+    "canonical_kpi_eligible": false,
+    "external_read": false,
+    "external_write": false,
+    "contact": false,
+    "spend": false,
+    "live_bitrix_write": false,
+    "canonical_account_ref": "fixture:account-dealer-001",
+    "dealer_role_decision_ref": "fixture:role-dealer-installer-001",
+    "rfq_artifact_ref": "fixture:rfq-benchmark-001",
+    "object_or_site_ref": "fixture:site-dealer-project-001",
+    "product_scope": [
+      "ALUMINIUM_PROFILE_6060"
+    ],
+    "quantity_scope": "fixture:quantity-benchmark-001",
+    "region": "FIXTURE_REGION_MOSCOW_OBLAST",
+    "requested_date": "2026-09-15",
+    "protected_opportunity_owner_ref": "fixture:channel-owner-001",
+    "capacity_snapshot_ref": "fixture:capacity-dealer-001",
+    "economics_snapshot_ref": "fixture:economics-dealer-001",
+    "responsible_human_id": "fixture-human-dealer-reviewer"
+  },
+  "permit_decision": null
+}

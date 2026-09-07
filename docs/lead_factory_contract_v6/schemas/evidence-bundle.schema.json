@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://alumkomplekt.local/lead-factory/v6/evidence-bundle.schema.json",
+  "title": "Lead Factory Evidence Bundle v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["evidence_id", "evidence_type", "producer_id", "producer_role", "created_at_utc", "valid_until_utc", "artifact_sha256", "input_refs", "contract_version", "purpose", "data_class", "verification_status"],
+  "properties": {
+    "evidence_id": {"type": "string", "minLength": 8},
+    "evidence_type": {"type": "string", "minLength": 2},
+    "producer_id": {"type": "string", "minLength": 2},
+    "producer_role": {"type": "string", "minLength": 2},
+    "created_at_utc": {"type": "string", "format": "date-time"},
+    "valid_until_utc": {"type": "string", "format": "date-time"},
+    "artifact_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "input_refs": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 3}},
+    "contract_version": {"type": "string", "minLength": 1},
+    "purpose": {"type": "string", "minLength": 4},
+    "data_class": {"type": "string", "minLength": 2},
+    "verification_status": {"enum": ["UNVERIFIED", "VERIFIED", "REVOKED", "EXPIRED"]},
+    "verifier_id": {"type": ["string", "null"]},
+    "verification_sha256": {"type": ["string", "null"], "pattern": "^[a-f0-9]{64}$"}
+  }
+}
+

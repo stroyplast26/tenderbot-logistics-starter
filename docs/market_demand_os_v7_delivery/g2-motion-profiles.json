@@ -1,0 +1,471 @@
+{
+  "schema_version": "1.1.0",
+  "profile_set_id": "AK-MDOS-V7-G2-NEAR-MONEY-SHADOW-2026-08-25",
+  "updated_at_utc": "2026-08-25T19:43:00Z",
+  "package_binding": {
+    "contract_id": "AK-MDOS-V7",
+    "package_version": "7.1.0-rc.1",
+    "package_root_sha256": "d4da97bd47ed1bf76a52826a852e3a158611d18adf32a901b814a864e862d97e",
+    "active_beachhead_profile": null,
+    "ratification": null
+  },
+  "authority": {
+    "status": "SHADOW_DESIGN_ONLY",
+    "canonical_kpi_eligible": false,
+    "external_reads_enabled": false,
+    "external_writers_enabled": false,
+    "contact_enabled": false,
+    "spend_enabled": false,
+    "live_bitrix_writes_enabled": false,
+    "allowed_data_classes": [
+      "SYNTHETIC_FIXTURE",
+      "OWNER_SUPPLIED_LOCAL_SNAPSHOT_WITH_DOCUMENTED_PURPOSE"
+    ],
+    "prohibited_actions": [
+      "Email, messenger, phone or advertising contact",
+      "Live Bitrix read or write",
+      "Live bank/provider read",
+      "Web scraping or enrichment",
+      "API purchase or other spend",
+      "Live routing, pricing, discount or delivery promise",
+      "Counting fixture outcomes as GDO, PaidOrder, customer or causal uplift"
+    ],
+    "ratification_rule": "A future canary requires one exact owner-ratified BeachheadProfile and a successor package/change record. These profiles do not grant authority."
+  },
+  "delivery_observation": {
+    "status": "IMPLEMENTED_NOT_INDEPENDENTLY_VERIFIED",
+    "independent_verification": false,
+    "code_bindings": ["CODE:lead_factory/mdos_v7/g2.py#G2MotionRegistry"],
+    "test_bindings": ["TEST:tests/test_mdos_v7_g2.py"],
+    "evidence_refs": ["EVIDENCE:reports/market_demand_os_v7/g2-inbound-attribution-shadow-evidence.json"],
+    "scope_limit": "Executable local readiness validation only; it grants no live authority."
+  },
+  "shared_truth_kernel": {
+    "payment_truth": "Only a reconciled Bank API, payment-provider or signed-bank-statement PaymentProof may become canonical payment truth. Fixture payment proof remains non-KPI.",
+    "order_truth": "Local append-only OrderRegistry; no 1C dependency.",
+    "fulfilment_truth": "Local append-only FulfilmentLedger with primary document, human actor and evidence hash; no 1C dependency.",
+    "crm_role": "Bitrix24 is an accepted-work projection only and is never payment truth.",
+    "human_authority": "AI may propose claims or actions but cannot create GoldAcceptance, PermitDecision, PaymentProof, OrderRecord, Consent, Suppression or Promise.",
+    "shadow_path": [
+      "raw local fixture/snapshot",
+      "typed claim",
+      "human adjudication",
+      "identity decision",
+      "DemandUnit",
+      "human Gold review",
+      "exact shadow PermitDecision",
+      "local Bitrix-shaped projection",
+      "fixture PaymentProof",
+      "OrderRecord and FulfilmentRecord",
+      "non-KPI reconciliation"
+    ]
+  },
+  "evaluation_order": [
+    "G2-MOTION-EXISTING-WINBACK",
+    "G2-MOTION-HIGH-INTENT-INBOUND",
+    "G2-MOTION-DEALER-BENCHMARK-RFQ"
+  ],
+  "evaluation_order_reason": "Existing first-party history and explicit inbound are closest to already-held demand evidence; dealer Benchmark RFQ follows after the offer and dealer-specific capacity assumptions are owner-ratified.",
+  "global_blockers": [
+    {
+      "blocker_id": "BLOCK-RATIFICATION",
+      "owner_role": "BusinessOwner",
+      "state": "OPEN",
+      "required_input": "Exactly one ratified beachhead with ICP/exclusions, region, product/system, fulfilment model, offer, SLA, risk limits and target metrics.",
+      "blocks": ["G2_CANARY", "LIVE_ROUTING", "CONTACT", "SPEND", "LIVE_BITRIX"]
+    },
+    {
+      "blocker_id": "BLOCK-OFFER",
+      "owner_role": "BusinessOwner",
+      "state": "OPEN",
+      "required_input": "Exact offer and promise boundaries, including who may approve price, discount, lead time and engineering commitments.",
+      "blocks": ["PROMISE", "QUOTE", "CONTACT"]
+    },
+    {
+      "blocker_id": "BLOCK-CAPACITY",
+      "owner_role": "CapacityOwner",
+      "state": "OPEN",
+      "required_input": "Fresh estimator, engineering, production, delivery and installation capacity snapshot with backpressure thresholds.",
+      "blocks": ["GOLD_FOR_LIVE", "ASSIGNMENT", "PROMISE", "G2_CANARY"]
+    },
+    {
+      "blocker_id": "BLOCK-LEGAL-CONSENT",
+      "owner_role": "PrivacyLegalOwner",
+      "state": "OPEN",
+      "required_input": "Purpose and channel-specific legal basis, consent/suppression workflow, retention and deletion rules.",
+      "blocks": ["EXTERNAL_READ", "CONTACT", "ADVERTISING", "TRAINING_USE"]
+    },
+    {
+      "blocker_id": "BLOCK-PAYMENT-FORMAT",
+      "owner_role": "FinanceAuthority",
+      "state": "OPEN",
+      "required_input": "Bank API/payment-provider contract or signed bank statement format and verification method.",
+      "blocks": ["LIVE_PAYMENT_PROOF", "LIVE_COMMERCIAL_KPI"]
+    },
+    {
+      "blocker_id": "BLOCK-BITRIX-ACCESS",
+      "owner_role": "PlatformOwner",
+      "state": "OPEN",
+      "required_input": "Approved Bitrix field mapping, service identity, credentials, rate limits, readback and rollback procedure after ratification.",
+      "blocks": ["LIVE_BITRIX_READ", "LIVE_BITRIX_WRITE"]
+    },
+    {
+      "blocker_id": "BLOCK-INBOUND-ATTRIBUTION-LIVE",
+      "owner_role": "PrivacyLegalOwner",
+      "state": "OPEN",
+      "required_input": "Owner-approved lawful website/form data supply, notice and retention rules, plus an opaque form-to-Bitrix correlation contract. Raw Metrika visit/client IDs remain private and may exist only when lawful_supplied=true.",
+      "blocks": ["LIVE_INBOUND_READ", "LIVE_INBOUND_ROUTING", "LIVE_BITRIX_WRITE"]
+    },
+    {
+      "blocker_id": "BLOCK-INDEPENDENT-VERIFY",
+      "owner_role": "IndependentVerifier",
+      "state": "OPEN",
+      "required_input": "Independent review and signed evidence for the exact release, policy, config, tests, backup/restore and rollback state.",
+      "blocks": ["G2_CANARY", "PRODUCTION_RELEASE"]
+    }
+  ],
+  "profiles": [
+    {
+      "profile_id": "G2-MOTION-EXISTING-WINBACK",
+      "normative_motion": "EXISTING_ACCOUNT_EXPANSION",
+      "variant": "EXISTING_ACCOUNT_REORDER_OR_WIN_BACK",
+      "status": "SHADOW_DESIGN_ONLY",
+      "priority_rank": 1,
+      "business_hypothesis": "A known account with an evidenced prior commercial relationship and a current, distinct need can reach a qualified RFQ faster than a newly discovered account.",
+      "allowed_input_sources": [
+        "Synthetic known-account history fixture",
+        "Owner-supplied local export of prior orders, RFQs or interactions with documented lawful purpose",
+        "Synthetic bank/payment and fulfilment artifacts"
+      ],
+      "forbidden_input_sources": [
+        "Live Bitrix query",
+        "Live mailbox or telephony query",
+        "Purchased enrichment",
+        "Scraped external data"
+      ],
+      "cohort": {
+        "unit": "One distinct DemandUnit per account plus object/site plus product/system scope plus time window",
+        "eligibility": [
+          "Canonical account identity is human-adjudicated.",
+          "Prior relationship/order/RFQ evidence is locally available and purpose-compatible.",
+          "A distinct current need or reorder/win-back trigger is represented by evidence, not merely inactivity.",
+          "Product, region and fulfilment assumptions can be evaluated from a local fixture capacity snapshot."
+        ],
+        "exclusions": [
+          "Open suppression or missing legal basis for any proposed contact",
+          "Current active order that would make the new unit a duplicate",
+          "Supplier already selected with no lawful displacement path",
+          "Stale, negative or absent capacity/economics evidence",
+          "Need outside the proposed product/region/fulfilment profile"
+        ],
+        "denominator_rule": "Seal all eligible unique DemandUnits at cutoff before human review; do not use only accepted or contacted accounts as denominator."
+      },
+      "trigger_examples": [
+        "Explicit local RFQ or request for an updated calculation",
+        "Documented reorder/replacement requirement for a distinct object or period",
+        "Owner-provided win-back reason with current scope evidence"
+      ],
+      "proof_of_intent": [
+        "Usable RFQ/specification/dimensions or requested commercial calculation",
+        "Identified buying role and account/object scope",
+        "Decision horizon and next evidence/action are explicit"
+      ],
+      "not_proof_of_intent": [
+        "Account age or inactivity alone",
+        "A generic marketing score",
+        "A prior payment without a current distinct need",
+        "A manager note without primary evidence"
+      ],
+      "shadow_offer": "Prepare a no-send calculation/readiness task for a human owner; do not quote, promise, discount or contact.",
+      "shadow_action": {
+        "action_type": "CREATE_CRM_TASK",
+        "channel": "BITRIX24_SHADOW",
+        "cost": 0,
+        "external_effect": false,
+        "output": "Local Company/Deal/Task-shaped projection bound to exact accepted DemandUnit, GoldAcceptance and PermitDecision."
+      },
+      "shadow_metrics": [
+        "Eligible unique DemandUnits",
+        "Evidence-complete fraction",
+        "Human Gold accept/reject reasons",
+        "Estimated estimator/engineering minutes",
+        "Duplicate-account and duplicate-DemandUnit prevention count",
+        "Fixture Raw-to-Reconciliation success and replay digest"
+      ],
+      "profile_specific_blockers": [
+        "Owner has not defined the exact win-back/reorder offer or exclusions.",
+        "The lawful contact basis and suppression reconciliation for the existing base are not approved.",
+        "Current account/order extract and its field ownership are not supplied.",
+        "The active beachhead is not ratified."
+      ],
+      "live_prerequisites": [
+        "BLOCK-RATIFICATION",
+        "BLOCK-OFFER",
+        "BLOCK-CAPACITY",
+        "BLOCK-LEGAL-CONSENT",
+        "BLOCK-PAYMENT-FORMAT",
+        "BLOCK-BITRIX-ACCESS",
+        "BLOCK-INDEPENDENT-VERIFY"
+      ]
+    },
+    {
+      "profile_id": "G2-MOTION-DEALER-BENCHMARK-RFQ",
+      "normative_motion": "DEALER_AND_INSTALLER_ACTIVATION",
+      "variant": "DEALER_BENCHMARK_RFQ",
+      "status": "SHADOW_DESIGN_ONLY",
+      "priority_rank": 3,
+      "business_hypothesis": "A known dealer or installer with a concrete, comparable requirement can be evaluated through a bounded Benchmark RFQ package without treating a generic promise to respond as Gold demand.",
+      "allowed_input_sources": [
+        "Synthetic dealer/account and RFQ fixtures",
+        "Owner-supplied local dealer list with documented relationship and purpose",
+        "Owner-supplied local historical RFQ/order artifacts",
+        "Synthetic benchmark price/capacity inputs"
+      ],
+      "forbidden_input_sources": [
+        "New dealer scraping or directory harvesting",
+        "Mass cold outreach",
+        "Purchased dealer database or API",
+        "Live marketplace or tender capture"
+      ],
+      "cohort": {
+        "unit": "One dealer account plus one distinct RFQ/object/product-system/time window",
+        "eligibility": [
+          "Dealer/installer identity and role are human-adjudicated.",
+          "Relationship or lawful inbound/RFQ basis is documented locally.",
+          "Benchmark scope has comparable products, quantities, geography and fulfilment assumptions.",
+          "Capacity and economics can be evaluated without a live promise."
+        ],
+        "exclusions": [
+          "A promise to send an RFQ later without a usable artifact",
+          "Protected opportunity owned by another channel",
+          "Unknown buyer/payer or ambiguous no-circumvention ownership",
+          "Missing consent/legal basis for contact",
+          "Incomparable benchmark scope or stale capacity"
+        ],
+        "denominator_rule": "Seal every eligible distinct dealer-RFQ unit, including rejected/incomplete units; never count dealer rows or contacts as opportunities."
+      },
+      "trigger_examples": [
+        "Usable dealer RFQ with product/system, quantity, region and requested date",
+        "Explicit request to benchmark an equivalent scoped package",
+        "Owner-supplied current project requirement tied to a known dealer"
+      ],
+      "proof_of_intent": [
+        "Received usable RFQ artifact",
+        "Concrete requested calculation with scope and timing",
+        "Confirmed buying role or lawful routed owner"
+      ],
+      "not_proof_of_intent": [
+        "Dealer directory listing",
+        "Generic interest or reply",
+        "Promise to send a quote/RFQ next week",
+        "Price comparison without equivalent scope and fulfilment assumptions"
+      ],
+      "shadow_offer": "Prepare a human-review Benchmark RFQ comparison task with scope-normalization gaps; do not send it or make price/service promises.",
+      "shadow_action": {
+        "action_type": "CREATE_CRM_TASK",
+        "channel": "BITRIX24_SHADOW",
+        "cost": 0,
+        "external_effect": false,
+        "output": "Local dealer Deal/Task-shaped projection with benchmark assumptions, missing evidence and exact protected-opportunity ownership."
+      },
+      "shadow_metrics": [
+        "Eligible distinct dealer RFQs",
+        "RFQ artifact usability",
+        "Scope-normalization failure reasons",
+        "Human Gold accept/reject reasons",
+        "Estimated calculation and engineering load",
+        "Protected-opportunity conflict count"
+      ],
+      "profile_specific_blockers": [
+        "Owner has not ratified the exact Benchmark RFQ offer, comparison rules or non-circumvention protocol.",
+        "Dealer cohort ownership and lawful channel basis are not supplied.",
+        "Product equivalence, margin floor and service-capacity rules are not approved.",
+        "Current PermitService fixture allowlist covers known-account history only and would require a reviewed shadow-only extension for this fixture source."
+      ],
+      "live_prerequisites": [
+        "BLOCK-RATIFICATION",
+        "BLOCK-OFFER",
+        "BLOCK-CAPACITY",
+        "BLOCK-LEGAL-CONSENT",
+        "BLOCK-PAYMENT-FORMAT",
+        "BLOCK-BITRIX-ACCESS",
+        "BLOCK-INDEPENDENT-VERIFY"
+      ]
+    },
+    {
+      "profile_id": "G2-MOTION-HIGH-INTENT-INBOUND",
+      "normative_motion": "HIGH_INTENT_INBOUND",
+      "variant": "OWNED_INBOUND_RFQ_OR_CALCULATION_REQUEST",
+      "status": "SHADOW_DESIGN_ONLY",
+      "priority_rank": 2,
+      "business_hypothesis": "An explicit owned inbound request containing usable scope can become an accepted DemandUnit quickly when identity, capacity and safe routing are proven.",
+      "allowed_input_sources": [
+        "Synthetic website form/email/call-transcript fixture",
+        "Synthetic privacy-safe website attribution fixture",
+        "Owner-supplied local snapshot of a lawfully received inbound request",
+        "Synthetic capacity, payment and fulfilment artifacts"
+      ],
+      "forbidden_input_sources": [
+        "Live website, mailbox, telephony or messenger read",
+        "Live CRM read",
+        "Third-party enrichment",
+        "Automated reply, routing or advertising retargeting"
+      ],
+      "inbound_attribution_contract": {
+        "owner_requirement_id": "DLV-REQ-INBOUND-ATTR-001",
+        "priority": "P0_OWNER_OVERLAY",
+        "authority": "SYNTHETIC_SHADOW_ONLY",
+        "external_effect_count": 0,
+        "canonical_kpi_eligible": false,
+        "analytics_fields": [
+          "captured_at",
+          "origin_channel",
+          "landing_path",
+          "referrer_classification",
+          "utm_source",
+          "utm_medium",
+          "utm_campaign",
+          "utm_content",
+          "utm_term",
+          "metrika_visit_id_present",
+          "metrika_client_id_present",
+          "prior_path",
+          "opaque_form_correlation_id"
+        ],
+        "field_rules": {
+          "captured_at": "Required UTC Z timestamp; absent or invalid input is denied rather than invented.",
+          "origin_channel": "Captured channel field limited to WEBSITE_FORM or UNKNOWN; it is not computed by source_hierarchy.",
+          "landing_path": "Path-only value; query and fragment are stripped or rejected and never persisted in analytics.",
+          "referrer_classification": "Allowlisted class only; raw referrer URL and query are not analytics fields; missing yields UNKNOWN.",
+          "utm": "Only utm_source, utm_medium, utm_campaign, utm_content and utm_term are allowed; missing dimensions yield UNKNOWN.",
+          "metrika_ids": "Raw visit/client IDs are private pseudonymous identifiers allowed only when lawful_supplied=true; analytics, Bitrix and evidence receive presence booleans only.",
+          "prior_path": "Path-only value with no query or fragment; missing yields UNKNOWN.",
+          "opaque_form_correlation_id": "Opaque non-PII token binds a private form/request record to the local Bitrix-shaped projection."
+        },
+        "private_plane": {
+          "contains": ["PII", "request_text", "raw_metrika_visit_id", "raw_metrika_client_id"],
+          "analytics_export_allowed": false,
+          "bitrix_projection_export_allowed": false,
+          "evidence_export_allowed": false,
+          "metrika_raw_id_condition": "lawful_supplied=true"
+        },
+        "public_plane": {
+          "pii_allowed": false,
+          "request_text_allowed": false,
+          "raw_metrika_ids_allowed": false,
+          "metrika_presence_flags_allowed": true
+        },
+        "source_hierarchy": [
+          "ALLOWLISTED_UTM",
+          "CLASSIFIED_EXTERNAL_REFERRER",
+          "DIRECT_WEBSITE",
+          "UNKNOWN"
+        ],
+        "source_proof_exclusions": [
+          "Metrika visit ID",
+          "Metrika client ID",
+          "Page view or form start alone",
+          "Caller-supplied origin label without reconciled evidence"
+        ],
+        "reconciliation": {
+          "deterministic": true,
+          "same_inputs_same_origin": true,
+          "raw_observations_immutable": true,
+          "conflicting_classifications_preserved_for_human_review": true,
+          "lineage_required": true
+        },
+        "code_binding_state": "IMPLEMENTED_NOT_INDEPENDENTLY_VERIFIED",
+        "code_bindings": [
+          "CODE:lead_factory/mdos_v7/inbound_attribution.py#WebsiteInboundAttributionContract",
+          "CODE:lead_factory/mdos_v7/inbound_attribution.py#reconcile_attribution",
+          "CODE:lead_factory/mdos_v7/inbound_attribution.py#assert_pii_free"
+        ],
+        "test_bindings": ["TEST:tests/test_mdos_v7_inbound_attribution.py"],
+        "local_test_observation": "6 passed; Ruff clean; not independently verified.",
+        "evidence_refs": ["EVIDENCE:reports/market_demand_os_v7/g2-inbound-attribution-shadow-evidence.json"],
+        "observed_evidence": {
+          "reconciliation_status": "RECONCILED_ATTRIBUTED",
+          "raw_private_values_included": false,
+          "external_effect_count": 0,
+          "independent_verification": false
+        }
+      },
+      "cohort": {
+        "unit": "One inbound requester/account/household plus one object/site plus product/system scope plus time window",
+        "eligibility": [
+          "Inbound source and purpose are documented.",
+          "A usable request, dimensions, RFQ or calculation need is present.",
+          "Identity/role uncertainty is routed to human review rather than merged automatically.",
+          "Region/product/fulfilment feasibility can be checked from a local fixture snapshot."
+        ],
+        "exclusions": [
+          "Spam, supplier solicitation, vacancy or irrelevant request",
+          "No product/system need or object/site scope",
+          "Region without approved fulfilment path",
+          "Duplicate of an open DemandUnit",
+          "Unsafe promise, unavailable capacity or missing legal handling basis"
+        ],
+        "denominator_rule": "Seal all lawfully available inbound units at cutoff, including spam, duplicate, out-of-scope and rejected units with reason codes."
+      },
+      "trigger_examples": [
+        "Explicit RFQ attachment",
+        "Calculation request with dimensions/product/system and region",
+        "Request for a documented product/engineering decision tied to a concrete object"
+      ],
+      "proof_of_intent": [
+        "Usable RFQ/specification/dimensions",
+        "Concrete product/system need and decision horizon",
+        "Sufficient identity or an explicit human identity-review outcome"
+      ],
+      "not_proof_of_intent": [
+        "Page view, click or form start",
+        "Generic callback request without need evidence",
+        "A model score without source artifact",
+        "CRM-created Lead alone"
+      ],
+      "shadow_offer": "Prepare a no-send triage/calculation task with missing fields and safe routing recommendation; do not reply or promise service.",
+      "shadow_action": {
+        "action_type": "CREATE_CRM_TASK",
+        "channel": "BITRIX24_SHADOW",
+        "cost": 0,
+        "external_effect": false,
+        "output": "Local Deal/Task-shaped projection only for an exact accepted DemandUnit, with no message or live route."
+      },
+      "shadow_metrics": [
+        "Inbound units by explicit intent artifact type",
+        "Duplicate/spam/out-of-scope reason distribution",
+        "Human identity and Gold review time",
+        "Missing-field and capacity-load distribution",
+        "Fixture routing decision replay digest",
+        "Zero external-effect assertion"
+      ],
+      "profile_specific_blockers": [
+        "Owner has not ratified the exact inbound product/region/fulfilment beachhead or response SLA.",
+        "Live inbound access, consent notice, retention and suppression handling are not approved.",
+        "No owner-approved live attribution capture or opaque form-to-Bitrix correlation contract exists.",
+        "Capacity/backpressure owner and safe overflow behavior are not defined.",
+        "Current PermitService fixture allowlist covers known-account history only and would require a reviewed shadow-only extension for this fixture source."
+      ],
+      "live_prerequisites": [
+        "BLOCK-RATIFICATION",
+        "BLOCK-OFFER",
+        "BLOCK-CAPACITY",
+        "BLOCK-LEGAL-CONSENT",
+        "BLOCK-PAYMENT-FORMAT",
+        "BLOCK-BITRIX-ACCESS",
+        "BLOCK-INBOUND-ATTRIBUTION-LIVE",
+        "BLOCK-INDEPENDENT-VERIFY"
+      ]
+    }
+  ],
+  "owner_decisions_required_before_any_live_work": [
+    "Choose and ratify exactly one of the three profiles as the first beachhead.",
+    "Approve the exact offer, promise limits, region/product/fulfilment scope and exclusions.",
+    "Approve capacity/economics snapshots and backpressure thresholds.",
+    "Approve legal basis, consent/suppression and retention for each intended channel.",
+    "Approve the website/form attribution boundary: lawful data supply, private raw Metrika handling, path/referrer minimisation and opaque form-to-Bitrix correlation.",
+    "Select the payment-truth integration: Bank API, payment provider or signed bank statement format.",
+    "Provide Bitrix mapping/credentials only after the previous gates pass.",
+    "Appoint an independent verifier/release authority."
+  ]
+}

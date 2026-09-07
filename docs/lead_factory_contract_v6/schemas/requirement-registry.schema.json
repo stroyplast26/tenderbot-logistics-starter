@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://alumkomplekt.local/lead-factory/v6/requirement-registry.schema.json",
+  "title": "Lead Factory Requirement Registry v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["registry_id", "registry_version", "contract_id", "package_version", "requirements"],
+  "properties": {
+    "registry_id": {"const": "LF-V6-REQUIREMENTS"},
+    "registry_version": {"type": "string", "minLength": 1},
+    "contract_id": {"const": "LF-OUTCOME-V6"},
+    "package_version": {"type": "string", "minLength": 1},
+    "requirements": {
+      "type": "array", "minItems": 1,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["id", "document", "line", "text_sha256", "owner_role", "criticality", "status", "applicable_tiers", "acceptance_ids"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^LF-[A-Z0-9-]+-\\d{3}$"},
+          "document": {"type": "string", "minLength": 3},
+          "line": {"type": "integer", "minimum": 1},
+          "text_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+          "owner_role": {"type": "string", "minLength": 2},
+          "criticality": {"enum": ["P0", "P1", "P2", "P3"]},
+          "status": {"enum": ["DEFINED", "DESIGNED", "IMPLEMENTED", "VERIFIED_OFFLINE", "VERIFIED_CANARY", "PROVEN_PRODUCTION", "BLOCKED", "SUPERSEDED"]},
+          "applicable_tiers": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string"}},
+          "acceptance_ids": {"type": "array", "uniqueItems": true, "items": {"type": "string", "pattern": "^AT-[A-Z0-9-]+-\\d{2}$"}}
+        }
+      }
+    }
+  }
+}
+

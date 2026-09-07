@@ -1,0 +1,38 @@
+{
+  "fixture_page_version": "wave1-fixture-page-v1",
+  "provider": "SABY_TRADE",
+  "product_code": "SABY_TRADE",
+  "source_id": "wave1:saby_trade",
+  "contract_version": "wave1-business-public-v1",
+  "mapping_version": "saby_trade-draft-mapping-v1",
+  "receipt_key": "saby-trade-page-001",
+  "page_sequence": 1,
+  "cursor_before": {
+    "position": 0,
+    "opaque_value": ""
+  },
+  "next_cursor": {
+    "position": 50,
+    "opaque_value": "fixture_saby_trade_page_2"
+  },
+  "has_more": true,
+  "received_at_utc": "2026-08-20T05:58:00Z",
+  "upstream_receipt_sha256": "2121212121212121212121212121212121212121212121212121212121212121",
+  "cost_minor": 0,
+  "records": [
+    {
+      "trade_id": "saby-synthetic-001",
+      "revision": "2",
+      "publication_time": "2026-08-19T07:30:00Z",
+      "change_time": "2026-08-20T04:30:00Z",
+      "buyer": "ООО СИНТЕТИЧЕСКИЙ ПОКУПАТЕЛЬ В",
+      "buyer_inn": "5000000003",
+      "region_code": "50",
+      "subject": "Синтетическая поставка оконных блоков",
+      "state": "OPEN",
+      "price_minor": 98000000,
+      "currency_code": "RUB",
+      "bid_until": "2026-08-28T11:00:00Z"
+    }
+  ]
+}
