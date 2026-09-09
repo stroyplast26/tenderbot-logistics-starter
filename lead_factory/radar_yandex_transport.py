@@ -71,8 +71,12 @@ def _post_yandex_core(
         # directly. There is no flag or callback that makes this path live.
         assert_external_allowed(_ACTION)
     else:
-        from .radar_yandex_pilot_authority import consume_capability
-        consume_capability(capability, body, request_id)
+        from .radar_yandex_connection_authority import ManualDispatchCapability, consume_manual_capability
+        if type(capability) is ManualDispatchCapability:
+            consume_manual_capability(capability, body, request_id, api_key)
+        else:
+            from .radar_yandex_pilot_authority import consume_capability
+            consume_capability(capability, body, request_id)
     if (type(body) is not bytes or not 0 < len(body) <= 8192
             or not re.fullmatch(r"[A-Za-z0-9._~-]{16,512}", api_key)
             or not _SAFE_ID.fullmatch(request_id)):
