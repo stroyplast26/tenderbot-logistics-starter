@@ -33,17 +33,22 @@ Mail.ru → Bitrix V4 writer отозван и не должен активир�
 
 Проект рассчитан на CPython 3.11.9 x64. Скопированную с другого Windows-профиля
 .venv нельзя чинить заменой путей: её нужно сохранить как backup и создать заново.
+Канонический bootstrap сам создаёт repo-local `.venv`, ставит закреплённые
+runtime/development dependencies и затем проверяет точный interpreter/toolchain.
 
     winget install --exact --id Python.Python.3.11 --version 3.11.9 --source winget --scope user --accept-package-agreements --accept-source-agreements --disable-interactivity
     Rename-Item .venv .venv.pre-reinstall
-    & "$env:LOCALAPPDATA\Programs\Python\Python311\python.exe" -m venv .venv
-    .\python_runtime.bat -m pip install -r requirements-win-py311.lock.txt
-    .\python_runtime.bat -m pip check
+    powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\scripts\bootstrap_python_runtime.ps1
+    powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\scripts\bootstrap_python_runtime.ps1 -CheckOnly
 
-Для разработки установите точный verification toolchain (pytest 9.0.2,
-pytest-subtests 0.15.0 и Ruff 0.15.17):
+Для нового безопасного source/Gold flow используйте только fail-closed launcher;
+он повторяет `-CheckOnly` и не допускает fallback Python:
 
-    .\python_runtime.bat -m pip install -r requirements-dev-win-py311.lock.txt
+    .\scripts\run_safe_lead_flow.ps1 source plan
+
+Ограничения, metered provider reads, cap-one и текущий STOP перед Gold
+signer/promotion описаны в
+[`docs/SAFE_LEAD_FLOW_LAUNCH_RUNBOOK.md`](docs/SAFE_LEAD_FLOW_LAUNCH_RUNBOOK.md).
 
 Отдельные lock-файлы `requirements-report-win-py311.lock.txt` и
 `requirements-ocr-win-py311.lock.txt` добавляют Pillow и optional OCR wrapper.
@@ -59,10 +64,12 @@ pytest-subtests 0.15.0 и Ruff 0.15.17):
     .\python_runtime.bat -m lead_factory.cli status
     .\python_runtime.bat -m lead_factory.cli work-queue
 
-Эти команды не включают внешние сервисы. Не запускайте init или явную миграцию
-канонической schema v16 в рамках recovery-baseline. Python launcher сначала
-проверяет реальную .venv, затем допускает только рабочий CPython 3.11 из
-TENDERBOT_PYTHON, стандартной user-installation, py launcher или PATH.
+Эти команды не включают внешние сервисы и остаются общей локальной диагностикой,
+но не являются точкой входа нового source/Gold flow. Не запускайте init или
+явную миграцию канонической schema v16 в рамках recovery-baseline. Общий legacy
+`python_runtime.bat` может искать CPython через `TENDERBOT_PYTHON`, стандартную
+user-installation, py launcher или PATH; для нового flow такой fallback запрещён,
+и его нельзя использовать вместо `run_safe_lead_flow.ps1`.
 
 Для локальных секретов скопируйте .env.example в .env и заполните только
 явно разрешённые интеграции. Пустые секреты подходят для offline-тестов.
