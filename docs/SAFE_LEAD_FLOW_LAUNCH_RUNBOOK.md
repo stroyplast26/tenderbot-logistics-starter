@@ -15,8 +15,9 @@
 источникам. До второго платного источника нужен общий spend-ledger; пока предел
 30 000 ₽ контролируется владельцем по журналам источников и детализации биллинга.
 
-`plan`, `status`, `check`, `yandex-status`, `yandex-purge`, `review-list`,
-`review-decide` и `review-close` всегда локальны. `yandex-purge` удаляет только
+`plan`, `status`, `check`, `yandex-prepare`, `yandex-status`, `yandex-purge`,
+`review-list`, `review-decide` и `review-close` всегда локальны.
+`yandex-prepare` создаёт только неактивный draft, а `yandex-purge` удаляет только
 просроченный raw response после отдельного явного подтверждения. В рамках этого
 поддерживаемого safe flow обращение к провайдеру
 разрешено только через `source run-one` с отдельным явным подтверждением; после
@@ -55,10 +56,11 @@ powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\scripts\bootst
 
 Launcher удаляет ambient `YANDEX_SEARCH_API_KEY` до bootstrap и child process.
 После успешного bootstrap он кратковременно выставляет известный несекретный
-маркер только для `source run-one`; Python entry и accounted runner проверяют
-этот маркер до state, broker и provider. Это защита от случайного прямого вызова
-и ошибки bootstrap-пути, а не криптографическая capability и не защита от
-злонамеренного процесса с правами того же пользователя ОС.
+маркер только для `source run-one` и локального mutating
+`source yandex-prepare`; Python entry проверяет его до изменения state, а
+accounted runner — до broker и provider. Это защита от случайного прямого
+вызова и ошибки bootstrap-пути, а не криптографическая capability и не защита
+от злонамеренного процесса с правами того же пользователя ОС.
 
 Запуск разрешён только из **точного текущего checkout**, который прошёл
 независимую приёмку как единый release candidate. Не используйте копию launcher,
@@ -74,6 +76,35 @@ Launcher удаляет ambient `YANDEX_SEARCH_API_KEY` до bootstrap и child 
 .\scripts\run_safe_lead_flow.ps1 source plan
 .\scripts\run_safe_lead_flow.ps1 source status
 ```
+
+Создать неактивный Yandex draft для дальнейшего независимого согласования:
+
+```powershell
+.\scripts\run_safe_lead_flow.ps1 source yandex-prepare --query "ТОЧНЫЙ НЕПЕРСОНАЛЬНЫЙ ЗАПРОС" --region "Краснодарский край" --idempotency-key "YANDEX-PREPARE-FIRST-V1" --confirm-inactive-only
+```
+
+Это локальная подготовка со статусом `PREPARED_NOT_ACTIVATED`, а не job с
+live-authority. Она создаёт только `request.draft.json`, пустой
+`request.sqlite` и пустой `dispatch-claims` с шестичасовым сроком draft.
+Команда не читает credential, не обращается к Yandex, не создаёт
+`request.json`, owner/reviewer/readiness evidence или activation и не даёт права
+выполнить `check` либо `run-one`. Один idempotency key навсегда связывается с
+одинаковыми query и region: точный повтор возвращает тот же draft без второго
+создания, а изменённый повтор завершается fail-closed. Незавершённые временные
+артефакты собственной неудачной попытки удаляются; опубликованный
+`PREPARED_NOT_ACTIVATED` draft автоматически не заменяется и не становится
+активным.
+
+Успешный JSON не повторяет query, region, folder ID или локальные пути и явно
+содержит отключённые external read, CRM, contact, outbox, campaign и schedule.
+Даже exit code `0` означает только успешную локальную подготовку. Реальный
+запуск возможен лишь после code freeze, отдельного owner instruction на exact
+scope, независимого `ACCEPT`, свежей проверки billing/API/credential и будущего
+audited activator, которого эта команда не реализует. Для сверки точного draft
+результат содержит только безопасные `job_id`, `draft_sha256`, `policy_sha256`,
+`scope_sha256`, `expires_at_utc`, `created`, `replayed`, явные
+`authority_verified=false` и `launch_allowed=false`, а также список незакрытых
+gates.
 
 Локальная проверка конкретного источника:
 
@@ -435,8 +466,10 @@ Gold signing, promotion, CRM write, outbox, email/телефонный outreach 
 Пока эти пункты не закрыты, корректный статус — безопасный ручной первый срез,
 а не production lead flow.
 
-Репозиторий пока намеренно не создаёт owner/reviewer/billing evidence и не имеет
-production-команды выпуска нового exact job/activation. Нельзя копировать для
-этого synthetic test helper или старый внешний installer: сначала нужен
-двухфазный audited installer, который создаёт неактивный scope, принимает только
-реальные свежие evidence artifacts и лишь затем отдельно устанавливает pin.
+Репозиторий намеренно не создаёт owner/reviewer/billing evidence.
+`source yandex-prepare` закрывает только первую, неактивную фазу и оставляет
+scope в `PREPARED_NOT_ACTIVATED`; production-команды выпуска `request.json` и
+activation пока нет. Нельзя копировать для второй фазы synthetic test helper
+или старый внешний installer: нужен отдельный audited activator, который после
+code freeze принимает реальные свежие evidence artifacts и только последним
+шагом устанавливает exact pin.

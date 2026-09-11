@@ -14,6 +14,7 @@ param(
         'review-list',
         'review-decide',
         'review-close',
+        'yandex-prepare',
         'yandex-status',
         'yandex-purge',
         'prepare',
@@ -64,6 +65,7 @@ try {
         'source|review-list' = @('run_source_discovery_once.py', 'review-list')
         'source|review-decide' = @('run_source_discovery_once.py', 'review-decide')
         'source|review-close' = @('run_source_discovery_once.py', 'review-close')
+        'source|yandex-prepare' = @('run_source_discovery_once.py', 'yandex-prepare')
         'source|yandex-status' = @('run_source_discovery_once.py', 'yandex-status')
         'source|yandex-purge' = @('run_source_discovery_once.py', 'yandex-purge')
         'gold|prepare' = @('run_gold_acceptance.py', 'prepare')
@@ -174,6 +176,26 @@ try {
         }
     }
 
+    if ($Flow -eq 'source' -and $Operation -eq 'yandex-prepare') {
+        if (
+            $CommandArguments.Count -ne 7 -or
+            [string]$CommandArguments[0] -cne '--query' -or
+            [string]::IsNullOrWhiteSpace([string]$CommandArguments[1]) -or
+            [string]$CommandArguments[1] -match '[\x00-\x1f\x7f-\x9f]' -or
+            [string]$CommandArguments[1] -ne ([string]$CommandArguments[1]).Trim() -or
+            [string]$CommandArguments[2] -cne '--region' -or
+            [string]::IsNullOrWhiteSpace([string]$CommandArguments[3]) -or
+            [string]$CommandArguments[3] -match '[\x00-\x1f\x7f-\x9f]' -or
+            [string]$CommandArguments[3] -ne ([string]$CommandArguments[3]).Trim() -or
+            [string]$CommandArguments[4] -cne '--idempotency-key' -or
+            [string]$CommandArguments[5] -cnotmatch
+                '\A[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}\z' -or
+            [string]$CommandArguments[6] -cne '--confirm-inactive-only'
+        ) {
+            throw 'SAFE_LEAD_FLOW_YANDEX_PREPARE_ARGUMENTS_INVALID'
+        }
+    }
+
     # The bootstrap check is the admission gate. It returns to this script only
     # after validating the exact repo-local interpreter and package set.
     $null = & $BootstrapPath -CheckOnly
@@ -181,7 +203,10 @@ try {
         throw 'SAFE_LEAD_FLOW_RUNTIME_UNAVAILABLE'
     }
 
-    if ($Flow -eq 'source' -and $Operation -eq 'run-one') {
+    if (
+        $Flow -eq 'source' -and
+        $Operation -in @('run-one', 'yandex-prepare')
+    ) {
         Set-Item -LiteralPath $LauncherMarkerPath -Value $LauncherMarkerValue -Force
     }
 
