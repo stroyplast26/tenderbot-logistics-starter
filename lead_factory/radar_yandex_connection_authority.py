@@ -231,9 +231,15 @@ class VerifiedManualGrant:
                 common._fail("FOLDER_MISMATCH")
             request = data.bound.policy.requests[0]
             request.body(folder_id)
+            return request
+
+    def authorize_new_dispatch(self, journal: YandexPilotJournal) -> None:
+        """Reject a new intent after STOP while leaving completed reads usable."""
+        with _LOCK:
+            data = _fresh(self, common._now_utc())
+            common._check_journal(data.bound, journal)
             if journal.status()["stopped"]:
                 common._fail("REQUEST_STOPPED")
-            return request
 
     def check_credential(self, api_key: str) -> None:
         with _LOCK:

@@ -38,6 +38,12 @@ _SAFE_ID = re.compile(r"[A-Za-z0-9._:-]{1,128}\Z")
 class YandexTransportError(RuntimeError):
     """Safe failure classification; contains no server body or credential."""
 
+    def __init__(self, code: str, *, external_requests_this_run: int = 0,
+                 journal_status: dict | None = None) -> None:
+        self.external_requests_this_run = external_requests_this_run
+        self.journal_status = journal_status
+        super().__init__(code)
+
 
 def _now_utc() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -76,7 +82,7 @@ def _post_yandex_core(
             consume_manual_capability(capability, body, request_id, api_key)
         else:
             from .radar_yandex_pilot_authority import consume_capability
-            consume_capability(capability, body, request_id)
+            consume_capability(capability, body, request_id, api_key)
     if (type(body) is not bytes or not 0 < len(body) <= 8192
             or not re.fullmatch(r"[A-Za-z0-9._~-]{16,512}", api_key)
             or not _SAFE_ID.fullmatch(request_id)):
@@ -148,12 +154,21 @@ def _post_yandex_core(
             if type(value) is str and _SAFE_ID.fullmatch(value):
                 correlation[name] = value
         return bytes(result), correlation
+    except YandexTransportError as exc:
+        raise YandexTransportError(str(exc), external_requests_this_run=1) from None
     except (TimeoutError, OSError, http.client.HTTPException, ValueError):
-        raise YandexTransportError("HTTP_IO_UNCERTAIN") from None
+        raise YandexTransportError("HTTP_IO_UNCERTAIN", external_requests_this_run=1) from None
+    except Exception:
+        # Once connect has been invoked, even an unexpected implementation
+        # failure is an externally attempted request and must never look free.
+        raise YandexTransportError("HTTP_UNEXPECTED_UNCERTAIN", external_requests_this_run=1) from None
     finally:
-        if watchdog is not None:
-            watchdog.cancel()
-        connection.close()
+        try:
+            if watchdog is not None:
+                watchdog.cancel()
+            connection.close()
+        except (OSError, http.client.HTTPException, RuntimeError, ValueError):
+            raise YandexTransportError("HTTP_IO_UNCERTAIN", external_requests_this_run=1) from None
 
 
 def run_yandex_search(

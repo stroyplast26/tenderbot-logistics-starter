@@ -20,6 +20,7 @@ from lead_factory.radar_yandex_search import SearchRequest, build_yandex_pilot_p
 NOW = "2026-09-08T12:00:00Z"
 EXPIRY = "2026-09-09T12:00:00Z"
 FOLDER = "synthetic-folder"
+KEY = "synthetic-token-never-a-real-key"
 
 
 def canonical(value):
@@ -45,11 +46,14 @@ def make_bundle(root: Path, *, now: str = NOW):
     claims.mkdir()
     claims_identity = {"st_dev": claims.stat().st_dev, "st_ino": claims.stat().st_ino}
     code = authority._source_hashes()
+    credential = {"service_account_id": "synthetic-sa", "api_key_id": "synthetic-key-id",
+                  "scope": "yc.search-api.execute",
+                  "credential_sha256": hashlib.sha256(KEY.encode()).hexdigest()}
     scope = {"policy_sha256": policy.sha256, "journal_path": str(journal_path.resolve()),
              "journal_identity": identity, "claims_identity": claims_identity,
-             "workspace_root": str(authority._WORKSPACE_ROOT)}
+             "workspace_root": str(authority._WORKSPACE_ROOT), "credential": credential}
     bundle = {
-        "version": "radar-yandex-pilot-authority-v1", "created_at_utc": now, "expires_at_utc": expires,
+        "version": "radar-yandex-pilot-authority-v2", "created_at_utc": now, "expires_at_utc": expires,
         "action": "radar.yandex.search.read", "endpoint": "https://searchapi.api.cloud.yandex.net/v2/web/search",
         "mdos_ratification": False,
         "forbidden_effects": ["OTHER_SOURCES", "CRM_WRITES", "OUTGOING_CONTACT", "MESSAGES", "PUBLICATION", "SCHEDULER"],
@@ -65,6 +69,9 @@ def make_bundle(root: Path, *, now: str = NOW):
                                    "evidence_sha256": hashlib.sha256(b"SYNTHETIC ONLY REVIEW").hexdigest()},
         "readiness": {"kind": "BILLING_API_READINESS", "observed_at_utc": now, "billing_status": "ACTIVE",
                       "search_api_status": "CONFIGURATION_VERIFIED", "credential_status": "AVAILABLE",
+                      "service_account_id": credential["service_account_id"],
+                      "api_key_id": credential["api_key_id"], "credential_scope": credential["scope"],
+                      "credential_sha256": credential["credential_sha256"],
                       "folder_id_sha256": policy.folder_id_sha256,
                       "evidence_sha256": hashlib.sha256(b"SYNTHETIC ONLY READINESS").hexdigest()},
     }
@@ -151,8 +158,8 @@ class YandexPilotAuthorityTests(unittest.TestCase):
         self.assertEqual(verified.policy_sha256, self.policy.sha256)
         self.assertEqual(verified.journal_path, self.root / "pilot.sqlite")
         capability = verified.mint_dispatch_capability(journal, intent, body, now=NOW)
-        authority.consume_capability(capability, body, intent.request_id)
-        self.fail("CAPABILITY_NOT_ISSUED", authority.consume_capability, capability, body, intent.request_id)
+        authority.consume_capability(capability, body, intent.request_id, KEY)
+        self.fail("CAPABILITY_NOT_ISSUED", authority.consume_capability, capability, body, intent.request_id, KEY)
         self.assertEqual(journal.status()["attempts_reserved"], 1)
         with self.assertRaises(ExternalAuthorityError):
             assert_external_allowed("synthetic-old-guard-still-closed")
@@ -163,8 +170,8 @@ class YandexPilotAuthorityTests(unittest.TestCase):
         forged = object.__new__(authority.VerifiedPilotGrant)
         self.fail("GRANT_NOT_ISSUED", forged.open_journal)
         fake_cap = object.__new__(authority.DispatchCapability)
-        self.fail("CAPABILITY_NOT_ISSUED", authority.consume_capability, fake_cap, b"{}", "fake-request")
-        self.fail("CAPABILITY_NOT_ISSUED", authority.consume_capability, True, b"{}", "fake-request")
+        self.fail("CAPABILITY_NOT_ISSUED", authority.consume_capability, fake_cap, b"{}", "fake-request", KEY)
+        self.fail("CAPABILITY_NOT_ISSUED", authority.consume_capability, True, b"{}", "fake-request", KEY)
 
     def test_missing_pin_and_wrong_bundle_hash_fail_closed(self):
         self.pin.unlink()
@@ -227,8 +234,8 @@ class YandexPilotAuthorityTests(unittest.TestCase):
         other = canonical(self.policy.requests[1].body(self.folder))
         self.fail("BODY_MISMATCH", verified.mint_dispatch_capability, journal, intent, other, now=NOW)
         capability = verified.mint_dispatch_capability(journal, intent, body, now=NOW)
-        self.fail("CAPABILITY_BINDING_INVALID", authority.consume_capability, capability, other, intent.request_id)
-        self.fail("CAPABILITY_NOT_ISSUED", authority.consume_capability, capability, body, intent.request_id)
+        self.fail("CAPABILITY_BINDING_INVALID", authority.consume_capability, capability, other, intent.request_id, KEY)
+        self.fail("CAPABILITY_NOT_ISSUED", authority.consume_capability, capability, body, intent.request_id, KEY)
 
     def test_second_verified_grant_cannot_mint_same_intent(self):
         first, journal, intent, body = self.ready_intent()
@@ -242,7 +249,7 @@ class YandexPilotAuthorityTests(unittest.TestCase):
         pin = json.loads(self.pin.read_text(encoding="utf-8"))
         pin["status"] = "REVOKED"
         self.pin.write_bytes(canonical(pin))
-        self.fail("ACTIVATION_INACTIVE", authority.consume_capability, capability, body, intent.request_id)
+        self.fail("ACTIVATION_INACTIVE", authority.consume_capability, capability, body, intent.request_id, KEY)
         pin["status"] = "ACTIVE"
         self.pin.write_bytes(canonical(pin))
         self.fail("ACTIVATION_EXPIRED", authority.verify_pilot_grant, self.bundle, now=EXPIRY)
@@ -251,12 +258,12 @@ class YandexPilotAuthorityTests(unittest.TestCase):
         verified, journal, intent, body = self.ready_intent()
         capability = verified.mint_dispatch_capability(journal, intent, body, now=NOW)
         with patch.object(authority, "_now_utc", return_value=EXPIRY):
-            self.fail("ACTIVATION_EXPIRED", authority.consume_capability, capability, body, intent.request_id)
+            self.fail("ACTIVATION_EXPIRED", authority.consume_capability, capability, body, intent.request_id, KEY)
         self.fail("CLOCK_BACKWARDS", verified.authorize_request, journal, self.policy.requests[0], self.folder, now=NOW)
         # A newly verified grant has no in-memory history of the consumed
         # capability, but still sees its committed expiry observation.
         self.fail("CLOCK_BACKWARDS", self.verified)
-        self.fail("CAPABILITY_NOT_ISSUED", authority.consume_capability, capability, body, intent.request_id)
+        self.fail("CAPABILITY_NOT_ISSUED", authority.consume_capability, capability, body, intent.request_id, KEY)
 
     def test_expiry_seen_by_verifier_is_durable_before_open_even_across_processes(self):
         context = multiprocessing.get_context("spawn")
@@ -282,7 +289,8 @@ class YandexPilotAuthorityTests(unittest.TestCase):
         verified, journal, intent, body = self.ready_intent()
         journal.stop(now=NOW)
         self.fail("PILOT_STOPPED", verified.mint_dispatch_capability, journal, intent, body, now=NOW)
-        self.fail("PILOT_STOPPED", verified.authorize_request, journal, self.policy.requests[0], self.folder, now=NOW)
+        verified.authorize_request(journal, self.policy.requests[0], self.folder, now=NOW)
+        self.fail("PILOT_STOPPED", verified.authorize_new_dispatch, journal, now=NOW)
 
     def test_forged_intent_or_completed_state_cannot_mint(self):
         verified, journal, intent, body = self.ready_intent()
@@ -321,8 +329,8 @@ class YandexPilotAuthorityTests(unittest.TestCase):
         verified, journal, intent, body = self.ready_intent()
         capability = verified.mint_dispatch_capability(journal, intent, body, now=NOW)
         journal.stop(now=NOW)
-        authority.consume_capability(capability, body, intent.request_id)
-        self.fail("CAPABILITY_NOT_ISSUED", authority.consume_capability, capability, body, intent.request_id)
+        authority.consume_capability(capability, body, intent.request_id, KEY)
+        self.fail("CAPABILITY_NOT_ISSUED", authority.consume_capability, capability, body, intent.request_id, KEY)
 
     def test_two_processes_cannot_mint_same_persisted_intent_and_restart_cannot_retry(self):
         verified, journal, intent, body = self.ready_intent()

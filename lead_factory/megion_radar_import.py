@@ -10,6 +10,7 @@ from __future__ import annotations
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
+import hashlib
 import json
 import re
 from typing import Any, Callable
@@ -19,7 +20,17 @@ from .construction_radar import (
     RadarObservation, RadarValidationError,
 )
 from .ids import payload_hash
-from .megion_public_permits import _source_version, parse_megion_permits_csv
+from .megion_public_permits import (
+    MEGION_PUBLIC_ISSUERS,
+    MEGION_PUBLIC_LEGAL_FORMS,
+    MEGION_PUBLIC_SCOPES,
+    MEGION_JURISDICTION,
+    _CADASTRAL,
+    _PERMIT,
+    _source_version,
+    megion_public_scope,
+    parse_megion_permits_csv,
+)
 from .radar_review_access import RadarEvidenceCommand, RadarEvidenceVault
 from .store import FactoryStore
 
@@ -28,18 +39,20 @@ MEGION_SOURCE_KEY = "megion-public-permits-31875"
 MEGION_TERMS_URL = "https://opendata.admmegion.ru/about/terms/"
 MEGION_TERMS_SHA256 = "7bc257bccb9f6aba582477728524d10bbff8c31ccb3ce096a9a1313160b2279e"
 MEGION_TERMS_REF = "evidence://megion-public-permits/terms/sha256/" + MEGION_TERMS_SHA256
-MEGION_IMPORT_VERSION = "megion-radar-import-v1"
+MEGION_IMPORT_VERSION = "megion-radar-import-v4"
+MEGION_PROJECTION_VERSION = "megion-public-projection-v4"
+MEGION_RECEIPT_SCHEMA_VERSION = "megion-public-receipt-v4"
 _PRODUCER = "megion_radar_import"
 _ROW_EVENT = "megion_public_permit_imported"
 _SNAPSHOT_EVENT = "megion_public_snapshot_imported"
-_METHOD = "megion-public-dataset-transform-v1"
+_METHOD = "megion-public-dataset-transform-v4"
 _RETENTION = "PUBLIC_REFERENCE_NO_EXPIRY"
 _TOKEN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:/-]{0,255}$")
 _HEX = re.compile(r"^[0-9a-f]{64}$")
 _PUBLIC_FIELDS = frozenset({
     "permit_number", "issuer", "jurisdiction", "title", "address", "cadastral_id",
-    "developer_name", "issued_at_utc", "latitude", "longitude", "stage",
-    "stage_source_date_utc",
+    "developer_name", "developer_legal_form", "building_scope", "source_text_withheld",
+    "issued_at_utc", "latitude", "longitude", "stage", "stage_source_date_utc",
 })
 
 
@@ -65,6 +78,39 @@ class MegionRadarImportResult:
     replayed: bool
 
 
+@dataclass(frozen=True, slots=True)
+class MegionReviewedSnapshot:
+    source_url: str
+    published_at_utc: str
+    csv_byte_length: int
+    csv_sha256: str
+    source_revision: str
+
+
+MEGION_REVIEWED_SNAPSHOTS = (
+    MegionReviewedSnapshot(
+        source_url=(
+            "https://opendata.admmegion.ru/opendata/csv/31875/data/"
+            "data-20260803T095353-structure-20240702T122402.csv"
+        ),
+        published_at_utc="2026-08-03T00:00:00Z",
+        csv_byte_length=93946,
+        csv_sha256="fd5138a8562e2810dca4a8651a536dd103d86dacf103e70e71b932f4158779a9",
+        source_revision="20260803095353",
+    ),
+    MegionReviewedSnapshot(
+        source_url=(
+            "https://opendata.admmegion.ru/opendata/csv/31875/data/"
+            "data-20260902T145832-structure-20240702T122402.csv"
+        ),
+        published_at_utc="2026-09-02T00:00:00Z",
+        csv_byte_length=93856,
+        csv_sha256="64da610e83005420bd8e48ffbbeaf6e64b5490144822de3c2440efb2decd95d4",
+        source_revision="20260902145832",
+    ),
+)
+
+
 def _utc(value: str) -> datetime:
     try:
         result = datetime.fromisoformat(value.replace("Z", "+00:00"))
@@ -79,19 +125,50 @@ def _stamp(value: datetime) -> str:
     return value.astimezone(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
 
 
+def _csv_sha256(csv_bytes: bytes) -> str:
+    return hashlib.sha256(csv_bytes).hexdigest()
+
+
+def _reviewed_snapshot_metadata(
+    *, source_url: str, published_at_utc: str, csv_byte_length: int, csv_sha256: str,
+) -> MegionReviewedSnapshot:
+    if (type(source_url) is not str or type(published_at_utc) is not str
+            or type(csv_byte_length) is not int or type(csv_sha256) is not str):
+        raise RadarValidationError("Megion snapshot is not in the reviewed allowlist")
+    for snapshot in MEGION_REVIEWED_SNAPSHOTS:
+        if (
+            source_url == snapshot.source_url
+            and published_at_utc == snapshot.published_at_utc
+            and csv_byte_length == snapshot.csv_byte_length
+            and csv_sha256 == snapshot.csv_sha256
+        ):
+            return snapshot
+    raise RadarValidationError("Megion snapshot is not in the reviewed allowlist")
+
+
+def _reviewed_snapshot_bytes(
+    csv_bytes: bytes, *, source_url: str, published_at_utc: str,
+) -> MegionReviewedSnapshot:
+    if type(csv_bytes) is not bytes:
+        raise RadarValidationError("Megion snapshot is not in the reviewed allowlist")
+    candidate = next(
+        (
+            snapshot
+            for snapshot in MEGION_REVIEWED_SNAPSHOTS
+            if source_url == snapshot.source_url
+            and published_at_utc == snapshot.published_at_utc
+            and len(csv_bytes) == snapshot.csv_byte_length
+        ),
+        None,
+    )
+    if candidate is None or _csv_sha256(csv_bytes) != candidate.csv_sha256:
+        raise RadarValidationError("Megion snapshot is not in the reviewed allowlist")
+    return candidate
+
+
 def megion_building_scope(title: str) -> str:
     """Conservative research selection, never an aluminium-demand inference."""
-    text = title.casefold().replace("ё", "е")
-    if re.search(r"трубопровод|газопровод|нефтепровод|водовод|водопровод|канализац|"
-                 r"электроснабжен|линия электропередач|кабельн|теплосет|теплотрасс|"
-                 r"автодорог|автомобильн\w* дорог|улично-дорож|линейн\w* объект", text):
-        return "LINEAR_INFRASTRUCTURE"
-    if re.search(r"здани|жил\w* дом|многоквартир|жилищн|магазин|торгов\w* центр|"
-                 r"школ|детск\w* сад|детск\w* дошкольн|поликлиник|больниц|"
-                 r"гостиниц|общежити|склад|мастерск|спорткомплекс|спортивн\w* комплекс|"
-                 r"культурн\w* центр|административн\w* корпус|производственн\w* корпус", text):
-        return "BUILDING"
-    return "UNKNOWN"
+    return megion_public_scope(title)
 
 
 def _observation(fields: dict[str, str], *, passport_id: str, external_key: str,
@@ -142,6 +219,12 @@ def _snapshot_body(event: Any) -> dict[str, Any]:
     body = _event_body(event)
     try:
         command = body["command"]
+        reviewed = _reviewed_snapshot_metadata(
+            source_url=command["source_url"],
+            published_at_utc=command["source_publication_at_utc"],
+            csv_byte_length=command["csv_byte_length"],
+            csv_sha256=command["csv_sha256"],
+        )
         valid = (
             body["snapshot_id"] == payload_hash(command)
             and event["idempotency_key"] == "snapshot:" + body["snapshot_id"]
@@ -150,7 +233,11 @@ def _snapshot_body(event: Any) -> dict[str, Any]:
             and event["aggregate_type"] == "radar_source"
             and event["aggregate_id"] == MEGION_SOURCE_KEY
             and command["version"] == MEGION_IMPORT_VERSION
+            and command["projection_version"] == MEGION_PROJECTION_VERSION
+            and command["receipt_schema_version"] == MEGION_RECEIPT_SCHEMA_VERSION
             and command["source_key"] == MEGION_SOURCE_KEY
+            and body["projection_version"] == MEGION_PROJECTION_VERSION
+            and body["receipt_schema_version"] == MEGION_RECEIPT_SCHEMA_VERSION
             and type(body["items"]) is list
             and 1 <= len(body["items"]) <= 200
             and type(body["source_revision"]) is str
@@ -158,12 +245,13 @@ def _snapshot_body(event: Any) -> dict[str, Any]:
             and body["source_revision"] == _source_version(
                 command["source_url"], command["source_publication_at_utc"]
             )
+            == reviewed.source_revision
             and _HEX.fullmatch(command["csv_sha256"])
             and _utc(command["source_publication_at_utc"]) <= _utc(body["captured_at_utc"])
             and body["evidence_semantics"] == "LOCAL_PUBLIC_DATASET_TRANSFORM"
             and body["external_requests"] == 0
         )
-    except (TypeError, KeyError, ValueError):
+    except (TypeError, KeyError, ValueError, RadarValidationError):
         valid = False
     if not valid:
         raise RadarValidationError("Megion snapshot binding is invalid")
@@ -217,11 +305,20 @@ def read_megion_source_metadata_tx(con: Any, signal: Any) -> dict[str, Any]:
             raise ValueError("snapshot membership")
         snapshot = _snapshot_body(snapshot_events[0])
         command = snapshot["command"]
+        reviewed = _reviewed_snapshot_metadata(
+            source_url=body["source_url"],
+            published_at_utc=body["source_publication_at_utc"],
+            csv_byte_length=body["original_csv_byte_length"],
+            csv_sha256=body["original_csv_sha256"],
+        )
+        permit_match = _PERMIT.fullmatch(fields["permit_number"])
         member = {"signal_id": signal["radar_signal_id"], "object_id": signal["radar_object_id"],
                   "project_id": signal["radar_project_id"], "source_external_key": signal["source_external_key"],
                   "source_revision": signal["source_revision"], "created": True}
         valid = (
             body["version"] == MEGION_IMPORT_VERSION
+            and body["projection_version"] == MEGION_PROJECTION_VERSION
+            and body["receipt_schema_version"] == MEGION_RECEIPT_SCHEMA_VERSION
             and body["source_key"] == passport["source_key"] == MEGION_SOURCE_KEY
             and body["radar_signal_id"] == signal["radar_signal_id"]
             and body["radar_object_id"] == signal["radar_object_id"]
@@ -235,8 +332,21 @@ def read_megion_source_metadata_tx(con: Any, signal: Any) -> dict[str, Any]:
             and signal["command_hash"] == validated.command_hash
             and body["public_fields"] == fields and set(fields) == _PUBLIC_FIELDS
             and all(type(value) is str for value in fields.values())
+            and fields["issuer"] in MEGION_PUBLIC_ISSUERS
+            and fields["jurisdiction"] == MEGION_JURISDICTION
+            and fields["developer_legal_form"] in MEGION_PUBLIC_LEGAL_FORMS
+            and fields["building_scope"] in MEGION_PUBLIC_SCOPES
+            and fields["source_text_withheld"] == "true"
+            and fields["title"] == fields["address"] == fields["developer_name"] == ""
+            and fields["stage"] == "PERMIT_ISSUED"
+            and fields["stage_source_date_utc"] == fields["issued_at_utc"]
+            and permit_match
+            and permit_match.group("year") == fields["issued_at_utc"][:4]
+            and (not fields["cadastral_id"] or _CADASTRAL.fullmatch(fields["cadastral_id"]))
+            and fields["latitude"] == fields["longitude"] == ""
             and body["content_sha256"] == body["sanitized_row_sha256"] == evidence.content_sha256
             and _HEX.fullmatch(body["original_csv_sha256"])
+            and body["source_revision"] == reviewed.source_revision
             and body["revision_binding_sha256"] == version_binding
             and event["idempotency_key"] == "row:" + identity
             and evidence.source_label == "megion-public-row:" + identity
@@ -248,6 +358,9 @@ def read_megion_source_metadata_tx(con: Any, signal: Any) -> dict[str, Any]:
             and command["source_url"] == body["source_url"]
             and command["source_publication_at_utc"] == body["source_publication_at_utc"]
             and command["csv_sha256"] == body["original_csv_sha256"]
+            and command["csv_byte_length"] == body["original_csv_byte_length"]
+            and command["projection_version"] == body["projection_version"]
+            and command["receipt_schema_version"] == body["receipt_schema_version"]
             and command["fetch_receipt_ref"] == body["fetch_receipt_ref"]
             and body["actor"] == event["actor"] == evidence.actor
             and body["captured_at_utc"] == event["occurred_at_utc"]
@@ -277,10 +390,12 @@ def read_megion_source_metadata_tx(con: Any, signal: Any) -> dict[str, Any]:
         key: body[key] for key in (
             "source_url", "source_publication_at_utc", "published_precision", "captured_at_utc",
             "public_fields", "evidence_id", "evidence_semantics", "rights_basis_ref",
-            "retention_policy", "original_csv_sha256", "sanitized_row_sha256", "fetch_receipt_ref",
+            "retention_policy", "original_csv_sha256", "original_csv_byte_length",
+            "sanitized_row_sha256", "fetch_receipt_ref", "projection_version",
+            "receipt_schema_version",
         )
     } | {"acquisition_label": "Ручная загрузка официального CSV", "acquired_by": "LOCAL_FILE",
-         "building_scope": megion_building_scope(fields["title"])}
+         "building_scope": fields["building_scope"]}
 
 
 class MegionRadarImporter:
@@ -305,12 +420,19 @@ class MegionRadarImporter:
         if (type(fetch_receipt_ref) is not str or (fetch_receipt_ref and not re.fullmatch(
                 r"(?:evidence://|offline-evidence:)[^\s]{1,480}", fetch_receipt_ref))):
             raise RadarValidationError("Megion acquisition receipt reference is invalid")
+        # Authenticity is established before CSV decoding/parsing and before a
+        # database transaction can open. Unknown or changed snapshots fail closed.
+        reviewed = _reviewed_snapshot_bytes(
+            csv_bytes, source_url=source_url, published_at_utc=published_at_utc,
+        )
         now = self.clock()
         if not isinstance(now, datetime) or now.tzinfo is None:
             raise RadarValidationError("Megion import clock is invalid")
         now = now.astimezone(timezone.utc)
         captured = _stamp(now)
         batch = parse_megion_permits_csv(csv_bytes, source_url=source_url, published_at_utc=published_at_utc)
+        if any(record.source_revision != reviewed.source_revision for record in batch.records):
+            raise RadarValidationError("Megion reviewed snapshot revision is inconsistent")
         if batch.excluded_counts.get("CONFLICTING_PERMIT_ROWS", 0):
             raise RadarConflict("Megion snapshot has conflicting rows for one permit")
         if _utc(published_at_utc) > now:
@@ -330,8 +452,8 @@ class MegionRadarImporter:
             reason = ""
             if _utc(record.issued_at_utc).year < since_year:
                 reason = "BEFORE_SINCE_YEAR"
-            elif building_only and megion_building_scope(record.title) != "BUILDING":
-                reason = "BUILDING_SCOPE_" + megion_building_scope(record.title)
+            elif building_only and record.building_scope != "BUILDING":
+                reason = "BUILDING_SCOPE_" + record.building_scope
             if reason:
                 excluded[reason] = excluded.get(reason, 0) + 1
             else:
@@ -346,8 +468,12 @@ class MegionRadarImporter:
         revision = next(iter(revisions))
         command = {
             "version": MEGION_IMPORT_VERSION, "source_key": MEGION_SOURCE_KEY,
+            "projection_version": MEGION_PROJECTION_VERSION,
+            "receipt_schema_version": MEGION_RECEIPT_SCHEMA_VERSION,
             "passport_id": passport_id, "actor": actor, "source_url": source_url,
-            "source_publication_at_utc": published_at_utc, "csv_sha256": batch.csv_sha256,
+            "source_publication_at_utc": published_at_utc,
+            "csv_byte_length": reviewed.csv_byte_length,
+            "csv_sha256": reviewed.csv_sha256,
             "since_year": since_year, "building_only": building_only, "fetch_receipt_ref": fetch_receipt_ref,
         }
         snapshot_id = payload_hash(command)
@@ -375,7 +501,7 @@ class MegionRadarImporter:
                 if int(revision) < int(previous["source_revision"]):
                     raise RadarConflict("Megion stale snapshot cannot replace a newer snapshot")
                 if (revision == previous["source_revision"]
-                        and (batch.csv_sha256 != previous["command"]["csv_sha256"]
+                        and (reviewed.csv_sha256 != previous["command"]["csv_sha256"]
                              or published_at_utc != previous["command"]["source_publication_at_utc"])):
                     raise RadarConflict("Megion snapshot revision has different bytes or publication")
             replay = next((item for item in snapshots if item["snapshot_id"] == snapshot_id), None)
@@ -398,7 +524,7 @@ class MegionRadarImporter:
                             or metadata["sanitized_row_sha256"] != selected_hashes[item["source_external_key"]]):
                         raise RadarValidationError("Megion replay row binding is invalid")
                     items.append(MegionRadarImportItem(**(item | {"created": False})))
-                return MegionRadarImportResult(snapshot_id, batch.csv_sha256, len(items), 0, len(items),
+                return MegionRadarImportResult(snapshot_id, reviewed.csv_sha256, len(items), 0, len(items),
                                                excluded, tuple(items), True)
             items = []
             for record in selected:
@@ -441,13 +567,17 @@ class MegionRadarImporter:
                     raise RadarConflict("Megion permit did not resolve to a canonical object")
                 body = {
                     "version": MEGION_IMPORT_VERSION, "source_key": MEGION_SOURCE_KEY,
+                    "projection_version": MEGION_PROJECTION_VERSION,
+                    "receipt_schema_version": MEGION_RECEIPT_SCHEMA_VERSION,
                     "snapshot_id": snapshot_id,
                     "passport_id": passport_id, "radar_signal_id": result.signal_id,
                     "radar_object_id": result.object_id, "radar_project_id": result.project_id,
                     "source_external_key": record.source_external_key, "source_revision": revision,
                     "revision_binding_sha256": record.revision_binding_sha256,
                     "evidence_id": evidence.evidence_id, "content_sha256": evidence.content_sha256,
-                    "original_csv_sha256": batch.csv_sha256, "sanitized_row_sha256": record.sanitized_row_sha256,
+                    "original_csv_sha256": reviewed.csv_sha256,
+                    "original_csv_byte_length": reviewed.csv_byte_length,
+                    "sanitized_row_sha256": record.sanitized_row_sha256,
                     "source_url": source_url, "source_publication_at_utc": record.published_at_utc,
                     "published_precision": record.published_precision, "captured_at_utc": captured,
                     "acquired_by": "LOCAL_FILE", "acquisition_mode": "MANUAL_IMPORT",
@@ -469,9 +599,11 @@ class MegionRadarImporter:
                 producer=_PRODUCER, idempotency_key="snapshot:" + snapshot_id, actor=actor,
                 occurred_at_utc=captured, schema_version=15,
                 payload={"snapshot_id": snapshot_id, "command": command, "captured_at_utc": captured,
-                         "source_revision": revision, "items": [asdict(item) for item in items],
-                         "input_row_count": batch.input_row_count, "excluded_counts": excluded,
-                         "evidence_semantics": "LOCAL_PUBLIC_DATASET_TRANSFORM", "external_requests": 0},
+                          "source_revision": revision, "items": [asdict(item) for item in items],
+                          "input_row_count": batch.input_row_count, "excluded_counts": excluded,
+                          "projection_version": MEGION_PROJECTION_VERSION,
+                          "receipt_schema_version": MEGION_RECEIPT_SCHEMA_VERSION,
+                          "evidence_semantics": "LOCAL_PUBLIC_DATASET_TRANSFORM", "external_requests": 0},
             )
-            return MegionRadarImportResult(snapshot_id, batch.csv_sha256, len(items), created, len(items) - created,
+            return MegionRadarImportResult(snapshot_id, reviewed.csv_sha256, len(items), created, len(items) - created,
                                            excluded, tuple(items), False)
