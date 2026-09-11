@@ -24,8 +24,15 @@ from lead_factory.megion_public_permits import (
     parse_megion_permits_csv,
 )
 from lead_factory.megion_radar_import import (
-    MEGION_IMPORT_VERSION, MEGION_SOURCE_KEY, MEGION_TERMS_REF, MegionRadarImporter,
-    megion_building_scope, read_megion_source_metadata_tx,
+    MEGION_IMPORT_VERSION,
+    MEGION_PROJECTION_VERSION,
+    MEGION_RECEIPT_SCHEMA_VERSION,
+    MEGION_REVIEWED_SNAPSHOTS,
+    MEGION_SOURCE_KEY,
+    MEGION_TERMS_REF,
+    MegionRadarImporter,
+    megion_building_scope,
+    read_megion_source_metadata_tx,
 )
 from lead_factory.store import FactoryStore
 
@@ -33,6 +40,11 @@ from lead_factory.store import FactoryStore
 NOW = datetime(2026, 9, 7, 12, tzinfo=timezone.utc)
 URL = "https://opendata.admmegion.ru/opendata/csv/31875/data/data-20260902T145832-structure-20240702T122402.csv"
 PUBLISHED = "2026-09-02T00:00:00Z"
+AUG_URL = "https://opendata.admmegion.ru/opendata/csv/31875/data/data-20260803T095353-structure-20240702T122402.csv"
+AUG_PUBLISHED = "2026-08-03T00:00:00Z"
+REVIEWED_BY_URL = {snapshot.source_url: snapshot for snapshot in MEGION_REVIEWED_SNAPSHOTS}
+SEP_SNAPSHOT = REVIEWED_BY_URL[URL]
+AUG_SNAPSHOT = REVIEWED_BY_URL[AUG_URL]
 
 
 def fixture_row(number="86-19-999-2026", title="Здание мастерской", issued="14.04.2026"):
@@ -45,12 +57,20 @@ def fixture_row(number="86-19-999-2026", title="Здание мастерско�
             "городской округ город Мегион"]
 
 
-def encode(rows):
+def encode(rows, *, byte_length=None):
     stream = io.StringIO(newline="")
     writer = csv.writer(stream, lineterminator="\r\n")
     writer.writerow(MEGION_CSV_HEADERS)
     writer.writerows(rows)
-    return b"\xef\xbb\xbf" + stream.getvalue().encode("utf-8")
+    blob = b"\xef\xbb\xbf" + stream.getvalue().encode("utf-8")
+    if byte_length is not None:
+        if len(blob) > byte_length:
+            raise AssertionError("synthetic CSV exceeds reviewed snapshot size")
+        # Only the digest function is injected below. Blank CSV lines make the
+        # synthetic parser fixture match the reviewed byte count without
+        # pretending these are the reviewed municipal bytes.
+        blob += b"\n" * (byte_length - len(blob))
+    return blob
 
 
 class MegionRadarImportTests(unittest.TestCase):
@@ -79,7 +99,22 @@ class MegionRadarImportTests(unittest.TestCase):
         kwargs = dict(passport_id=self.passport_id, actor="test-source-import", source_url=URL,
                       published_at_utc=PUBLISHED)
         kwargs.update(changes)
-        return self.importer.import_bytes(encode(rows or [fixture_row()]), **kwargs)
+        inject_reviewed_hash = kwargs.pop("_test_inject_reviewed_hash", True)
+        snapshot = next(
+            (
+                item for item in MEGION_REVIEWED_SNAPSHOTS
+                if item.source_url == kwargs["source_url"]
+                and item.published_at_utc == kwargs["published_at_utc"]
+            ),
+            SEP_SNAPSHOT,
+        )
+        byte_length = kwargs.pop("_test_csv_byte_length", snapshot.csv_byte_length)
+        digest = kwargs.pop("_test_csv_sha256", snapshot.csv_sha256)
+        blob = encode(rows if rows is not None else [fixture_row()], byte_length=byte_length)
+        if not inject_reviewed_hash:
+            return self.importer.import_bytes(blob, **kwargs)
+        with patch("lead_factory.megion_radar_import._csv_sha256", return_value=digest):
+            return self.importer.import_bytes(blob, **kwargs)
 
     def counts(self):
         con = self.store.connect()
@@ -101,12 +136,13 @@ class MegionRadarImportTests(unittest.TestCase):
             con.close()
 
     def test_only_sanitized_public_bytes_are_retained_and_capture_is_not_backdated(self):
-        raw = encode([fixture_row()])
+        raw = encode([fixture_row()], byte_length=SEP_SNAPSHOT.csv_byte_length)
         parsed = parse_megion_permits_csv(raw, source_url=URL, published_at_utc=PUBLISHED)
         before = self.counts()
         result = self.import_rows()
         self.assertEqual((result.selected_count, result.created_count, result.unchanged_count), (1, 1, 0))
-        self.assertEqual(result.csv_sha256, hashlib.sha256(raw).hexdigest())
+        self.assertNotEqual(hashlib.sha256(raw).hexdigest(), SEP_SNAPSHOT.csv_sha256)
+        self.assertEqual(result.csv_sha256, SEP_SNAPSHOT.csv_sha256)
         metadata = self.metadata(result.items[0])
         self.assertEqual(metadata["source_publication_at_utc"], PUBLISHED)
         self.assertEqual(metadata["captured_at_utc"], "2026-09-07T12:00:00Z")
@@ -118,6 +154,9 @@ class MegionRadarImportTests(unittest.TestCase):
         self.assertIn(fields["issuer"], MEGION_PUBLIC_ISSUERS)
         self.assertEqual(metadata["evidence_semantics"], "LOCAL_PUBLIC_DATASET_TRANSFORM")
         self.assertEqual(metadata["acquired_by"], "LOCAL_FILE")
+        self.assertEqual(metadata["original_csv_byte_length"], SEP_SNAPSHOT.csv_byte_length)
+        self.assertEqual(metadata["projection_version"], MEGION_PROJECTION_VERSION)
+        self.assertEqual(metadata["receipt_schema_version"], MEGION_RECEIPT_SCHEMA_VERSION)
         con = self.store.connect()
         try:
             stored = con.execute("SELECT blob FROM radar_evidence_records").fetchone()[0]
@@ -127,13 +166,103 @@ class MegionRadarImportTests(unittest.TestCase):
             claim = con.execute("SELECT * FROM radar_project_claims WHERE claim_type='STAGE'").fetchone()
             self.assertEqual(claim["observed_at_utc"], "2026-04-14T00:00:00Z")
             self.assertEqual(claim["claimant_type"], "PUBLIC_DATASET")
-            self.assertEqual(claim["method_version"], "megion-public-dataset-transform-v3")
+            self.assertEqual(claim["method_version"], "megion-public-dataset-transform-v4")
         finally:
             con.close()
         after = self.counts()
         for table in ("radar_project_participants", "radar_procurement_predictions", "opportunities",
                       "interactions", "human_tasks", "crm_outbox", "outbox"):
             self.assertEqual(before[table], after[table])
+
+    def test_reviewed_manifest_is_exact_and_substitutions_fail_before_parse_or_write(self):
+        self.assertEqual(MEGION_IMPORT_VERSION, "megion-radar-import-v4")
+        self.assertEqual(MEGION_PROJECTION_VERSION, "megion-public-projection-v4")
+        self.assertEqual(MEGION_RECEIPT_SCHEMA_VERSION, "megion-public-receipt-v4")
+        self.assertEqual(
+            tuple(
+                (
+                    item.source_url,
+                    item.published_at_utc,
+                    item.csv_byte_length,
+                    item.csv_sha256,
+                )
+                for item in MEGION_REVIEWED_SNAPSHOTS
+            ),
+            (
+                (
+                    AUG_URL,
+                    AUG_PUBLISHED,
+                    93946,
+                    "fd5138a8562e2810dca4a8651a536dd103d86dacf103e70e71b932f4158779a9",
+                ),
+                (
+                    URL,
+                    PUBLISHED,
+                    93856,
+                    "64da610e83005420bd8e48ffbbeaf6e64b5490144822de3c2440efb2decd95d4",
+                ),
+            ),
+        )
+        self.assertTrue(all(not hasattr(item, "csv_bytes") for item in MEGION_REVIEWED_SNAPSHOTS))
+
+        before = self.counts()
+        cases = (
+            {"source_url": URL.replace("20260902T145832", "20260903T145832")},
+            {"published_at_utc": "2026-09-03T00:00:00Z"},
+            {"_test_csv_sha256": "0" * 64},
+            {"_test_csv_byte_length": SEP_SNAPSHOT.csv_byte_length - 1},
+            {
+                "source_url": URL.replace("20260902T145832", "20261002T145832"),
+                "published_at_utc": "2026-10-02T00:00:00Z",
+            },
+            {"_test_inject_reviewed_hash": False},
+        )
+        with patch("lead_factory.megion_radar_import.parse_megion_permits_csv") as parser:
+            for changes in cases:
+                with self.subTest(changes=changes), self.assertRaises(RadarValidationError):
+                    self.import_rows(**changes)
+                self.assertEqual(self.counts(), before)
+            parser.assert_not_called()
+
+    def test_off_region_ids_and_issue_year_mismatch_write_nothing(self):
+        before = self.counts()
+        cases = []
+        for index, value in (
+            (11, "77-19-999-2026"),
+            (2, "77:19:0010405:1234"),
+            (2, "86:20:0010405:1234"),
+            (11, "86-19-999-2025"),
+        ):
+            candidate = fixture_row()
+            candidate[index] = value
+            cases.append(candidate)
+        for candidate in cases:
+            with self.subTest(candidate=candidate[11]), self.assertRaises(RadarValidationError):
+                self.import_rows([candidate])
+            self.assertEqual(self.counts(), before)
+
+    def test_zero_and_off_area_coordinates_are_withheld_from_every_projection(self):
+        rows = []
+        for index, (longitude, latitude) in enumerate((("0", "0"), ("37.6176", "55.7558"))):
+            candidate = fixture_row(f"86-19-{990 + index}-2026")
+            candidate[2] = "-"
+            candidate[7:9] = [longitude, latitude]
+            rows.append(candidate)
+        result = self.import_rows(rows)
+        self.assertEqual(result.created_count, 2)
+        for item in result.items:
+            fields = self.metadata(item)["public_fields"]
+            self.assertEqual((fields["longitude"], fields["latitude"]), ("", ""))
+        con = self.store.connect()
+        try:
+            self.assertEqual(
+                con.execute(
+                    "SELECT COUNT(*) FROM radar_object_identity_claims WHERE claim_type='COORDINATES'"
+                ).fetchone()[0],
+                0,
+            )
+        finally:
+            con.close()
 
     def test_free_text_projection_never_reaches_parser_database_events_or_workbench(self):
         from lead_factory.radar_workbench import RadarResearchWorkbench
@@ -312,11 +441,11 @@ class MegionRadarImportTests(unittest.TestCase):
                 self.assertNotIn("денис", output)
                 self.assertNotIn("сидоров", output)
 
-    def test_pre_v3_receipts_are_quarantined_by_current_reader(self):
+    def test_pre_v4_receipts_are_quarantined_by_current_reader_and_manager(self):
         from lead_factory.radar_workbench import RadarResearchWorkbench, RadarWorkbenchConflict
 
-        self.assertEqual(MEGION_IMPORT_VERSION, "megion-radar-import-v3")
-        for old_version in ("v1", "v2"):
+        self.assertEqual(MEGION_IMPORT_VERSION, "megion-radar-import-v4")
+        for old_version in ("v1", "v2", "v3"):
             with self.subTest(old_version=old_version), tempfile.TemporaryDirectory() as directory:
                 self.store = FactoryStore(Path(directory) / "legacy.sqlite3")
                 self.store.init()
@@ -328,6 +457,12 @@ class MegionRadarImportTests(unittest.TestCase):
                 ), patch(
                     "lead_factory.megion_radar_import._METHOD",
                     f"megion-public-dataset-transform-{old_version}",
+                ), patch(
+                    "lead_factory.megion_radar_import.MEGION_PROJECTION_VERSION",
+                    f"megion-public-projection-{old_version}",
+                ), patch(
+                    "lead_factory.megion_radar_import.MEGION_RECEIPT_SCHEMA_VERSION",
+                    f"megion-public-receipt-{old_version}",
                 ):
                     result = self.import_rows()
                 before = self.counts()
@@ -366,26 +501,23 @@ class MegionRadarImportTests(unittest.TestCase):
         self.assertEqual(self.counts(), before)
 
     def test_newer_unchanged_snapshot_records_only_capture_and_preserves_claim_age(self):
-        first = self.import_rows()
+        first = self.import_rows(source_url=AUG_URL, published_at_utc=AUG_PUBLISHED)
         before = self.counts()
-        newer = URL.replace("20260902T145832", "20260903T120000")
-        result = self.import_rows(source_url=newer, published_at_utc="2026-09-03T00:00:00Z")
+        result = self.import_rows()
         self.assertFalse(result.replayed)
         self.assertEqual((result.created_count, result.unchanged_count), (0, 1))
         self.assertEqual(result.items[0].signal_id, first.items[0].signal_id)
         after = self.counts()
         self.assertEqual(after.pop("events"), before.pop("events") + 1)
         self.assertEqual(after, before)
-        self.assertEqual(self.metadata(result.items[0])["source_publication_at_utc"], PUBLISHED)
+        self.assertEqual(self.metadata(result.items[0])["source_publication_at_utc"], AUG_PUBLISHED)
 
     def test_changed_public_record_creates_revision_on_same_object(self):
-        first = self.import_rows()
-        result = self.import_rows([fixture_row(issued="15.04.2026")],
-                                 source_url=URL.replace("20260902T145832", "20260903T120000"),
-                                 published_at_utc="2026-09-03T00:00:00Z")
+        first = self.import_rows(source_url=AUG_URL, published_at_utc=AUG_PUBLISHED)
+        result = self.import_rows([fixture_row(issued="15.04.2026")])
         self.assertEqual(result.items[0].object_id, first.items[0].object_id)
         self.assertNotEqual(result.items[0].signal_id, first.items[0].signal_id)
-        self.assertEqual(result.items[0].source_revision, "20260903120000")
+        self.assertEqual(result.items[0].source_revision, "20260902145832")
         self.assertEqual(
             self.metadata(result.items[0])["public_fields"]["issued_at_utc"],
             "2026-04-15T00:00:00Z",
@@ -394,21 +526,23 @@ class MegionRadarImportTests(unittest.TestCase):
     def test_new_passport_and_new_source_revision_readmit_without_redating_facts(self):
         from lead_factory.radar_workbench import RadarResearchWorkbench
 
-        first = self.import_rows()
+        first = self.import_rows(source_url=AUG_URL, published_at_utc=AUG_PUBLISHED)
         second_passport = self.register(passport_version="2")
         before = self.counts()
         with self.assertRaisesRegex(RadarConflict, "rebound"):
-            self.import_rows(passport_id=second_passport)
+            self.import_rows(
+                passport_id=second_passport,
+                source_url=AUG_URL,
+                published_at_utc=AUG_PUBLISHED,
+            )
         self.assertEqual(self.counts(), before)
-        second = self.import_rows(passport_id=second_passport,
-                                  source_url=URL.replace("20260902T145832", "20260903T120000"),
-                                  published_at_utc="2026-09-03T00:00:00Z")
+        second = self.import_rows(passport_id=second_passport)
         self.assertEqual(second.created_count, 1)
         self.assertEqual(second.items[0].object_id, first.items[0].object_id)
         self.assertNotEqual(second.items[0].signal_id, first.items[0].signal_id)
         metadata = self.metadata(second.items[0])
         self.assertEqual(metadata["public_fields"]["issued_at_utc"], "2026-04-14T00:00:00Z")
-        self.assertEqual(metadata["source_publication_at_utc"], "2026-09-03T00:00:00Z")
+        self.assertEqual(metadata["source_publication_at_utc"], PUBLISHED)
         dossier = RadarResearchWorkbench(self.store, actor="test-operator", clock=lambda: NOW).dossier(first.items[0].object_id)
         current = next(signal for signal in dossier["signals"] if signal["radar_signal_id"] == second.items[0].signal_id)
         self.assertTrue(current["source_available"])
@@ -428,12 +562,74 @@ class MegionRadarImportTests(unittest.TestCase):
         finally:
             con.close()
 
+    def test_reader_revalidates_reviewed_snapshot_metadata_and_v4_bindings(self):
+        from lead_factory.ids import canonical_json, payload_hash
+
+        result = self.import_rows()
+        con = self.store.connect()
+        try:
+            signal = dict(
+                con.execute(
+                    "SELECT * FROM radar_signals WHERE radar_signal_id=?",
+                    (result.items[0].signal_id,),
+                ).fetchone()
+            )
+            trigger_rows = con.execute(
+                "SELECT name FROM sqlite_master WHERE type='trigger' AND tbl_name='events'"
+            ).fetchall()
+            for trigger in trigger_rows:
+                con.execute('DROP TRIGGER "' + trigger[0].replace('"', '""') + '"')
+            event = con.execute(
+                "SELECT * FROM events WHERE event_type='megion_public_permit_imported'"
+            ).fetchone()
+            original = json.loads(event["payload_json"])
+            substitutions = (
+                ("source_url", AUG_URL),
+                ("source_publication_at_utc", AUG_PUBLISHED),
+                ("original_csv_sha256", "0" * 64),
+                ("original_csv_byte_length", SEP_SNAPSHOT.csv_byte_length - 1),
+                ("projection_version", "megion-public-projection-v3"),
+                ("receipt_schema_version", "megion-public-receipt-v3"),
+            )
+            tables = (
+                "events", "radar_signals", "radar_objects", "radar_projects",
+                "radar_evidence_records", "radar_project_claims", "radar_project_participants",
+                "radar_procurement_predictions", "opportunities", "interactions",
+                "human_tasks", "crm_outbox", "outbox",
+            )
+            before = {
+                table: con.execute(f"SELECT count(*) FROM {table}").fetchone()[0]
+                for table in tables
+            }
+            for key, value in substitutions:
+                with self.subTest(key=key):
+                    body = json.loads(json.dumps(original))
+                    body[key] = value
+                    con.execute(
+                        "UPDATE events SET payload_json=?,payload_hash=? WHERE event_id=?",
+                        (canonical_json(body), payload_hash(body), event["event_id"]),
+                    )
+                    with self.assertRaises(RadarValidationError):
+                        read_megion_source_metadata_tx(con, signal)
+                    self.assertEqual(
+                        {
+                            table: con.execute(f"SELECT count(*) FROM {table}").fetchone()[0]
+                            for table in tables
+                        },
+                        before,
+                    )
+            con.execute(
+                "UPDATE events SET payload_json=?,payload_hash=? WHERE event_id=?",
+                (canonical_json(original), payload_hash(original), event["event_id"]),
+            )
+        finally:
+            con.close()
+
     def test_newer_unchanged_snapshot_replay_rejects_forged_result_ids(self):
         from lead_factory.ids import canonical_json, payload_hash
 
-        self.import_rows()
-        newer = URL.replace("20260902T145832", "20260903T120000")
-        second = self.import_rows(source_url=newer, published_at_utc="2026-09-03T00:00:00Z")
+        self.import_rows(source_url=AUG_URL, published_at_utc=AUG_PUBLISHED)
+        second = self.import_rows()
         con = self.store.connect()
         try:
             triggers = con.execute("SELECT name,sql FROM sqlite_master WHERE type='trigger' AND tbl_name='events'").fetchall()
@@ -451,21 +647,24 @@ class MegionRadarImportTests(unittest.TestCase):
             con.close()
         before = self.counts()
         with self.assertRaisesRegex(RadarValidationError, "replay row binding"):
-            self.import_rows(source_url=newer, published_at_utc="2026-09-03T00:00:00Z")
+            self.import_rows()
         self.assertEqual(self.counts(), before)
 
     def test_stale_snapshot_same_version_mutation_and_duplicate_conflict_write_nothing(self):
         self.import_rows()
         before = self.counts()
         bad_calls = [
-            lambda: self.import_rows(source_url=URL.replace("20260902T145832", "20260901T120000"),
-                                     published_at_utc="2026-09-01T00:00:00Z"),
-            lambda: self.import_rows([fixture_row(issued="15.04.2026")]),
-            lambda: self.import_rows([fixture_row(), fixture_row(issued="15.04.2026"),
-                                     fixture_row("86-19-998-2026")]),
+            (RadarConflict, lambda: self.import_rows(
+                source_url=AUG_URL, published_at_utc=AUG_PUBLISHED,
+            )),
+            (RadarValidationError, lambda: self.import_rows([fixture_row(issued="15.04.2026")])),
+            (RadarConflict, lambda: self.import_rows([
+                fixture_row(), fixture_row(issued="15.04.2026"),
+                fixture_row("86-19-998-2026"),
+            ])),
         ]
-        for call in bad_calls:
-            with self.assertRaises(RadarConflict):
+        for error, call in bad_calls:
+            with self.assertRaises(error):
                 call()
             self.assertEqual(self.counts(), before)
 

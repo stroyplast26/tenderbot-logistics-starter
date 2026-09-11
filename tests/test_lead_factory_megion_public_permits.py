@@ -71,8 +71,8 @@ class MegionPublicPermitsTests(unittest.TestCase):
         self.assertEqual(record.issued_at_utc, "2026-04-14T00:00:00Z")
         self.assertEqual(record.stage, "PERMIT_ISSUED")
         self.assertEqual(record.stage_source_date_utc, record.issued_at_utc)
-        self.assertEqual(record.latitude, "61.036799")
-        self.assertEqual(record.longitude, "76.105056")
+        self.assertEqual(record.latitude, "")
+        self.assertEqual(record.longitude, "")
         self.assertEqual(record.sanitized_row_sha256, hashlib.sha256(record.sanitized_row_bytes).hexdigest())
         public = json.loads(record.sanitized_row_json)
         self.assertEqual(set(public), {"permit_number", "issuer", "jurisdiction", "title", "address",
@@ -200,7 +200,29 @@ class MegionPublicPermitsTests(unittest.TestCase):
         value = row()
         value[7], value[8] = "76,1050560", "61,0367990"
         record = parse(csv_bytes([value])).records[0]
-        self.assertEqual((record.longitude, record.latitude), ("76.105056", "61.036799"))
+        self.assertEqual((record.longitude, record.latitude), ("", ""))
+
+    def test_megion_identifiers_issue_year_and_coordinates_are_fail_closed(self):
+        for index, value in (
+            (11, "77-19-999-2026"),
+            (2, "77:19:0010405:1234"),
+            (2, "86:20:0010405:1234"),
+        ):
+            with self.subTest(index=index, value=value):
+                candidate = row()
+                candidate[index] = value
+                self.assertEqual(parse(csv_bytes([candidate])).records, ())
+
+        mismatch = row()
+        mismatch[11] = "86-19-999-2025"
+        self.assertEqual(parse(csv_bytes([mismatch])).records, ())
+
+        for longitude, latitude in (("76.105056", "61.036799"), ("0", "0"), ("40", "55")):
+            with self.subTest(longitude=longitude, latitude=latitude):
+                candidate = row()
+                candidate[7:9] = [longitude, latitude]
+                record = parse(csv_bytes([candidate])).records[0]
+                self.assertEqual((record.longitude, record.latitude), ("", ""))
 
     def test_structured_values_use_dataset_specific_grammars_and_finite_mappings(self):
         for permit in (
