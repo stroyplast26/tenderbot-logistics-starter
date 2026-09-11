@@ -118,7 +118,10 @@ function renderDossier() {
   const publicPermits = data.signals.filter(row => row.public_fields && row.is_current_revision);
   for (const row of publicPermits) {
     const fields = row.public_fields;
-    $("participants").append(dataRow("Застройщик по реестру разрешений", `${fields.developer_name} · ИНН и закупщика предстоит установить`, row));
+    const developer = fields.source_text_withheld === "true"
+      ? `Организационно-правовая форма: ${fields.developer_legal_form} · исходное наименование скрыто до ручной проверки`
+      : `${fields.developer_name} · ИНН и закупщика предстоит установить`;
+    $("participants").append(dataRow("Сведения о застройщике", developer, row));
     $("claims").append(dataRow("Разрешение на строительство", `${fields.permit_number} · выдано ${String(fields.issued_at_utc).slice(0, 10).split("-").reverse().join(".")}`, row));
   }
   if (publicPermits.length) $("claims").append(el("p", "Реестр подтверждает выдачу разрешения. Текущую стройку, потребность в алюминии и сроки закупки предстоит проверить.", "warning"));

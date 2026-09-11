@@ -8,6 +8,9 @@ from lead_factory.megion_public_permits import (
     MAX_CSV_BYTES,
     MAX_CSV_ROWS,
     MEGION_CSV_HEADERS,
+    MEGION_PUBLIC_ISSUERS,
+    MEGION_PUBLIC_LEGAL_FORMS,
+    MEGION_PUBLIC_SCOPES,
     MegionPermitsValidationError,
     parse_megion_permits_csv,
     validate_megion_source_url,
@@ -33,7 +36,7 @@ def row():
         "61.036799",
         "Ханты-Мансийский автономный округ — Югра",
         'Здание мастерской,\nкорпус "А"',
-        "86-19-TEST-2026",
+        "86-19-999-2026",
         "14.04.2026",
         "PRIVATE_OFFICIAL_POSITION_SENTINEL",
         "PRIVATE_OFFICIAL_NAME_SENTINEL",
@@ -73,14 +76,28 @@ class MegionPublicPermitsTests(unittest.TestCase):
         self.assertEqual(record.sanitized_row_sha256, hashlib.sha256(record.sanitized_row_bytes).hexdigest())
         public = json.loads(record.sanitized_row_json)
         self.assertEqual(set(public), {"permit_number", "issuer", "jurisdiction", "title", "address",
-                                       "cadastral_id", "developer_name", "issued_at_utc", "longitude",
-                                       "latitude", "stage", "stage_source_date_utc"})
+                                       "cadastral_id", "developer_name", "developer_legal_form",
+                                       "building_scope", "source_text_withheld", "issued_at_utc",
+                                       "longitude", "latitude", "stage", "stage_source_date_utc"})
         self.assertNotIn("SENTINEL", record.sanitized_row_json)
         self.assertNotIn("source_url", public)
         self.assertNotIn("source_revision", public)
         self.assertNotIn("csv_sha256", public)
         self.assertNotIn("demand", public)
         self.assertNotIn("expires_at_utc", public)
+        self.assertEqual(record.address, "")
+        self.assertIn(record.issuer, MEGION_PUBLIC_ISSUERS)
+        self.assertEqual(record.title, "")
+        self.assertEqual(record.developer_name, "")
+        self.assertIn(record.developer_legal_form, MEGION_PUBLIC_LEGAL_FORMS)
+        self.assertIn(record.building_scope, MEGION_PUBLIC_SCOPES)
+        self.assertEqual(record.source_text_withheld, "true")
+        for raw_fragment in (
+            "Примерная",
+            "Тестовая организация",
+            "мастерской",
+        ):
+            self.assertNotIn(raw_fragment, record.sanitized_row_json)
 
     def test_private_ambiguous_and_contact_polluted_developers_are_excluded(self):
         cases = []
@@ -111,7 +128,7 @@ class MegionPublicPermitsTests(unittest.TestCase):
         equal = parse(csv_bytes([first, copy]))
         self.assertEqual(len(equal.records), 1)
         self.assertEqual(dict(equal.excluded_counts), {"DUPLICATE_PUBLIC_ROW": 1})
-        copy[10] = "Другое здание"
+        copy[12] = "15.04.2026"
         conflict = parse(csv_bytes([first, copy]))
         reversed_ = parse(csv_bytes([copy, first]))
         self.assertEqual(conflict.records, ())
@@ -132,9 +149,45 @@ class MegionPublicPermitsTests(unittest.TestCase):
         self.assertEqual(first.sanitized_row_sha256, next_version.sanitized_row_sha256)
         self.assertNotEqual(first.source_revision, next_version.source_revision)
         self.assertNotEqual(first.revision_binding_sha256, next_version.revision_binding_sha256)
-        modified[15] = "УАиГ"
-        another_issuer = parse(csv_bytes([modified])).records[0]
-        self.assertNotEqual(first.source_external_key, another_issuer.source_external_key)
+        modified[0] = "Мегион, RAWADDRESSMARKER, участок 2"
+        modified[5] = "ООО «RAWDEVELOPERMARKER»"
+        modified[10] = "Здание RAWTITLEMARKER"
+        another_projection = parse(csv_bytes([modified])).records[0]
+        self.assertEqual(first.source_external_key, another_projection.source_external_key)
+        self.assertEqual(first.sanitized_row_sha256, another_projection.sanitized_row_sha256)
+        modified[15] = "ДТР"
+        another_permit = parse(csv_bytes([modified])).records[0]
+        self.assertNotEqual(first.source_external_key, another_permit.source_external_key)
+
+    def test_free_text_is_transient_and_only_finite_projection_is_returned(self):
+        value = row()
+        value[0] = "Мегион, RAWADDRESSMARKER, участок 77"
+        value[5] = "ООО «RAWDEVELOPERMARKER»"
+        value[10] = "Здание RAWTITLEMARKER"
+        record = parse(csv_bytes([value])).records[0]
+        exposed = "|".join(
+            (
+                record.address,
+                record.developer_name,
+                record.title,
+                record.sanitized_row_json,
+            )
+        )
+        for marker in (
+            "RAWADDRESSMARKER",
+            "RAWDEVELOPERMARKER",
+            "RAWTITLEMARKER",
+        ):
+            self.assertNotIn(marker, exposed)
+        self.assertEqual((record.address, record.developer_name, record.title), ("", "", ""))
+        self.assertIn(record.issuer, MEGION_PUBLIC_ISSUERS)
+        self.assertIn(record.developer_legal_form, MEGION_PUBLIC_LEGAL_FORMS)
+        self.assertIn(record.building_scope, MEGION_PUBLIC_SCOPES)
+        self.assertEqual(record.source_text_withheld, "true")
+
+        unknown_issuer = row()
+        unknown_issuer[15] = "RAWISSUERMARKER"
+        self.assertEqual(parse(csv_bytes([unknown_issuer])).records, ())
 
     def test_invalid_coordinates_do_not_become_invented_locations(self):
         for longitude, latitude in [("", ""), ("https://2gis.ru/example", "61.1"),
@@ -148,6 +201,45 @@ class MegionPublicPermitsTests(unittest.TestCase):
         value[7], value[8] = "76,1050560", "61,0367990"
         record = parse(csv_bytes([value])).records[0]
         self.assertEqual((record.longitude, record.latitude), ("76.105056", "61.036799"))
+
+    def test_structured_values_use_dataset_specific_grammars_and_finite_mappings(self):
+        for permit in (
+            "86-19-12-2026",
+            "86-19-1234-2026",
+            "86-RU86303000-131-2026",
+            "86-RU863000-1234-2026",
+        ):
+            with self.subTest(permit=permit):
+                value = row()
+                value[11] = permit
+                self.assertEqual(len(parse(csv_bytes([value])).records), 1)
+
+        two_cadastral_ids = row()
+        two_cadastral_ids[2] = "86:19:0010405:1 86:19:0010405:123456"
+        self.assertEqual(len(parse(csv_bytes([two_cadastral_ids])).records), 1)
+
+        for index, unsafe in (
+            (11, "ИванИванов"),
+            (11, "86-19-TEST-2026"),
+            (11, "8-900-123-45-67"),
+            (11, "٨٦-١٩-١٢٣-٢٠٢٦"),
+            (2, "ИванИванов"),
+            (2, "8-900-123-45-67"),
+            (2, "٨٦:١٩:٠٠١٠٤٠٥:١"),
+            (2, "86:19:0010405:1;86:19:0010405:2"),
+            (15, "Неизвестный орган"),
+            (16, "муниципальное образование Мегион"),
+        ):
+            with self.subTest(index=index, unsafe=unsafe):
+                value = row()
+                value[index] = unsafe
+                self.assertEqual(parse(csv_bytes([value])).records, ())
+
+        for issuer in MEGION_PUBLIC_ISSUERS:
+            with self.subTest(issuer=issuer):
+                value = row()
+                value[15] = issuer
+                self.assertEqual(parse(csv_bytes([value])).records[0].issuer, issuer)
 
     def test_untrusted_formula_and_invalid_required_values_are_excluded(self):
         for index, bad in [(0, "=HYPERLINK(\"https://example.invalid\")"), (5, "\t@SUM(1,2)"),
@@ -202,6 +294,7 @@ class MegionPublicPermitsTests(unittest.TestCase):
             " Иван П. Иванов", " Иван П Иванов", " Василий Петров", " василий петров",
             " Аркадий Сидоров", " аркадий сидоров", " Иван Шевченко", " Шевченко Иван",
             " денис сидоров", " Иван Иванович", " Анна Сергеевна",
+            " ٨ (٩٠٠) ١٢٣-٤٥-٦٧",
         )
         reasons = {
             0: {"PRIVATE_OBJECT_TEXT", "UNTRUSTED_CONTROL"},
@@ -222,7 +315,7 @@ class MegionPublicPermitsTests(unittest.TestCase):
         safe = row()
         safe[0] = ("Ханты Мансийский автономный округ — Югра, Г.О. Мегион, "
                    "улица Пушкина, улица пушкина, дом 8, корпус 900")
-        safe[2] = "86:19:006:2026"
+        safe[2] = "86:19:0000006:2026"
         safe[5] = "ООО «Ивановский квартал»"
         safe[10] = "Жилой комплекс Ивановский, корпус 86-19-006-2026"
         safe[11] = "86-19-006-2026"
@@ -261,6 +354,40 @@ class MegionPublicPermitsTests(unittest.TestCase):
         ordinary_unicode_whitespace = row()
         ordinary_unicode_whitespace[0] = "Мегион, улица\u00a0Пушкина, дом 1"
         self.assertEqual(len(parse(csv_bytes([ordinary_unicode_whitespace])).records), 1)
+
+    def test_unrecognized_name_shapes_are_either_rejected_or_projected_without_source_text(self):
+        variants = (
+            "Степан Бондаренко", "Богдан Петренко", "Руслан Мельник",
+            "Денис Кравчук", "Вадим Коваль", "Глеб Савчук",
+            "София Шевченко", "Людмила Бондаренко", "Надежда Мельник",
+            "И. И. Бондаренко", "И И Бондаренко", "Анна-Мария Бондаренко",
+            "Ivan Ivanov", "I. I. Bondarenko", "Иван Iванов", "Иван-Иванов",
+        )
+        for index in (0, 5, 10):
+            for variant in variants:
+                with self.subTest(index=index, variant=variant):
+                    value = row()
+                    value[index] += " " + variant
+                    result = parse(csv_bytes([value]))
+                    if not result.records:
+                        self.assertEqual(sum(result.excluded_counts.values()), 1)
+                        continue
+                    record = result.records[0]
+                    exposed = json.dumps(
+                        {name: getattr(record, name) for name in record.__slots__},
+                        ensure_ascii=False,
+                    )
+                    self.assertNotIn(variant, exposed)
+                    self.assertEqual(
+                        (record.title, record.address, record.developer_name),
+                        ("", "", ""),
+                    )
+
+        for variant in variants:
+            with self.subTest(index=15, variant=variant):
+                value = row()
+                value[15] += " " + variant
+                self.assertEqual(parse(csv_bytes([value])).records, ())
 
     def test_strict_header_csv_width_encoding_and_bounds(self):
         duplicate = list(MEGION_CSV_HEADERS)

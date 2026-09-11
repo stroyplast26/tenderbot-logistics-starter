@@ -19,7 +19,17 @@ from .construction_radar import (
     RadarObservation, RadarValidationError,
 )
 from .ids import payload_hash
-from .megion_public_permits import _source_version, parse_megion_permits_csv
+from .megion_public_permits import (
+    MEGION_PUBLIC_ISSUERS,
+    MEGION_PUBLIC_LEGAL_FORMS,
+    MEGION_PUBLIC_SCOPES,
+    MEGION_JURISDICTION,
+    _CADASTRAL,
+    _PERMIT,
+    _source_version,
+    megion_public_scope,
+    parse_megion_permits_csv,
+)
 from .radar_review_access import RadarEvidenceCommand, RadarEvidenceVault
 from .store import FactoryStore
 
@@ -28,18 +38,18 @@ MEGION_SOURCE_KEY = "megion-public-permits-31875"
 MEGION_TERMS_URL = "https://opendata.admmegion.ru/about/terms/"
 MEGION_TERMS_SHA256 = "7bc257bccb9f6aba582477728524d10bbff8c31ccb3ce096a9a1313160b2279e"
 MEGION_TERMS_REF = "evidence://megion-public-permits/terms/sha256/" + MEGION_TERMS_SHA256
-MEGION_IMPORT_VERSION = "megion-radar-import-v2"
+MEGION_IMPORT_VERSION = "megion-radar-import-v3"
 _PRODUCER = "megion_radar_import"
 _ROW_EVENT = "megion_public_permit_imported"
 _SNAPSHOT_EVENT = "megion_public_snapshot_imported"
-_METHOD = "megion-public-dataset-transform-v2"
+_METHOD = "megion-public-dataset-transform-v3"
 _RETENTION = "PUBLIC_REFERENCE_NO_EXPIRY"
 _TOKEN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:/-]{0,255}$")
 _HEX = re.compile(r"^[0-9a-f]{64}$")
 _PUBLIC_FIELDS = frozenset({
     "permit_number", "issuer", "jurisdiction", "title", "address", "cadastral_id",
-    "developer_name", "issued_at_utc", "latitude", "longitude", "stage",
-    "stage_source_date_utc",
+    "developer_name", "developer_legal_form", "building_scope", "source_text_withheld",
+    "issued_at_utc", "latitude", "longitude", "stage", "stage_source_date_utc",
 })
 
 
@@ -81,17 +91,7 @@ def _stamp(value: datetime) -> str:
 
 def megion_building_scope(title: str) -> str:
     """Conservative research selection, never an aluminium-demand inference."""
-    text = title.casefold().replace("ё", "е")
-    if re.search(r"трубопровод|газопровод|нефтепровод|водовод|водопровод|канализац|"
-                 r"электроснабжен|линия электропередач|кабельн|теплосет|теплотрасс|"
-                 r"автодорог|автомобильн\w* дорог|улично-дорож|линейн\w* объект", text):
-        return "LINEAR_INFRASTRUCTURE"
-    if re.search(r"здани|жил\w* дом|многоквартир|жилищн|магазин|торгов\w* центр|"
-                 r"школ|детск\w* сад|детск\w* дошкольн|поликлиник|больниц|"
-                 r"гостиниц|общежити|склад|мастерск|спорткомплекс|спортивн\w* комплекс|"
-                 r"культурн\w* центр|административн\w* корпус|производственн\w* корпус", text):
-        return "BUILDING"
-    return "UNKNOWN"
+    return megion_public_scope(title)
 
 
 def _observation(fields: dict[str, str], *, passport_id: str, external_key: str,
@@ -235,6 +235,16 @@ def read_megion_source_metadata_tx(con: Any, signal: Any) -> dict[str, Any]:
             and signal["command_hash"] == validated.command_hash
             and body["public_fields"] == fields and set(fields) == _PUBLIC_FIELDS
             and all(type(value) is str for value in fields.values())
+            and fields["issuer"] in MEGION_PUBLIC_ISSUERS
+            and fields["jurisdiction"] == MEGION_JURISDICTION
+            and fields["developer_legal_form"] in MEGION_PUBLIC_LEGAL_FORMS
+            and fields["building_scope"] in MEGION_PUBLIC_SCOPES
+            and fields["source_text_withheld"] == "true"
+            and fields["title"] == fields["address"] == fields["developer_name"] == ""
+            and fields["stage"] == "PERMIT_ISSUED"
+            and fields["stage_source_date_utc"] == fields["issued_at_utc"]
+            and _PERMIT.fullmatch(fields["permit_number"])
+            and (not fields["cadastral_id"] or _CADASTRAL.fullmatch(fields["cadastral_id"]))
             and body["content_sha256"] == body["sanitized_row_sha256"] == evidence.content_sha256
             and _HEX.fullmatch(body["original_csv_sha256"])
             and body["revision_binding_sha256"] == version_binding
@@ -280,7 +290,7 @@ def read_megion_source_metadata_tx(con: Any, signal: Any) -> dict[str, Any]:
             "retention_policy", "original_csv_sha256", "sanitized_row_sha256", "fetch_receipt_ref",
         )
     } | {"acquisition_label": "Ручная загрузка официального CSV", "acquired_by": "LOCAL_FILE",
-         "building_scope": megion_building_scope(fields["title"])}
+         "building_scope": fields["building_scope"]}
 
 
 class MegionRadarImporter:
@@ -330,8 +340,8 @@ class MegionRadarImporter:
             reason = ""
             if _utc(record.issued_at_utc).year < since_year:
                 reason = "BEFORE_SINCE_YEAR"
-            elif building_only and megion_building_scope(record.title) != "BUILDING":
-                reason = "BUILDING_SCOPE_" + megion_building_scope(record.title)
+            elif building_only and record.building_scope != "BUILDING":
+                reason = "BUILDING_SCOPE_" + record.building_scope
             if reason:
                 excluded[reason] = excluded.get(reason, 0) + 1
             else:
