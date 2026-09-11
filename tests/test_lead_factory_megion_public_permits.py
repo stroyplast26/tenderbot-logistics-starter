@@ -185,6 +185,83 @@ class MegionPublicPermitsTests(unittest.TestCase):
         value[0] = "Мегион, улица Пушкина, участок 1"
         self.assertEqual(len(parse(csv_bytes([value])).records), 1)
 
+    def test_common_russian_contacts_and_probable_names_are_fail_closed(self):
+        unsafe = (
+            " 8 (900) 123-45-67", " +7-900-123-45-67", " +7.900.123.45.67",
+            " 7 (900) 123-45-67", " 8-900-123-45-67", " 8.900.123.45.67",
+            " +7/900/123/45/67", " 89001234567", " 8\u00a0(900)\u2009123\u201145\u201167",
+            " 8\u200b(900)\u200b123-45-67", " 8\u2060(900)\u2060123-45-67",
+            " 8\x00(900)123-45-67",
+            " 8(900)123\u0301-45-67", " ＋７ ９００ １２３ ４５ ６７",
+            " 8(900)123\ufe63 45\ufe63 67",
+            " Иван Иванов", " иван иванов", " иВан ИВАНОВ", " ИВАНОВ\u00a0ИВАН",
+            " Иван\u200bИванов", " Иван\u2060Иванов", " Ива\u0301н Иванов",
+            " Иван,\nИванов", " И.И. Иванов", " Иванов И. И.",
+            " и.и. Иванов", " и. и. Иванов", " И.и. Иванов",
+            " Иванов И И", " И И Иванов", " В. Иванов", " Иванов С.",
+            " Иван П. Иванов", " Иван П Иванов", " Василий Петров", " василий петров",
+            " Аркадий Сидоров", " аркадий сидоров", " Иван Шевченко", " Шевченко Иван",
+            " денис сидоров", " Иван Иванович", " Анна Сергеевна",
+        )
+        reasons = {
+            0: {"PRIVATE_OBJECT_TEXT", "UNTRUSTED_CONTROL"},
+            5: {"PRIVATE_DEVELOPER", "UNSAFE_OR_MISSING_LEGAL_NAME", "UNTRUSTED_CONTROL"},
+            10: {"PRIVATE_OBJECT_TEXT", "UNTRUSTED_CONTROL"},
+            15: {"UNSAFE_OR_MISSING_ISSUER", "UNTRUSTED_CONTROL"},
+        }
+        for index, allowed_reasons in reasons.items():
+            for suffix in unsafe:
+                with self.subTest(index=index, suffix=suffix):
+                    value = row()
+                    value[index] += suffix
+                    result = parse(csv_bytes([value]))
+                    self.assertEqual(result.records, ())
+                    self.assertEqual(sum(result.excluded_counts.values()), 1)
+                    self.assertTrue(set(result.excluded_counts) <= allowed_reasons)
+
+        safe = row()
+        safe[0] = ("Ханты Мансийский автономный округ — Югра, Г.О. Мегион, "
+                   "улица Пушкина, улица пушкина, дом 8, корпус 900")
+        safe[2] = "86:19:006:2026"
+        safe[5] = "ООО «Ивановский квартал»"
+        safe[10] = "Жилой комплекс Ивановский, корпус 86-19-006-2026"
+        safe[11] = "86-19-006-2026"
+        self.assertEqual(len(parse(csv_bytes([safe])).records), 1)
+
+        safe_names = row()
+        safe_names[5] = "ООО «Проект жилых домов Югры»"
+        safe_names[10] = "Жилой комплекс Северная Долина, магазин строительных материалов"
+        self.assertEqual(len(parse(csv_bytes([safe_names])).records), 1)
+
+        quoted_private_name = row()
+        quoted_private_name[5] = "ООО «василий петров»"
+        self.assertEqual(parse(csv_bytes([quoted_private_name])).records, ())
+
+        for private_name in (
+            "Денис Сидоров", "Рустам Ахметов", "Рустам Ахметов Консалтинг",
+        ):
+            replacements = {
+                0: f"Мегион, объект «{private_name}»",
+                5: f"ООО «{private_name}»",
+                10: f"Ответственный «{private_name}»",
+                15: f"Департамент «{private_name}»",
+            }
+            for index, replacement in replacements.items():
+                with self.subTest(index=index, private_name=private_name):
+                    quoted = row()
+                    quoted[index] = replacement
+                    result = parse(csv_bytes([quoted]))
+                    self.assertEqual(result.records, ())
+                    self.assertEqual(sum(result.excluded_counts.values()), 1)
+
+        eponymous_address = row()
+        eponymous_address[0] = "Мегион, улица Ивана Иванова, улица Василия Петрова, дом 1"
+        self.assertEqual(len(parse(csv_bytes([eponymous_address])).records), 1)
+
+        ordinary_unicode_whitespace = row()
+        ordinary_unicode_whitespace[0] = "Мегион, улица\u00a0Пушкина, дом 1"
+        self.assertEqual(len(parse(csv_bytes([ordinary_unicode_whitespace])).records), 1)
+
     def test_strict_header_csv_width_encoding_and_bounds(self):
         duplicate = list(MEGION_CSV_HEADERS)
         duplicate[-1] = duplicate[0]

@@ -15,6 +15,7 @@ import hashlib
 import io
 import json
 import re
+import unicodedata
 from collections import Counter
 from types import MappingProxyType
 from typing import Mapping
@@ -51,10 +52,43 @@ _NUMBER = re.compile(r"^[+-]?[0-9]+(?:[.,][0-9]+)?$")
 _PERMIT = re.compile(r"^[A-Za-zА-Яа-яЁё0-9][A-Za-zА-Яа-яЁё0-9./_-]{1,159}$")
 _PRIVATE_NAME = re.compile(
     r"(?:\bип\b|индивидуальн\w*\s+предпринимател|физическ\w*\s+лиц|\bфио\b|"
-    r"\b[а-яё]+\s+[а-яё]\.\s*[а-яё]\.|\b[а-яё]+\s+[а-яё]+\s+[а-яё]+(?:ович|евич|овна|евна)\b)",
+    r"\b[а-яё]+\s+[а-яё]\.\s*[а-яё]\.|"
+    r"\b[а-яё]+\s+[а-яё]+\s+[а-яё]+(?:ович|евич|овна|евна)\b)",
     re.IGNORECASE,
 )
-_CONTACT = re.compile(r"@|https?://|\b(?:тел(?:ефон)?|факс|e-?mail)\b|\+7[\s(\d]", re.IGNORECASE)
+_CONTACT = re.compile(
+    r"@|https?://|\b(?:тел(?:ефон)?|факс|e-?mail)\b|"
+    r"(?<![\d+])(?:\+7|[78])[\s./\-\u2010-\u2015\u2212]*"
+    r"(?:\(\s*[0-9]{3}\s*\)|[0-9]{3})[\s./\-\u2010-\u2015\u2212]*"
+    r"[0-9]{3}[\s./\-\u2010-\u2015\u2212]*[0-9]{2}"
+    r"[\s./\-\u2010-\u2015\u2212]*[0-9]{2}(?!\d)",
+    re.IGNORECASE,
+)
+_NAME_TOKEN = re.compile(
+    r"(?<![а-яё])([а-яё][а-яё'-]{0,31})(?![а-яё])", re.IGNORECASE
+)
+_PROBABLE_GIVEN_NAMES = frozenset(
+    ("александр алексей андрей антон аркадий артем артём василий виктор владимир дмитрий евгений "
+     "иван игорь лев максим михаил николай олег павел петр пётр роман сергей юрий ян "
+     "александра анна виктория дарья екатерина елена ирина марина мария наталья "
+     "ольга светлана татьяна юлия").split()
+)
+_PROBABLE_NAME_SUFFIXES = (
+    "ов", "ев", "ёв", "ин", "ын", "ский", "цкий", "ова", "ева", "ёва",
+    "ина", "ына", "ская", "цкая", "ович", "евич", "овна", "евна", "ична",
+)
+_NON_PERSON_NAME_TOKENS = frozenset(
+    ("автономный автономная бульвар город городской городская дом дома домов жилой жилая "
+     "здание земельный застройщик застройщика квартал комплекс край магазин магазина "
+     "материалов микрорайон "
+     "муниципальный муниципальная долина остров источник источники источников "
+     "набережная объект область округ парк переулок площадь поселение поселок посёлок "
+     "проезд проспект район республика село сквер сооружение строение улица улице улицы "
+     "ул участок центр шоссе корпус во на по до от из за со").split()
+)
+_TOPONYM_NAME_MARKERS = frozenset(
+    "бульвар набережная переулок площадь проезд проспект улица улице улицы ул шоссе им имени".split()
+)
 _LEGAL_FORMS = {
     "ооо": "ООО", "общество с ограниченной ответственностью": "ООО",
     "ао": "АО", "акционерное общество": "АО",
@@ -130,6 +164,71 @@ def _clean(value: str) -> str:
     return re.sub(r"\s+", " ", value).strip()
 
 
+def _pii_probe(value: str) -> str:
+    normalized = unicodedata.normalize("NFKC", value)
+    return "".join(char for char in normalized
+                   if unicodedata.category(char) not in {"Mn", "Mc", "Me"})
+
+
+def _name_separator(value: str, left, right) -> bool:
+    return bool(re.fullmatch(r"[\s.,;]+", value[left.end():right.start()]))
+
+
+def _is_toponym_name_pair(value: str, words: tuple, index: int) -> bool:
+    for marker_index in range(index - 1, max(-1, index - 3), -1):
+        if words[marker_index].group(1).casefold() not in _TOPONYM_NAME_MARKERS:
+            continue
+        if any(
+            not re.fullmatch(r"[\s.]+", value[words[position].end():words[position + 1].start()])
+            for position in range(marker_index, index + 1)
+        ):
+            continue
+        intervening = words[marker_index + 1:index]
+        if not intervening or all(len(match.group(1)) == 1 for match in intervening):
+            return True
+    return False
+
+
+def _has_probable_private_name(value: str) -> bool:
+    words = tuple(_NAME_TOKEN.finditer(value))
+    for index, (left, right) in enumerate(zip(words, words[1:])):
+        if not _name_separator(value, left, right):
+            continue
+        if _is_toponym_name_pair(value, words, index):
+            continue
+        raw_first, raw_second = left.group(1), right.group(1)
+        first, second = raw_first.casefold(), raw_second.casefold()
+        if first in _NON_PERSON_NAME_TOKENS or second in _NON_PERSON_NAME_TOKENS:
+            continue
+        surrounding = (
+            words[index - 1].group(1).casefold() if index else "",
+            words[index + 2].group(1).casefold() if index + 2 < len(words) else "",
+        )
+        geographic_suffix = ("ский", "цкий", "ская", "цкая")
+        first_geographic = first.endswith(geographic_suffix)
+        second_geographic = second.endswith(geographic_suffix)
+        if ((first_geographic or second_geographic)
+                and (any(token in _NON_PERSON_NAME_TOKENS for token in surrounding)
+                     or (first_geographic and second_geographic)
+                     or (min(len(first), len(second)) <= 4
+                         and first not in _PROBABLE_GIVEN_NAMES
+                         and second not in _PROBABLE_GIVEN_NAMES))):
+            continue
+        has_name_suffix = first.endswith(_PROBABLE_NAME_SUFFIXES) or second.endswith(
+            _PROBABLE_NAME_SUFFIXES
+        )
+        if (has_name_suffix or first in _PROBABLE_GIVEN_NAMES
+                or second in _PROBABLE_GIVEN_NAMES):
+            return True
+    return False
+
+
+def _has_private_text(value: str) -> bool:
+    probe = _pii_probe(value)
+    return bool(_CONTACT.search(probe) or _PRIVATE_NAME.search(probe)
+                or _has_probable_private_name(probe))
+
+
 def _form_key(value: str) -> str:
     return _clean(value).lower().replace("ё", "е").strip(' ."«»')
 
@@ -202,8 +301,12 @@ def _public_row(row: list[str]) -> dict[str, str]:
     # Ignored personal fields never participate in classification or evidence.
     for index in (0, 2, 4, 5, 7, 8, 10, 11, 12, 15, 16):
         value = row[index]
-        stripped = value.lstrip()
-        if any((ord(char) < 32 and char not in "\t\r\n") or ord(char) == 127 for char in value):
+        stripped = unicodedata.normalize("NFKC", value).lstrip()
+        if any(
+            unicodedata.category(char) == "Cf"
+            or (unicodedata.category(char) == "Cc" and char not in "\t\r\n")
+            for char in value
+        ):
             raise ValueError("UNTRUSTED_CONTROL")
         placeholder = bool(stripped) and set(stripped.strip()) <= {"-"}
         if (stripped.startswith(("=", "+", "-", "@"))
@@ -211,12 +314,12 @@ def _public_row(row: list[str]) -> dict[str, str]:
             raise ValueError("FORMULA_CELL")
     # Fields 3, 6, 13, 14 are deliberately never consulted or returned.
     form, developer = _clean(row[4]), _clean(row[5])
-    if _PRIVATE_NAME.search(form) or _PRIVATE_NAME.search(developer):
+    if _PRIVATE_NAME.search(_pii_probe(form)) or _PRIVATE_NAME.search(_pii_probe(developer)):
         raise ValueError("PRIVATE_DEVELOPER")
     legal_form = _LEGAL_FORMS.get(_form_key(form))
     if not legal_form:
         raise ValueError("UNCONFIRMED_LEGAL_FORM")
-    if not developer or len(developer) > 512 or _CONTACT.search(developer):
+    if not developer or len(developer) > 512 or _has_private_text(developer):
         raise ValueError("UNSAFE_OR_MISSING_LEGAL_NAME")
     if not any(re.match(rf"^{re.escape(prefix)}(?:\s|[«\"]|$)", developer, re.IGNORECASE)
                for prefix in set(_LEGAL_FORMS.values())):
@@ -224,14 +327,14 @@ def _public_row(row: list[str]) -> dict[str, str]:
     permit, issuer, municipality = (_clean(row[index]) for index in (11, 15, 16))
     if not _PERMIT.fullmatch(permit):
         raise ValueError("INVALID_PERMIT_NUMBER")
-    if not issuer or len(issuer) > 256 or _PRIVATE_NAME.search(issuer) or _CONTACT.search(issuer):
+    if not issuer or len(issuer) > 256 or _has_private_text(issuer):
         raise ValueError("UNSAFE_OR_MISSING_ISSUER")
     if "мегион" not in municipality.casefold() or len(municipality) > 256:
         raise ValueError("UNEXPECTED_JURISDICTION")
     title, address, cadastral = (_clean(row[index]) for index in (10, 0, 2))
     if not title or len(title) > 4096 or len(address) > 2048:
         raise ValueError("INVALID_PUBLIC_OBJECT_TEXT")
-    if any(_CONTACT.search(value) or _PRIVATE_NAME.search(value) for value in (title, address)):
+    if any(_has_private_text(value) for value in (title, address)):
         raise ValueError("PRIVATE_OBJECT_TEXT")
     if not cadastral.strip("-") or cadastral.lower() in {"нет", "не указан"}:
         cadastral = ""
