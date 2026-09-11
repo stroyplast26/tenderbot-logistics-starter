@@ -24,6 +24,7 @@ from lead_factory.source_discovery_control import (
     run_source_discovery_once,
     source_discovery_plan,
     source_discovery_status,
+    verify_source_discovery_authority,
 )
 from lead_factory.tenderplan_read_only_intake import (
     TENDERPLAN_READ_ONLY_CONFIRMATION,
@@ -308,6 +309,261 @@ def test_plan_status_and_check_are_local_only_and_idempotent(tmp_path: Path) -> 
     assert first_status == second_status
     assert checked["state"] == "READY_FOR_SEPARATE_AUTHORITY_CHECK"
     assert not state_path.exists()
+
+
+def test_supported_yandex_check_verifies_native_authority_without_exposing_request(
+    tmp_path: Path,
+) -> None:
+    state_path = tmp_path / "control.sqlite3"
+    secret_query = "PRIVATE QUERY MUST NOT LEAVE NATIVE CHECK"
+    native_result = {
+        "ok": True,
+        "connection": "PERMANENT",
+        "request": {
+            "query_text": secret_query,
+            "region_label": "PRIVATE REGION",
+            "page": 0,
+        },
+        "cached": False,
+        "accounting": {
+            "policy_sha256": "f" * 64,
+            "stopped": False,
+            "expires_at_utc": "2026-09-11T23:59:59Z",
+            "attempts_reserved": 0,
+            "max_requests": 1,
+            "reserved_cost_minor": 0,
+            "remaining_cost_minor": 49,
+            "currency": "RUB",
+            "cost_semantics": "UPPER_ESTIMATE_NOT_INVOICE",
+            "states": {
+                "RESERVED": 0,
+                "DISPATCH_INTENT": 0,
+                "UNCERTAIN": 0,
+                "COMPLETED": 0,
+            },
+            "retained_responses": 0,
+            "live_authority_granted": False,
+        },
+    }
+    job_path = tmp_path / "approved-job.json"
+    with patch(
+        "lead_factory.source_discovery_control.check_manual_yandex_search",
+        return_value=native_result,
+    ) as native_check:
+        report = verify_source_discovery_authority(
+            "YANDEX",
+            state_path=state_path,
+            yandex_job_path=job_path,
+            folder_id="synthetic-folder",
+        )
+
+    native_check.assert_called_once_with(job_path, folder_id="synthetic-folder")
+    assert report["authority_verified"] is True
+    assert report["state"] == "READY_FOR_EXPLICIT_CONFIRMATION"
+    assert report["cached"] is False
+    assert report["journal"]["accounting_status"] == "VERIFIED"
+    serialized = json.dumps(report, ensure_ascii=False)
+    assert secret_query not in serialized
+    assert "PRIVATE REGION" not in serialized
+    assert str(job_path) not in serialized
+    assert not state_path.exists()
+
+
+def test_supported_yandex_check_detaches_native_failure_material(tmp_path: Path) -> None:
+    marker = "PRIVATE-YANDEX-CHECK-MATERIAL"
+    job_path = tmp_path / f"{marker}.json"
+    try:
+        with patch(
+            "lead_factory.source_discovery_control.check_manual_yandex_search",
+            side_effect=RuntimeError(marker),
+        ):
+            verify_source_discovery_authority(
+                "YANDEX",
+                state_path=tmp_path / "control.sqlite3",
+                yandex_job_path=job_path,
+                folder_id=f"folder-{marker}",
+            )
+    except SourceDiscoveryControlError as error:
+        assert error.code == "YANDEX_AUTHORITY_CHECK_REJECTED"
+        _assert_control_exception_is_detached(error, (marker,))
+    else:
+        raise AssertionError("native authority failure was accepted")
+
+
+@pytest.mark.parametrize(
+    ("cached", "max_requests"),
+    ((False, 1), (True, True)),
+)
+def test_supported_yandex_check_rejects_inconsistent_native_accounting(
+    tmp_path: Path,
+    cached: bool,
+    max_requests: object,
+) -> None:
+    completed = _accounted_page("PRIVATE ACCOUNTING QUERY")
+    accounting = dict(completed.journal)
+    accounting["states"] = dict(completed.journal["states"])
+    accounting["max_requests"] = max_requests
+    native_result = {
+        "ok": True,
+        "connection": "PERMANENT",
+        "request": {
+            "query_text": "PRIVATE ACCOUNTING QUERY",
+            "region_label": "PRIVATE ACCOUNTING REGION",
+            "page": 0,
+        },
+        "cached": cached,
+        "accounting": accounting,
+    }
+
+    with (
+        patch(
+            "lead_factory.source_discovery_control.check_manual_yandex_search",
+            return_value=native_result,
+        ),
+        pytest.raises(SourceDiscoveryControlError) as denied,
+    ):
+        verify_source_discovery_authority(
+            "YANDEX",
+            state_path=tmp_path / "control.sqlite3",
+            yandex_job_path=tmp_path / "job.json",
+            folder_id="folder",
+        )
+
+    assert denied.value.code == "YANDEX_ACCOUNTING_INCONSISTENT"
+    assert denied.value.__cause__ is None
+    assert denied.value.__context__ is None
+
+
+def test_source_cli_check_runs_real_native_verifier_without_secret_or_http(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    from lead_factory import radar_yandex_connection as connection
+    from lead_factory import radar_yandex_connection_authority as authority
+    from lead_factory import radar_yandex_pilot_authority as common
+    from tests.test_lead_factory_radar_yandex_connection import FOLDER, NOW, make_manual_job
+
+    root = tmp_path / "yandex-search"
+    job_path, _policy = make_manual_job(root)
+    state_path = tmp_path / "must-not-be-created.sqlite3"
+    with (
+        patch.object(authority, "_STATE_ROOT", root),
+        patch.object(common, "_now_utc", return_value=NOW),
+        patch.object(connection, "_now_utc", return_value=NOW),
+        patch.object(source_cli, "SOURCE_DISCOVERY_STATE_PATH", state_path),
+        patch(
+            "lead_factory.source_discovery_control.load_yandex_api_key",
+            side_effect=AssertionError("credential loader called"),
+        ) as credential_loader,
+        patch(
+            "lead_factory.radar_yandex_connection._post_yandex_core",
+            side_effect=AssertionError("HTTP called"),
+        ) as http,
+    ):
+        exit_code = source_cli.main(
+            [
+                "check",
+                "--source",
+                "YANDEX",
+                "--yandex-job",
+                str(job_path),
+                "--folder-id",
+                FOLDER,
+            ]
+        )
+
+    assert exit_code == 0
+    credential_loader.assert_not_called()
+    http.assert_not_called()
+    assert not state_path.exists()
+    payload_text = capsys.readouterr().out
+    payload = json.loads(payload_text)
+    assert payload["authority_verified"] is True
+    assert payload["state"] == "READY_FOR_EXPLICIT_CONFIRMATION"
+    assert payload["journal"]["attempts_reserved"] == 0
+    for hidden in (
+        "synthetic public construction",
+        "synthetic region",
+        FOLDER,
+        str(job_path),
+        "credential_sha256",
+    ):
+        assert hidden not in payload_text
+
+
+def test_source_cli_yandex_maintenance_routes_are_local_and_job_id_only(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    job_id = "12345678-1234-1234-1234-123456789abc"
+    status_report = {
+        "effects": {"provider_read_may_be_metered": False},
+        "operation": "YANDEX_JOURNAL_STATUS_LOCAL",
+        "state": "NO_RAW_RESPONSE_RETAINED",
+    }
+    purge_report = {
+        "effects": {"provider_read_may_be_metered": False},
+        "operation": "YANDEX_JOURNAL_PURGE_LOCAL",
+        "purged_results": 0,
+        "state": "NO_RAW_RESPONSE_RETAINED",
+    }
+    with (
+        patch.object(
+            source_cli,
+            "yandex_journal_status",
+            return_value=status_report,
+        ) as status,
+        patch.object(
+            source_cli,
+            "purge_yandex_journal",
+            return_value=purge_report,
+        ) as purge,
+        patch(
+            "lead_factory.source_discovery_control.load_yandex_api_key",
+            side_effect=AssertionError("credential loader called"),
+        ) as credential_loader,
+        patch(
+            "lead_factory.radar_yandex_connection._post_yandex_core",
+            side_effect=AssertionError("HTTP called"),
+        ) as http,
+    ):
+        assert source_cli.main(["yandex-status", "--job-id", job_id]) == 0
+        assert (
+            source_cli.main(
+                [
+                    "yandex-purge",
+                    "--job-id",
+                    job_id,
+                    "--confirm-expired-raw-purge",
+                ]
+            )
+            == 0
+        )
+
+    first, second = capsys.readouterr().out.splitlines()
+    assert json.loads(first) == status_report
+    assert json.loads(second) == purge_report
+    status.assert_called_once_with(job_id)
+    purge.assert_called_once_with(
+        job_id,
+        confirmation=source_cli.YANDEX_RAW_PURGE_CONFIRMATION,
+    )
+    credential_loader.assert_not_called()
+    http.assert_not_called()
+
+
+def test_source_cli_rejects_noncanonical_yandex_job_id_without_echo(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    private_value = "PRIVATE-JOB-ID-MATERIAL"
+    with patch.object(source_cli, "yandex_journal_status") as status:
+        with pytest.raises(SystemExit) as captured:
+            source_cli.main(["yandex-status", "--job-id", private_value])
+
+    assert captured.value.code == 2
+    status.assert_not_called()
+    error = capsys.readouterr().err
+    assert private_value not in error
+    assert "invalid Yandex job id" in error
 
 
 def test_yandex_delegates_exactly_once_and_report_is_sanitized(tmp_path: Path) -> None:

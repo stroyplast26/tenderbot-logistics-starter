@@ -15,8 +15,10 @@
 источникам. До второго платного источника нужен общий spend-ledger; пока предел
 30 000 ₽ контролируется владельцем по журналам источников и детализации биллинга.
 
-`plan`, `status`, `check`, `review-list`, `review-decide` и `review-close`
-всегда локальны. В рамках этого поддерживаемого safe flow обращение к провайдеру
+`plan`, `status`, `check`, `yandex-status`, `yandex-purge`, `review-list`,
+`review-decide` и `review-close` всегда локальны. `yandex-purge` удаляет только
+просроченный raw response после отдельного явного подтверждения. В рамках этого
+поддерживаемого safe flow обращение к провайдеру
 разрешено только через `source run-one` с отдельным явным подтверждением; после
 него всё равно повторно срабатывает нативная authority-проверка Yandex или
 TenderPlan. Без неё запрос не отправляется. В репозитории остаётся отдельный
@@ -83,10 +85,16 @@ Launcher удаляет ambient `YANDEX_SEARCH_API_KEY` до bootstrap и child 
 .\scripts\run_safe_lead_flow.ps1 source check --source KONTUR
 ```
 
+Для Yandex эта команда проходит нативную проверку exact connection, job,
+activation, code hashes, owner/reviewer/readiness receipts и journal. Она не
+читает ключ и не делает HTTP. Успех содержит `authority_verified=true` и
+`READY_FOR_EXPLICIT_CONFIRMATION`; любой отсутствующий, просроченный или
+несогласованный элемент даёт санитизированный fail-closed ответ и exit code `2`.
+
 Для Saby, DOM.RF и Kontur ожидаемое состояние сейчас —
 `BLOCKED_OFFLINE_CONTRACT`, а exit code — `2`. TenderPlan/Yandex `check`
-показывает только готовность перейти к отдельной нативной authority-проверке;
-он не подтверждает live-authority сам и не вызывает provider read.
+не вызывает provider read. Для TenderPlan `check` пока показывает только
+готовность перейти к его отдельной нативной authority-проверке.
 
 Портфель первого этапа разделён следующим образом:
 
@@ -102,16 +110,49 @@ Launcher удаляет ambient `YANDEX_SEARCH_API_KEY` до bootstrap и child 
 объекта и фактическая польза для менеджера. DOM.RF не является обязательным для
 первого потока и не покупается только ради расширения охвата.
 
-`status` и `check` не создают state database. Все source-команды намеренно
+`status` и `check` не создают controller state database. Yandex `check` открывает
+только уже существующий exact native journal и обновляет его монотонное
+наблюдаемое время для защиты от отката часов; job, activation, credential и
+provider response он не создаёт. Все source-команды намеренно
 используют только фиксированный canonical state
 `state\lead_factory\source_discovery_control.sqlite3`; произвольный
 `--state-path` через launcher не допускается.
 
 Локальный Yandex review также работает только с каноническими базами Source
 Lab и source controller; произвольные пути через launcher не принимаются.
-Контроллер `source-discovery-control-v3` связывает batch с хешем точного
+Контроллер `source-discovery-control-v4` связывает batch с хешем точного
 канонического пути Source Lab. Копия или перенос controller/Source Lab в другой
 каталог не может закрыть исходный batch.
+
+Состояние и обязательная очистка raw response для одного канонического job:
+
+```powershell
+.\scripts\run_safe_lead_flow.ps1 source yandex-status --job-id "01234567-89ab-4cde-8fab-0123456789ab"
+.\scripts\run_safe_lead_flow.ps1 source yandex-purge --job-id "01234567-89ab-4cde-8fab-0123456789ab" --confirm-expired-raw-purge
+```
+
+Вместо пути оператор передаёт только `job_id` в каноническом строчном
+UUID-формате. Команда сама вычисляет путь
+`yandex-search\requests\<UUID>\request.json` из доверенного OS state текущего
+пользователя; произвольный job path или SQLite-файл передать нельзя.
+Затем она проверяет exact job, journal и его физическую identity, а также
+сохранённую retention-привязку именно этого job. Основное место для неё —
+`requests/<UUID>/retention-activation.json`. Если per-job копии ещё нет,
+допустима точно совпадающая корневая `request-activation.json`, а после
+замены active pin — её архив `request-activation.<archive>.json`. Во всех
+случаях exact hashes и срок должны совпасть с job; просроченная привязка не
+продлевается и используется только для обязательной privacy-очистки.
+
+`yandex-status` показывает `retained_responses`, `purge_due_count`,
+`next_purge_at_utc` и состояние `RAW_RETENTION_PENDING`, `RAW_PURGE_DUE` или
+`NO_RAW_RESPONSE_RETAINED`. `yandex-purge` требует точный confirmation,
+удаляет только raw payload и correlation headers с наступившим
+`retain_until_utc` и идемпотентен: до срока ничего не удаляет, после повтора
+не повреждает accounting. Hashes, расход и terminal state сохраняются.
+Обе команды не читают credential, не обращаются к provider и не
+выводят query, job path, raw response или correlation headers. Для защиты от
+отката часов обе могут только продвинуть монотонное `last_at_utc` journal; это
+не продлевает job или activation.
 Просмотр exact batch требует `batch_receipt_sha256` из результата
 соответствующего `source run-one`:
 
@@ -199,8 +240,9 @@ ACL текущим оператором ОС и SYSTEM и назначьте ш�
 exact job. Они не имеют 24-часового срока задания и сами по себе ничего не
 разрешают. Exact job и его activation создаются заново **после последнего
 изменения кода**, действуют не более 24 часов и закрепляют указание владельца,
-лимит, текущий checkout и независимый `ACCEPT`. Текущий installer создаёт
-шестичасовое окно; это не сокращает обязательное 24-часовое raw-retention.
+лимит, текущий checkout и независимый `ACCEPT`. Исторический внешний installer
+создавал шестичасовое окно, но сейчас он не поддерживается и не используется;
+это не меняет обязательное 24-часовое raw-retention.
 
 Code hash задания охватывает всю цепочку до сети: launcher, controller,
 Source Lab bridge, нативные Yandex authority/accounting/transport и фиксированный
@@ -392,3 +434,9 @@ Gold signing, promotion, CRM write, outbox, email/телефонный outreach 
 
 Пока эти пункты не закрыты, корректный статус — безопасный ручной первый срез,
 а не production lead flow.
+
+Репозиторий пока намеренно не создаёт owner/reviewer/billing evidence и не имеет
+production-команды выпуска нового exact job/activation. Нельзя копировать для
+этого synthetic test helper или старый внешний installer: сначала нужен
+двухфазный audited installer, который создаёт неактивный scope, принимает только
+реальные свежие evidence artifacts и лишь затем отдельно устанавливает pin.

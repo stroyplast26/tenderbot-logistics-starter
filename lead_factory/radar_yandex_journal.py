@@ -454,6 +454,22 @@ class YandexPilotJournal:
                     "retained_responses": sum(r["response"] is not None for r in rows),
                     "live_authority_granted": False}
 
+    def retention_status(self, *, now: str) -> dict[str, object]:
+        """Return raw-retention deadlines only; never return payload or headers."""
+
+        current = _utc(now)
+        with self._transaction(now):
+            rows = self._connection.execute(
+                "SELECT retain_until_utc FROM attempts WHERE response IS NOT NULL"
+            ).fetchall()
+            deadlines = tuple(str(row["retain_until_utc"]) for row in rows)
+            parsed = tuple(_utc(value) for value in deadlines)
+            return {
+                "next_purge_at_utc": min(deadlines) if deadlines else None,
+                "purge_due_count": sum(deadline <= current for deadline in parsed),
+                "retained_responses": len(deadlines),
+            }
+
     def purge_expired(self, *, now: str) -> int:
         with self._transaction(now):
             rows = self._connection.execute(

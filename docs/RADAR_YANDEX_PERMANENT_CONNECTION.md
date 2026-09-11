@@ -24,10 +24,12 @@
   журнал, указание владельца, независимую приёмку и готовность биллинга.
 
 Постоянные metadata подключения не имеют срока exact job. Само задание и
-activation действуют не более 24 часов (текущий installer выдаёт шесть часов),
-а `retention_hours` raw response обязан быть равен ровно 24 часам. Их создают
-заново после финального изменения исполняемого кода; старые job/activation не
-переносятся на новый release candidate.
+activation действуют не более 24 часов, а `retention_hours` raw response обязан
+быть равен ровно 24 часам. Исторический внешний installer создавал шестичасовое
+окно, но сейчас он не поддерживается и не используется. Новый exact-комплект
+создают только через будущий audited installer после финального изменения
+исполняемого кода; старые job/activation не переносятся на новый release
+candidate.
 
 Секрет не помещают в Git, описание PR, чат, аргументы команд или текст задания.
 Права каталога ограничивают текущим пользователем Windows и SYSTEM. DPAPI
@@ -78,6 +80,12 @@ hash binding receipt и фиксирует outcome, journal counters и
 .\scripts\run_safe_lead_flow.ps1 source check --source YANDEX --yandex-job "C:\ABSOLUTE\approved-yandex-job.json" --folder-id "FOLDER_ID"
 ```
 
+Успешная проверка возвращает `authority_verified=true` и
+`READY_FOR_EXPLICIT_CONFIRMATION`. Она открывает уже существующий journal и
+обновляет только его монотонное наблюдаемое время; при этом не читает credential,
+не создаёт reservation/intent и не вызывает HTTP. `authority_verified=false`
+или любой fail-closed ответ не является допуском к запуску.
+
 Один отдельно разрешённый read выполняет тот же launcher:
 
 ```powershell
@@ -118,7 +126,39 @@ accounting receipts, job ID, policy digest, journal-path digest, outcome и чи
 `request.sqlite` и `dispatch-claims`. `request-activation.json` в корне
 подключения закрепляет точные байты одного действующего задания. Запуск не
 создаёт эти файлы, не продлевает допуск и не подставляет автоматическое согласие.
-Архивные журналы и claims сохраняются при установке следующего задания.
+Для дальнейшего privacy-обслуживания сохраняется exact retention-привязка
+каждого job. Предпочтительно она лежит в
+`requests/<UUID>/retention-activation.json`. Если per-job копии ещё нет,
+допустима точно совпадающая корневая `request-activation.json`, а после
+замены active pin — её архив `request-activation.<archive>.json`. Эта
+привязка позволяет проверить и очистить старый journal после замены
+активного job, не перепривязывая его к новой activation и не продлевая
+просроченный допуск. Архивные журналы и claims сохраняются при установке
+следующего задания.
+
+Проверить журнал и удалить только просроченный raw response через тот же launcher:
+
+```powershell
+.\scripts\run_safe_lead_flow.ps1 source yandex-status --job-id "01234567-89ab-4cde-8fab-0123456789ab"
+.\scripts\run_safe_lead_flow.ps1 source yandex-purge --job-id "01234567-89ab-4cde-8fab-0123456789ab" --confirm-expired-raw-purge
+```
+
+Оператор передаёт только `job_id` в каноническом строчном UUID-формате.
+Путь `yandex-search\requests\<UUID>\request.json` вычисляется самой командой из
+доверенного OS state текущего пользователя. Произвольные job paths и SQLite-файлы не
+принимаются. Exact job, journal identity и сохранённая per-job
+retention-activation должны совпасть; иначе команда завершается fail-closed.
+
+`yandex-status` сообщает `retained_responses`, `purge_due_count`,
+`next_purge_at_utc` и одно из состояний `RAW_RETENTION_PENDING`, `RAW_PURGE_DUE` или
+`NO_RAW_RESPONSE_RETAINED`. `yandex-purge` требует явное
+`--confirm-expired-raw-purge`, до `retain_until_utc` ничего не удаляет, а с момента
+наступления срока удаляет только raw payload и correlation headers. Повторный
+запуск идемпотентен; hashes, accounting и terminal state сохраняются.
+Обе команды не читают credential, не обращаются к provider, не продлевают
+job/activation и не выводят query, response, correlation headers или путь. Для
+защиты от отката часов они могут только продвинуть монотонное `last_at_utc`
+journal.
 
 ## Результат поиска
 
