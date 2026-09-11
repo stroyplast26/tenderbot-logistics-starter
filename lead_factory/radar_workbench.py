@@ -18,6 +18,7 @@ from urllib.parse import urlsplit
 
 from .construction_radar import RadarValidationError, SourcePassportRegistry
 from .ids import new_lf_id, payload_hash
+from .megion_public_permits import MEGION_WITHHELD_DISPLAY_TITLE
 from .radar_review_access import RadarEvidenceVault
 from .store import FactoryStore
 from .tasks import HumanTaskController
@@ -361,13 +362,18 @@ class RadarResearchWorkbench:
         display = {row["claim_type"]: row["normalized_value"] for row in identities}
         coordinates = display.get("LOCATION", "").split("|")
         latitude, longitude = coordinates if len(coordinates) == 2 else ("", "")
+        source_text_withheld = any(
+            row.get("public_fields", {}).get("source_text_withheld") == "true"
+            for row in current
+        )
         return {
             "object_id": object_id,
             "project_id": obj["radar_project_id"],
             "title": next(
                 (row["public_fields"]["title"] for row in reversed(current)
                  if row.get("public_fields", {}).get("title")),
-                obj["creation_title"],
+                MEGION_WITHHELD_DISPLAY_TITLE
+                if source_text_withheld else obj["creation_title"],
             ),
             "address": next(
                 (row["public_fields"]["address"] for row in reversed(current)

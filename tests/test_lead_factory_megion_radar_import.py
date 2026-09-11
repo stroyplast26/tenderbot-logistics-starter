@@ -15,7 +15,14 @@ from lead_factory.construction_radar import (
     ConstructionDemandRadar, RadarConflict, RadarValidationError,
     SourcePassport, SourcePassportRegistry,
 )
-from lead_factory.megion_public_permits import MEGION_CSV_HEADERS, parse_megion_permits_csv
+from lead_factory.megion_public_permits import (
+    MEGION_CSV_HEADERS,
+    MEGION_PUBLIC_ISSUERS,
+    MEGION_PUBLIC_LEGAL_FORMS,
+    MEGION_PUBLIC_SCOPES,
+    MEGION_WITHHELD_DISPLAY_TITLE,
+    parse_megion_permits_csv,
+)
 from lead_factory.megion_radar_import import (
     MEGION_IMPORT_VERSION, MEGION_SOURCE_KEY, MEGION_TERMS_REF, MegionRadarImporter,
     megion_building_scope, read_megion_source_metadata_tx,
@@ -28,13 +35,14 @@ URL = "https://opendata.admmegion.ru/opendata/csv/31875/data/data-20260902T14583
 PUBLISHED = "2026-09-02T00:00:00Z"
 
 
-def fixture_row(number="86-19-TEST-2026", title="Здание мастерской", issued="14.04.2026"):
+def fixture_row(number="86-19-999-2026", title="Здание мастерской", issued="14.04.2026"):
     # Non-public column sentinels are deliberately unrelated to actual people.
     return ["Мегион, улица Примерная, участок 1", "IGNORE_OVERSIGHT", "86:19:0010405:1234",
             "PRIVATE_ADDRESS_SENTINEL", "Общество с ограниченной ответственностью",
             "ООО «Тестовая организация»", "PRIVATE_FULLNAME_SENTINEL", "76.105056", "61.036799",
             "Ханты-Мансийский автономный округ — Югра", title, number, issued,
-            "PRIVATE_POSITION_SENTINEL", "PRIVATE_OFFICIAL_SENTINEL", "ДЗиГ", "город Мегион"]
+            "PRIVATE_POSITION_SENTINEL", "PRIVATE_OFFICIAL_SENTINEL", "ДЗиГ",
+            "городской округ город Мегион"]
 
 
 def encode(rows):
@@ -102,8 +110,12 @@ class MegionRadarImportTests(unittest.TestCase):
         metadata = self.metadata(result.items[0])
         self.assertEqual(metadata["source_publication_at_utc"], PUBLISHED)
         self.assertEqual(metadata["captured_at_utc"], "2026-09-07T12:00:00Z")
-        self.assertEqual(metadata["public_fields"]["title"], "Здание мастерской")
-        self.assertEqual(metadata["public_fields"]["developer_name"], "ООО «Тестовая организация»")
+        fields = metadata["public_fields"]
+        self.assertEqual((fields["title"], fields["address"], fields["developer_name"]), ("", "", ""))
+        self.assertEqual(fields["developer_legal_form"], "ООО")
+        self.assertEqual(fields["building_scope"], "BUILDING")
+        self.assertEqual(fields["source_text_withheld"], "true")
+        self.assertIn(fields["issuer"], MEGION_PUBLIC_ISSUERS)
         self.assertEqual(metadata["evidence_semantics"], "LOCAL_PUBLIC_DATASET_TRANSFORM")
         self.assertEqual(metadata["acquired_by"], "LOCAL_FILE")
         con = self.store.connect()
@@ -115,13 +127,141 @@ class MegionRadarImportTests(unittest.TestCase):
             claim = con.execute("SELECT * FROM radar_project_claims WHERE claim_type='STAGE'").fetchone()
             self.assertEqual(claim["observed_at_utc"], "2026-04-14T00:00:00Z")
             self.assertEqual(claim["claimant_type"], "PUBLIC_DATASET")
-            self.assertEqual(claim["method_version"], "megion-public-dataset-transform-v2")
+            self.assertEqual(claim["method_version"], "megion-public-dataset-transform-v3")
         finally:
             con.close()
         after = self.counts()
         for table in ("radar_project_participants", "radar_procurement_predictions", "opportunities",
                       "interactions", "human_tasks", "crm_outbox", "outbox"):
             self.assertEqual(before[table], after[table])
+
+    def test_free_text_projection_never_reaches_parser_database_events_or_workbench(self):
+        from lead_factory.radar_workbench import RadarResearchWorkbench
+
+        safe = fixture_row()
+        safe[0] = "Мегион, RAWADDRESSMARKER, участок 77"
+        safe[5] = "ООО «RAWDEVELOPERMARKER»"
+        safe[10] = "Здание RAWTITLEMARKER"
+        address_name = fixture_row("86-19-998-2026")
+        address_name[0] += " Степан Бондаренко"
+        developer_name = fixture_row("86-19-997-2026")
+        developer_name[5] += " Ivan Ivanov"
+        title_name = fixture_row("86-19-996-2026")
+        title_name[10] += " I. I. Bondarenko"
+        rejected_issuer = fixture_row("86-19-995-2026")
+        rejected_issuer[15] += " Степан Бондаренко"
+        rejected_contact = fixture_row("86-19-994-2026")
+        rejected_contact[10] += " +7-900-123-45-67"
+        rows = [safe, address_name, developer_name, title_name, rejected_issuer, rejected_contact]
+        for value in rows:
+            value[2] = "-"
+            value[7:9] = ["", ""]
+        raw = encode(rows)
+        parsed = parse_megion_permits_csv(raw, source_url=URL, published_at_utc=PUBLISHED)
+        self.assertEqual(len(parsed.records), 4)
+        parser_projection = json.dumps(
+            [
+                {name: getattr(record, name) for name in record.__slots__}
+                for record in parsed.records
+            ],
+            ensure_ascii=False,
+            sort_keys=True,
+        )
+        markers = (
+            "RAWADDRESSMARKER",
+            "RAWDEVELOPERMARKER",
+            "RAWTITLEMARKER",
+            "Степан",
+            "Бондаренко",
+            "Ivan Ivanov",
+            "Bondarenko",
+            "+7-900-123-45-67",
+            "PRIVATE_ADDRESS_SENTINEL",
+            "PRIVATE_FULLNAME_SENTINEL",
+            "PRIVATE_POSITION_SENTINEL",
+            "PRIVATE_OFFICIAL_SENTINEL",
+        )
+        for marker in markers:
+            self.assertNotIn(marker, parser_projection)
+
+        stdout, stderr = io.StringIO(), io.StringIO()
+        with redirect_stdout(stdout), redirect_stderr(stderr):
+            result = self.import_rows(rows)
+        self.assertEqual((result.selected_count, result.created_count), (4, 4))
+        self.assertEqual(sum(result.excluded_counts.values()), 2)
+        dossier = RadarResearchWorkbench(
+            self.store, actor="test-manager", clock=lambda: NOW
+        ).dossier(result.items[0].object_id)
+        self.assertEqual(dossier["object"]["title"], MEGION_WITHHELD_DISPLAY_TITLE)
+        fields = dossier["signals"][0]["public_fields"]
+        self.assertEqual((fields["title"], fields["address"], fields["developer_name"]), ("", "", ""))
+        self.assertIn(fields["issuer"], MEGION_PUBLIC_ISSUERS)
+        self.assertIn(fields["developer_legal_form"], MEGION_PUBLIC_LEGAL_FORMS)
+        self.assertIn(fields["building_scope"], MEGION_PUBLIC_SCOPES)
+        self.assertEqual(fields["source_text_withheld"], "true")
+
+        persisted = []
+        con = self.store.connect()
+        try:
+            tables = tuple(
+                row[0]
+                for row in con.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name"
+                )
+            )
+            for table in tables:
+                quoted = '"' + table.replace('"', '""') + '"'
+                for stored_row in con.execute(f"SELECT * FROM {quoted}"):
+                    for value in stored_row:
+                        if isinstance(value, bytes):
+                            try:
+                                persisted.append(value.decode("utf-8"))
+                            except UnicodeDecodeError:
+                                continue
+                        elif value is not None:
+                            persisted.append(str(value))
+        finally:
+            con.close()
+        exposed = "\n".join(persisted) + json.dumps(dossier, ensure_ascii=False)
+        exposed += stdout.getvalue() + stderr.getvalue()
+        for marker in markers:
+            self.assertNotIn(marker, exposed)
+
+    def test_three_distinct_permits_have_exact_identity_without_shared_address_claim(self):
+        rows = []
+        for offset, permit in enumerate(("86-19-991-2026", "86-19-992-2026", "86-19-993-2026")):
+            value = fixture_row(permit)
+            value[2] = f"86:19:0010405:{offset + 1}"
+            value[7] = f"76.10{offset}"
+            value[8] = f"61.03{offset}"
+            rows.append(value)
+        result = self.import_rows(rows)
+        self.assertEqual((result.selected_count, result.created_count), (3, 3))
+        self.assertEqual(len({item.object_id for item in result.items}), 3)
+        con = self.store.connect()
+        try:
+            objects = con.execute(
+                "SELECT creation_resolution_state FROM radar_objects ORDER BY rowid"
+            ).fetchall()
+            signals = con.execute(
+                "SELECT resolution_state,review_reason FROM radar_signals ORDER BY rowid"
+            ).fetchall()
+            claim_types = [
+                row[0]
+                for row in con.execute(
+                    "SELECT claim_type FROM radar_object_identity_claims ORDER BY rowid"
+                )
+            ]
+            strong = con.execute(
+                "SELECT claim_type,normalized_value FROM radar_strong_identity_keys ORDER BY rowid"
+            ).fetchall()
+        finally:
+            con.close()
+        self.assertEqual([row[0] for row in objects], ["EXACT"] * 3)
+        self.assertEqual([tuple(row) for row in signals], [("EXACT", "ASSESSMENT_REQUIRED")] * 3)
+        self.assertNotIn("ADDRESS", claim_types)
+        self.assertEqual([row[0] for row in strong], ["PERMIT"] * 3)
+        self.assertEqual(len({row[1] for row in strong}), 3)
 
     def test_private_text_rejection_is_atomic_and_does_not_echo_values(self):
         before = self.counts()
@@ -139,6 +279,7 @@ class MegionRadarImportTests(unittest.TestCase):
                 " и. и. Иванов",
                 " Иванов И И",
                 " В. Иванов",
+                " ٨ (٩٠٠) ١٢٣-٤٥-٦٧",
             ):
                 with self.subTest(index=index, suffix=suffix):
                     value = fixture_row()
@@ -149,6 +290,7 @@ class MegionRadarImportTests(unittest.TestCase):
                             self.import_rows([value])
                     self.assertEqual(self.counts(), before)
                     output = (str(caught.exception) + stdout.getvalue() + stderr.getvalue()).casefold()
+                    self.assertNotIn(suffix.strip().casefold(), output)
                     for private_fragment in ("900", "123", "иван"):
                         self.assertNotIn(private_fragment, output)
 
@@ -170,35 +312,47 @@ class MegionRadarImportTests(unittest.TestCase):
                 self.assertNotIn("денис", output)
                 self.assertNotIn("сидоров", output)
 
-    def test_pre_v2_receipts_are_quarantined_by_current_reader(self):
+    def test_pre_v3_receipts_are_quarantined_by_current_reader(self):
         from lead_factory.radar_workbench import RadarResearchWorkbench, RadarWorkbenchConflict
 
-        self.assertEqual(MEGION_IMPORT_VERSION, "megion-radar-import-v2")
-        with patch("lead_factory.megion_radar_import.MEGION_IMPORT_VERSION",
-                   "megion-radar-import-v1"), patch(
-            "lead_factory.megion_radar_import._METHOD",
-            "megion-public-dataset-transform-v1",
-        ):
-            result = self.import_rows()
-        before = self.counts()
-        with self.assertRaises(RadarWorkbenchConflict):
-            RadarResearchWorkbench(
-                self.store, actor="test-manager", clock=lambda: NOW
-            ).list_objects()
-        con = self.store.connect()
-        try:
-            signal = dict(con.execute("SELECT * FROM radar_signals").fetchone())
-            blob_before = bytes(con.execute("SELECT blob FROM radar_evidence_records").fetchone()[0])
-            with self.assertRaises(RadarValidationError):
-                read_megion_source_metadata_tx(con, signal)
-            self.assertEqual(
-                bytes(con.execute("SELECT blob FROM radar_evidence_records").fetchone()[0]),
-                blob_before,
-            )
-        finally:
-            con.close()
-        self.assertEqual(self.counts(), before)
-        self.assertTrue(result.items[0].signal_id)
+        self.assertEqual(MEGION_IMPORT_VERSION, "megion-radar-import-v3")
+        for old_version in ("v1", "v2"):
+            with self.subTest(old_version=old_version), tempfile.TemporaryDirectory() as directory:
+                self.store = FactoryStore(Path(directory) / "legacy.sqlite3")
+                self.store.init()
+                self.passport_id = self.register()
+                self.importer = MegionRadarImporter(self.store, clock=lambda: NOW)
+                with patch(
+                    "lead_factory.megion_radar_import.MEGION_IMPORT_VERSION",
+                    f"megion-radar-import-{old_version}",
+                ), patch(
+                    "lead_factory.megion_radar_import._METHOD",
+                    f"megion-public-dataset-transform-{old_version}",
+                ):
+                    result = self.import_rows()
+                before = self.counts()
+                with self.assertRaises(RadarWorkbenchConflict):
+                    RadarResearchWorkbench(
+                        self.store, actor="test-manager", clock=lambda: NOW
+                    ).list_objects()
+                con = self.store.connect()
+                try:
+                    signal = dict(con.execute("SELECT * FROM radar_signals").fetchone())
+                    blob_before = bytes(
+                        con.execute("SELECT blob FROM radar_evidence_records").fetchone()[0]
+                    )
+                    with self.assertRaises(RadarValidationError):
+                        read_megion_source_metadata_tx(con, signal)
+                    self.assertEqual(
+                        bytes(
+                            con.execute("SELECT blob FROM radar_evidence_records").fetchone()[0]
+                        ),
+                        blob_before,
+                    )
+                finally:
+                    con.close()
+                self.assertEqual(self.counts(), before)
+                self.assertTrue(result.items[0].signal_id)
 
     def test_exact_replay_writes_nothing_even_with_later_capture_clock(self):
         first = self.import_rows()
@@ -226,13 +380,16 @@ class MegionRadarImportTests(unittest.TestCase):
 
     def test_changed_public_record_creates_revision_on_same_object(self):
         first = self.import_rows()
-        result = self.import_rows([fixture_row(title="Здание мастерской, корпус Б")],
+        result = self.import_rows([fixture_row(issued="15.04.2026")],
                                  source_url=URL.replace("20260902T145832", "20260903T120000"),
                                  published_at_utc="2026-09-03T00:00:00Z")
         self.assertEqual(result.items[0].object_id, first.items[0].object_id)
         self.assertNotEqual(result.items[0].signal_id, first.items[0].signal_id)
         self.assertEqual(result.items[0].source_revision, "20260903120000")
-        self.assertEqual(self.metadata(result.items[0])["public_fields"]["title"], "Здание мастерской, корпус Б")
+        self.assertEqual(
+            self.metadata(result.items[0])["public_fields"]["issued_at_utc"],
+            "2026-04-15T00:00:00Z",
+        )
 
     def test_new_passport_and_new_source_revision_readmit_without_redating_facts(self):
         from lead_factory.radar_workbench import RadarResearchWorkbench
@@ -303,9 +460,9 @@ class MegionRadarImportTests(unittest.TestCase):
         bad_calls = [
             lambda: self.import_rows(source_url=URL.replace("20260902T145832", "20260901T120000"),
                                      published_at_utc="2026-09-01T00:00:00Z"),
-            lambda: self.import_rows([fixture_row(title="Здание магазина")]),
-            lambda: self.import_rows([fixture_row(), fixture_row(title="Здание магазина"),
-                                     fixture_row("86-19-OTHER-2026")]),
+            lambda: self.import_rows([fixture_row(issued="15.04.2026")]),
+            lambda: self.import_rows([fixture_row(), fixture_row(issued="15.04.2026"),
+                                     fixture_row("86-19-998-2026")]),
         ]
         for call in bad_calls:
             with self.assertRaises(RadarConflict):
@@ -325,16 +482,16 @@ class MegionRadarImportTests(unittest.TestCase):
 
         with patch.object(ConstructionDemandRadar, "ingest", fail_second):
             with self.assertRaises(RadarConflict):
-                self.import_rows([fixture_row(), fixture_row("86-19-SECOND-2026")])
+                self.import_rows([fixture_row(), fixture_row("86-19-997-2026")])
         self.assertEqual(len(calls), 2)
         self.assertEqual(self.counts(), before)
 
     def test_scope_selection_is_bounded_building_only_and_not_aluminium_prediction(self):
         self.assertEqual(megion_building_scope("Мастерская"), "BUILDING")
         self.assertEqual(megion_building_scope("Холодный склад"), "BUILDING")
-        rows = [fixture_row(), fixture_row("86-19-OLD-2025", issued="01.02.2025"),
-                fixture_row("86-19-LINEAR-2026", title="Газопровод к зданию"),
-                fixture_row("86-19-UNKNOWN-2026", title="Объект благоустройства")]
+        rows = [fixture_row(), fixture_row("86-19-996-2025", issued="01.02.2025"),
+                fixture_row("86-19-995-2026", title="Газопровод к зданию"),
+                fixture_row("86-19-994-2026", title="Объект благоустройства")]
         result = self.import_rows(rows)
         self.assertEqual(result.selected_count, 1)
         self.assertEqual(result.excluded_counts, {"BEFORE_SINCE_YEAR": 1,
@@ -343,7 +500,7 @@ class MegionRadarImportTests(unittest.TestCase):
         self.importer = MegionRadarImporter(self.store, clock=lambda: NOW, max_selected_records=1)
         before = self.counts()
         with self.assertRaises(RadarValidationError):
-            self.import_rows([fixture_row(), fixture_row("86-19-SECOND-2026")])
+            self.import_rows([fixture_row(), fixture_row("86-19-997-2026")])
         self.assertEqual(self.counts(), before)
 
     def test_expired_superseded_wrong_source_terms_and_mode_are_denied(self):

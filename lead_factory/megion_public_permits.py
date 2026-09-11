@@ -49,7 +49,13 @@ _SOURCE_PATH = re.compile(
     r"^/opendata/csv/31875/data/data-(\d{8}T\d{6})-structure-(\d{8}T\d{6})\.csv$"
 )
 _NUMBER = re.compile(r"^[+-]?[0-9]+(?:[.,][0-9]+)?$")
-_PERMIT = re.compile(r"^[A-Za-zА-Яа-яЁё0-9][A-Za-zА-Яа-яЁё0-9./_-]{1,159}$")
+_PERMIT = re.compile(
+    r"^[0-9]{2}-(?:RU[0-9]{6,8}-[0-9]{2,4}|[0-9]{2}-[0-9]{2,4})-[0-9]{4}$"
+)
+_CADASTRAL = re.compile(
+    r"^[0-9]{2}:[0-9]{2}:[0-9]{7}:[0-9]{1,6}"
+    r"(?:\s+[0-9]{2}:[0-9]{2}:[0-9]{7}:[0-9]{1,6})?$"
+)
 _PRIVATE_NAME = re.compile(
     r"(?:\bип\b|индивидуальн\w*\s+предпринимател|физическ\w*\s+лиц|\bфио\b|"
     r"\b[а-яё]+\s+[а-яё]\.\s*[а-яё]\.|"
@@ -110,6 +116,25 @@ _LEGAL_FORMS = {
     "учреждение": "УЧРЕЖДЕНИЕ", "бюджетное учреждение": "БУ",
     "казенное учреждение": "КУ", "автономное учреждение": "АУ",
 }
+_LINEAR_OBJECT = re.compile(
+    r"трубопровод|газопровод|нефтепровод|водовод|водопровод|канализац|"
+    r"электроснабжен|линия электропередач|кабельн|теплосет|теплотрасс|"
+    r"автодорог|автомобильн\w* дорог|улично-дорож|линейн\w* объект"
+)
+_BUILDING_OBJECT = re.compile(
+    r"здани|жил\w* дом|многоквартир|жилищн|магазин|торгов\w* центр|"
+    r"школ|детск\w* сад|детск\w* дошкольн|поликлиник|больниц|"
+    r"гостиниц|общежити|склад|мастерск|спорткомплекс|спортивн\w* комплекс|"
+    r"культурн\w* центр|административн\w* корпус|производственн\w* корпус"
+)
+_MEGION_ISSUERS = MappingProxyType({"ДЗиГ": "ДЗиГ", "ДТР": "ДТР", "УАиГ": "УАиГ"})
+_MEGION_MUNICIPALITIES = MappingProxyType(
+    {"городской округ город мегион": MEGION_JURISDICTION}
+)
+MEGION_PUBLIC_ISSUERS = frozenset(_MEGION_ISSUERS.values())
+MEGION_PUBLIC_LEGAL_FORMS = frozenset(_LEGAL_FORMS.values())
+MEGION_PUBLIC_SCOPES = frozenset({"BUILDING", "LINEAR_INFRASTRUCTURE", "UNKNOWN"})
+MEGION_WITHHELD_DISPLAY_TITLE = "Описание объекта скрыто до ручной проверки"
 
 
 class MegionPermitsValidationError(ValueError):
@@ -128,6 +153,9 @@ class MegionPermitRecord:
     address: str
     cadastral_id: str
     developer_name: str
+    developer_legal_form: str
+    building_scope: str
+    source_text_withheld: str
     issued_at_utc: str
     latitude: str
     longitude: str
@@ -166,8 +194,18 @@ def _clean(value: str) -> str:
 
 def _pii_probe(value: str) -> str:
     normalized = unicodedata.normalize("NFKC", value)
-    return "".join(char for char in normalized
-                   if unicodedata.category(char) not in {"Mn", "Mc", "Me"})
+    result = []
+    for char in normalized:
+        if unicodedata.category(char) in {"Mn", "Mc", "Me"}:
+            continue
+        if char in "\u2010\u2011\u2012\u2013\u2014\u2015\u2212":
+            result.append("-")
+            continue
+        try:
+            result.append(str(unicodedata.decimal(char)))
+        except ValueError:
+            result.append(char)
+    return "".join(result)
 
 
 def _name_separator(value: str, left, right) -> bool:
@@ -217,8 +255,11 @@ def _has_probable_private_name(value: str) -> bool:
         has_name_suffix = first.endswith(_PROBABLE_NAME_SUFFIXES) or second.endswith(
             _PROBABLE_NAME_SUFFIXES
         )
-        if (has_name_suffix or first in _PROBABLE_GIVEN_NAMES
-                or second in _PROBABLE_GIVEN_NAMES):
+        if (
+            has_name_suffix
+            or first in _PROBABLE_GIVEN_NAMES
+            or second in _PROBABLE_GIVEN_NAMES
+        ):
             return True
     return False
 
@@ -227,6 +268,16 @@ def _has_private_text(value: str) -> bool:
     probe = _pii_probe(value)
     return bool(_CONTACT.search(probe) or _PRIVATE_NAME.search(probe)
                 or _has_probable_private_name(probe))
+
+
+def megion_public_scope(title: str) -> str:
+    """Map transient free text to the only title enum allowed in evidence."""
+    text = _pii_probe(title).casefold().replace("ё", "е")
+    if _LINEAR_OBJECT.search(text):
+        return "LINEAR_INFRASTRUCTURE"
+    if _BUILDING_OBJECT.search(text):
+        return "BUILDING"
+    return "UNKNOWN"
 
 
 def _form_key(value: str) -> str:
@@ -321,31 +372,44 @@ def _public_row(row: list[str]) -> dict[str, str]:
         raise ValueError("UNCONFIRMED_LEGAL_FORM")
     if not developer or len(developer) > 512 or _has_private_text(developer):
         raise ValueError("UNSAFE_OR_MISSING_LEGAL_NAME")
-    if not any(re.match(rf"^{re.escape(prefix)}(?:\s|[«\"]|$)", developer, re.IGNORECASE)
-               for prefix in set(_LEGAL_FORMS.values())):
-        developer = f"{legal_form} {developer}"
     permit, issuer, municipality = (_clean(row[index]) for index in (11, 15, 16))
-    if not _PERMIT.fullmatch(permit):
+    if not _PERMIT.fullmatch(permit) or _CONTACT.search(_pii_probe(permit)):
         raise ValueError("INVALID_PERMIT_NUMBER")
-    if not issuer or len(issuer) > 256 or _has_private_text(issuer):
+    canonical_issuer = _MEGION_ISSUERS.get(issuer)
+    if canonical_issuer is None or _has_private_text(issuer):
         raise ValueError("UNSAFE_OR_MISSING_ISSUER")
-    if "мегион" not in municipality.casefold() or len(municipality) > 256:
+    jurisdiction = _MEGION_MUNICIPALITIES.get(municipality.casefold())
+    if jurisdiction is None:
         raise ValueError("UNEXPECTED_JURISDICTION")
-    title, address, cadastral = (_clean(row[index]) for index in (10, 0, 2))
-    if not title or len(title) > 4096 or len(address) > 2048:
+    raw_title, raw_address, cadastral = (_clean(row[index]) for index in (10, 0, 2))
+    if not raw_title or len(raw_title) > 4096 or len(raw_address) > 2048:
         raise ValueError("INVALID_PUBLIC_OBJECT_TEXT")
-    if any(_has_private_text(value) for value in (title, address)):
+    if any(_has_private_text(value) for value in (raw_title, raw_address)):
         raise ValueError("PRIVATE_OBJECT_TEXT")
     if not cadastral.strip("-") or cadastral.lower() in {"нет", "не указан"}:
         cadastral = ""
-    elif len(cadastral) > 512 or not re.fullmatch(r"[0-9:;,\s/-]+", cadastral):
+    elif not _CADASTRAL.fullmatch(cadastral) or _CONTACT.search(_pii_probe(cadastral)):
         raise ValueError("UNSUPPORTED_CADASTRAL")
     issued = _issued_date(row[12])
     lon, lat = _coordinates(row[7], row[8])
-    return {"permit_number": permit, "issuer": issuer, "jurisdiction": MEGION_JURISDICTION,
-            "title": title, "address": address, "cadastral_id": cadastral,
-            "developer_name": developer, "issued_at_utc": issued, "longitude": lon, "latitude": lat,
-            "stage": "PERMIT_ISSUED", "stage_source_date_utc": issued}
+    scope = megion_public_scope(raw_title)
+    return {
+        "permit_number": permit,
+        "issuer": canonical_issuer,
+        "jurisdiction": jurisdiction,
+        "title": "",
+        "address": "",
+        "cadastral_id": cadastral,
+        "developer_name": "",
+        "developer_legal_form": legal_form,
+        "building_scope": scope,
+        "source_text_withheld": "true",
+        "issued_at_utc": issued,
+        "longitude": lon,
+        "latitude": lat,
+        "stage": "PERMIT_ISSUED",
+        "stage_source_date_utc": issued,
+    }
 
 
 def parse_megion_permits_csv(
