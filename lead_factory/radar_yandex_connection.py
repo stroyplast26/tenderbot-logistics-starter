@@ -7,15 +7,50 @@ Request expiry and result retention do not expire the permanent API connection.
 from __future__ import annotations
 
 import argparse
-from dataclasses import asdict
+from dataclasses import asdict, dataclass
 import json
+import os
 from pathlib import Path
+from types import MappingProxyType
+from typing import Callable, Mapping
 
-from .radar_yandex_connection_authority import ConnectionAuthorityError, verify_manual_grant
+from .radar_yandex_connection_authority import (
+    ConnectionAuthorityError,
+    ManualYandexSearchBinding,
+    verify_manual_grant,
+)
 from .radar_yandex_journal import JournalError
 from .radar_yandex_pilot_authority import _now_utc
-from .radar_yandex_search import SearchPage, YandexPreparationError, build_review_queue
-from .radar_yandex_transport import YandexTransportError, _api_key, _post_yandex_core
+from .radar_yandex_search import SearchPage, YandexPreparationError
+from .radar_yandex_transport import YandexTransportError, _post_yandex_core
+
+
+SAFE_LEAD_FLOW_LAUNCH_MARKER_NAME = "TENDERBOT_SAFE_LEAD_FLOW_LAUNCHER"
+SAFE_LEAD_FLOW_LAUNCH_MARKER_VALUE = "source-discovery-v3"
+
+
+@dataclass(frozen=True, slots=True)
+class ManualYandexSearchOutcome:
+    """Immutable page plus source-native HTTP/accounting evidence."""
+
+    page: SearchPage
+    external_requests_this_run: int
+    journal: Mapping[str, object]
+
+    def __post_init__(self) -> None:
+        if type(self.page) is not SearchPage:
+            raise TypeError("MANUAL_YANDEX_OUTCOME_INVALID")
+        if (
+            type(self.external_requests_this_run) is not int
+            or self.external_requests_this_run not in {0, 1}
+            or not isinstance(self.journal, Mapping)
+        ):
+            raise TypeError("MANUAL_YANDEX_OUTCOME_INVALID")
+        immutable = {
+            key: MappingProxyType(dict(value)) if isinstance(value, Mapping) else value
+            for key, value in self.journal.items()
+        }
+        object.__setattr__(self, "journal", MappingProxyType(immutable))
 
 
 def _journal_accounting(journal) -> dict:
@@ -49,16 +84,63 @@ def check_manual_yandex_search(job_path: str | Path, *, folder_id: str) -> dict:
 
 
 def run_manual_yandex_search(job_path: str | Path, *, folder_id: str) -> SearchPage:
-    return _run_manual_yandex_search_with_accounting(job_path, folder_id=folder_id)[0]
+    """Legacy page-only execution is intentionally disabled."""
+
+    raise YandexTransportError("ACCOUNTED_RUNNER_REQUIRED")
+
+
+def run_manual_yandex_search_accounted(
+    job_path: str | Path,
+    *,
+    folder_id: str,
+    credential_loader: Callable[[], str],
+    binding_recorder: Callable[[ManualYandexSearchBinding], None],
+) -> ManualYandexSearchOutcome:
+    """Run once and retain native evidence instead of reducing it to a page."""
+
+    page, external_requests, journal = _run_manual_yandex_search_with_accounting(
+        job_path,
+        folder_id=folder_id,
+        credential_loader=credential_loader,
+        binding_recorder=binding_recorder,
+    )
+    return ManualYandexSearchOutcome(page, external_requests, journal)
 
 
 def _run_manual_yandex_search_with_accounting(
-    job_path: str | Path, *, folder_id: str,
+    job_path: str | Path,
+    *,
+    folder_id: str,
+    credential_loader: Callable[[], str],
+    binding_recorder: Callable[[ManualYandexSearchBinding], None],
 ) -> tuple[SearchPage, int, dict]:
+    if (
+        os.environ.get(SAFE_LEAD_FLOW_LAUNCH_MARKER_NAME)
+        != SAFE_LEAD_FLOW_LAUNCH_MARKER_VALUE
+    ):
+        raise YandexTransportError(
+            "SAFE_LEAD_FLOW_LAUNCHER_REQUIRED",
+            external_requests_this_run=0,
+        )
     grant = verify_manual_grant(job_path, now=_now_utc())
     journal = grant.open_journal()
     try:
         request = grant.authorize_request(journal, folder_id)
+        binding_failed = False
+        try:
+            binding = grant.accounting_binding(journal)
+            if binding_recorder(binding) is not None:
+                raise TypeError
+        except Exception:
+            binding_failed = True
+        if binding_failed:
+            binding = None
+            binding_recorder = None  # type: ignore[assignment]
+            raise YandexTransportError(
+                "PRE_DISPATCH_REJECTED",
+                external_requests_this_run=0,
+                journal_status=_journal_accounting(journal),
+            )
         cached = journal.read_completed(request, now=_now_utc())
         if cached is not None:
             accounting = _journal_accounting(journal)
@@ -67,12 +149,26 @@ def _run_manual_yandex_search_with_accounting(
             grant.authorize_request(journal, folder_id)
             return cached, 0, accounting
         body = json.dumps(request.body(folder_id), ensure_ascii=False, separators=(",", ":")).encode("utf-8")
-        grant.authorize_new_dispatch(journal)
-        key = _api_key()
-        grant.check_credential(key)
-        reservation = journal.reserve(request, now=_now_utc())
-        intent = journal.mark_dispatch_intent(reservation, now=_now_utc())
+        key = ""
+        pre_dispatch_failed = False
+        try:
+            grant.authorize_new_dispatch(journal)
+            key = credential_loader()
+            grant.check_credential(key)
+            reservation = journal.reserve(request, now=_now_utc())
+            intent = journal.mark_dispatch_intent(reservation, now=_now_utc())
+        except Exception:
+            pre_dispatch_failed = True
+        if pre_dispatch_failed:
+            key = ""
+            credential_loader = None  # type: ignore[assignment]
+            raise YandexTransportError(
+                "PRE_DISPATCH_REJECTED",
+                external_requests_this_run=0,
+                journal_status=_journal_accounting(journal),
+            )
         external_requests = 0
+        dispatch_failed = False
         try:
             capability = grant.mint_dispatch_capability(journal, intent, body)
             blob, headers = _post_yandex_core(body, api_key=key, request_id=intent.request_id, capability=capability)
@@ -82,16 +178,27 @@ def _run_manual_yandex_search_with_accounting(
         except Exception as exc:
             if isinstance(exc, YandexTransportError):
                 external_requests = exc.external_requests_this_run
+            dispatch_failed = True
+        if dispatch_failed:
             try:
                 journal.finish_uncertain(intent, reason_code="DISPATCH_UNCERTAIN", now=_now_utc())
             except Exception:
                 pass  # Pre-HTTP intent remains charged even if recording fails.
+            accounting = _journal_accounting(journal)
+            key = ""
+            body = b""
+            credential_loader = None  # type: ignore[assignment]
+            if "blob" in locals():
+                blob = b""
+            if "headers" in locals():
+                headers = {}
             raise YandexTransportError(
                 "DISPATCH_UNCERTAIN", external_requests_this_run=external_requests,
-                journal_status=_journal_accounting(journal),
-            ) from None
+                journal_status=accounting,
+            )
         return page, 1, _journal_accounting(journal)
     finally:
+        key = ""
         try:
             journal.close()
         except Exception:
@@ -108,16 +215,9 @@ def main(argv: list[str] | None = None) -> int:
     external_requests = 0
     journal_status = None
     try:
-        if args.check:
-            result = check_manual_yandex_search(args.job, folder_id=args.folder_id)
-        else:
-            page, external_requests, journal_status = _run_manual_yandex_search_with_accounting(
-                args.job, folder_id=args.folder_id,
-            )
-            review_queue = build_review_queue([page])
-            review_queue["external_requests"] = external_requests
-            result = {"page": asdict(page), "review_queue": review_queue,
-                      "external_requests_this_run": external_requests, "journal": journal_status}
+        if not args.check:
+            raise YandexTransportError("DIRECT_EXECUTION_DISABLED")
+        result = check_manual_yandex_search(args.job, folder_id=args.folder_id)
         print(json.dumps(result, ensure_ascii=False, indent=2))
         return 0
     except YandexTransportError as exc:

@@ -27,16 +27,32 @@ from .radar_yandex_search import ENDPOINT, SearchRequest
 ConnectionAuthorityError = common.PilotAuthorityError
 _WORKSPACE_ROOT = Path(__file__).resolve().parents[1]
 _STATE_ROOT = common._trusted_profile() / ".codex/local_state/TenderBot/yandex-search"
-_CODE_FILES = (
-    "lead_factory/radar_yandex_connection_authority.py",
-    "lead_factory/radar_yandex_connection.py",
-    "lead_factory/radar_yandex_pilot_authority.py",
-    "lead_factory/radar_yandex_transport.py",
-    "lead_factory/radar_yandex_journal.py",
-    "lead_factory/radar_yandex_search.py",
-    "lead_factory/mdos_v7/authority.py",
+_LAUNCHER_FILES = (
+    "requirements-dev-win-py311.lock.txt",
+    "scripts/bootstrap_python_runtime.ps1",
+    "scripts/read_yandex_credential.ps1",
+    "scripts/run_safe_lead_flow.ps1",
+    "scripts/run_source_discovery_once.py",
 )
 _LOCK = threading.RLock()
+
+
+def _code_files() -> tuple[str, ...]:
+    package_root = _WORKSPACE_ROOT / "lead_factory"
+    try:
+        package_files = []
+        for candidate in package_root.rglob("*.py"):
+            lexical = candidate.absolute()
+            resolved = common._path(candidate)
+            if resolved != lexical or not resolved.is_file():
+                common._fail("CODE_PATH_INVALID")
+            package_files.append(candidate.relative_to(_WORKSPACE_ROOT).as_posix())
+    except (OSError, RuntimeError, ValueError):
+        common._fail("CODE_PATH_INVALID")
+    return tuple(sorted((*package_files, *_LAUNCHER_FILES)))
+
+
+_CODE_FILES = _code_files()
 
 
 def _source_hashes() -> dict[str, str]:
@@ -61,6 +77,38 @@ class _ManualData:
     bound: common._VerifiedData
     connection_sha256: str
     connection: dict
+
+
+@dataclass(frozen=True, slots=True)
+class ManualYandexSearchBinding:
+    """Sanitized immutable identity for controller/native reconciliation."""
+
+    job_id: str
+    job_sha256: str
+    policy_sha256: str
+    connection_sha256: str
+    journal_path_sha256: str
+    journal_identity_sha256: str
+
+    def __post_init__(self) -> None:
+        try:
+            valid_job_id = str(UUID(self.job_id)) == self.job_id
+        except (AttributeError, TypeError, ValueError):
+            valid_job_id = False
+        digests = (
+            self.job_sha256,
+            self.policy_sha256,
+            self.connection_sha256,
+            self.journal_path_sha256,
+            self.journal_identity_sha256,
+        )
+        if not valid_job_id or any(
+            type(value) is not str
+            or len(value) != 64
+            or any(character not in "0123456789abcdef" for character in value)
+            for value in digests
+        ):
+            raise ValueError("YANDEX_BINDING_INVALID")
 
 
 def _read_connection(now: str) -> tuple[dict, str]:
@@ -232,6 +280,24 @@ class VerifiedManualGrant:
             request = data.bound.policy.requests[0]
             request.body(folder_id)
             return request
+
+    def accounting_binding(self, journal: YandexPilotJournal) -> ManualYandexSearchBinding:
+        """Return only stable digests needed to locate and reconcile the journal."""
+
+        with _LOCK:
+            data = _fresh(self, common._now_utc())
+            common._check_journal(data.bound, journal)
+            journal_path_sha256 = hashlib.sha256(
+                str(data.bound.journal_path).encode("utf-8", "strict")
+            ).hexdigest()
+            return ManualYandexSearchBinding(
+                job_id=data.bound.policy.pilot_id,
+                job_sha256=data.bound.bundle_sha256,
+                policy_sha256=data.bound.policy.sha256,
+                connection_sha256=data.connection_sha256,
+                journal_path_sha256=journal_path_sha256,
+                journal_identity_sha256=common._digest(data.bound.journal_identity),
+            )
 
     def authorize_new_dispatch(self, journal: YandexPilotJournal) -> None:
         """Reject a new intent after STOP while leaving completed reads usable."""

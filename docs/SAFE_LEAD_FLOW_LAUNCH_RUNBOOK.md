@@ -1,0 +1,394 @@
+# Безопасный запуск первого Lead Flow
+
+Этот runbook относится только к ручному первому срезу source discovery и
+локальному Gold quarantine. Он не включает рассылку, контакт, CRM/outbox,
+рекламную кампанию, расписание или автоматический повтор.
+
+Операционный предел первого месяца — **не более 30 000 ₽ суммарно**. Источники
+подключаются строго по одному: сначала контрольный срез, ручная проверка качества
+в Source Lab и подтверждение добавочной ценности, затем отдельное решение о
+следующем источнике. Наличие общего бюджета не разрешает пакетную закупку,
+параллельные live-запуски или автоматическое увеличение лимита.
+
+Текущий код жёстко ограничивает первый Yandex job одной попыткой с резервом
+49 копеек, но ещё не ведёт единый машинный месячный лимит по всем платным
+источникам. До второго платного источника нужен общий spend-ledger; пока предел
+30 000 ₽ контролируется владельцем по журналам источников и детализации биллинга.
+
+`plan`, `status`, `check`, `review-list`, `review-decide` и `review-close`
+всегда локальны. В рамках этого поддерживаемого safe flow обращение к провайдеру
+разрешено только через `source run-one` с отдельным явным подтверждением; после
+него всё равно повторно срабатывает нативная authority-проверка Yandex или
+TenderPlan. Без неё запрос не отправляется. В репозитории остаётся отдельный
+исторический owner-pilot transport, но он не является частью этого flow и сейчас
+не имеет действующего activation; его нельзя использовать вместо launcher.
+
+## 1. Канонический Windows runtime
+
+Нужен ровно CPython 3.11.9 64-bit. Bootstrap закрепляет `pip==26.2.1`,
+`setuptools==65.5.0` и полный набор версий из
+`requirements-dev-win-py311.lock.txt`.
+
+Первичное создание `.venv` выполняется из корня репозитория:
+
+```powershell
+powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\scripts\bootstrap_python_runtime.ps1
+```
+
+Эта первичная команда обращается к публичному PyPI. Версии закреплены, но
+artifact hash-lock пока отсутствует. Это явный supply-chain GAP: до появления
+проверенного hash-lock и wheel provenance этот bootstrap нельзя называть
+криптографически воспроизводимым.
+
+Перед каждым запуском Lead Flow выполняйте только локальную проверку:
+
+```powershell
+powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\scripts\bootstrap_python_runtime.ps1 -CheckOnly
+```
+
+Дальше используйте только `scripts/run_safe_lead_flow.ps1`. Он сам повторяет
+`-CheckOnly`, запускает исключительно `.venv\Scripts\python.exe` текущего
+репозитория и не использует fallback Python, shell eval или строковую сборку
+команд.
+
+Launcher удаляет ambient `YANDEX_SEARCH_API_KEY` до bootstrap и child process.
+После успешного bootstrap он кратковременно выставляет известный несекретный
+маркер только для `source run-one`; Python entry и accounted runner проверяют
+этот маркер до state, broker и provider. Это защита от случайного прямого вызова
+и ошибки bootstrap-пути, а не криптографическая capability и не защита от
+злонамеренного процесса с правами того же пользователя ОС.
+
+Запуск разрешён только из **точного текущего checkout**, который прошёл
+независимую приёмку как единый release candidate. Не используйте копию launcher,
+старый worktree, внешний wrapper с зафиксированным чужим путём или прямой вызов
+внутреннего Python-модуля. После любого изменения исполняемой цепочки требуется
+новая exact-приёмка до provider read.
+
+## 2. Полностью локальные source-команды
+
+План и состояние:
+
+```powershell
+.\scripts\run_safe_lead_flow.ps1 source plan
+.\scripts\run_safe_lead_flow.ps1 source status
+```
+
+Локальная проверка конкретного источника:
+
+```powershell
+.\scripts\run_safe_lead_flow.ps1 source check --source YANDEX --yandex-job "C:\ABSOLUTE\approved-yandex-job.json" --folder-id "FOLDER_ID"
+.\scripts\run_safe_lead_flow.ps1 source check --source TENDERPLAN --query "алюминиевые конструкции"
+.\scripts\run_safe_lead_flow.ps1 source check --source SABY
+.\scripts\run_safe_lead_flow.ps1 source check --source DOMRF
+.\scripts\run_safe_lead_flow.ps1 source check --source KONTUR
+```
+
+Для Saby, DOM.RF и Kontur ожидаемое состояние сейчас —
+`BLOCKED_OFFLINE_CONTRACT`, а exit code — `2`. TenderPlan/Yandex `check`
+показывает только готовность перейти к отдельной нативной authority-проверке;
+он не подтверждает live-authority сам и не вызывает provider read.
+
+Портфель первого этапа разделён следующим образом:
+
+- Мегион — только локальный импорт двух exact-публикаций из allowlist, без сети;
+- Yandex — не более одного отдельно разрешённого read по exact job;
+- TenderPlan — отдельный read-only контур со своей регистрацией, authority,
+  журналом и очередью проверки; Yandex authority его не разрешает;
+- Saby, DOM.RF и Kontur — STOP до договоров, подтверждённых условий использования,
+  цены и отдельной приёмки коннектора.
+
+Переход к следующему источнику разрешается только после ручной оценки текущего:
+доля пригодных карточек, отсутствие ложных фактов, стоимость одного проверенного
+объекта и фактическая польза для менеджера. DOM.RF не является обязательным для
+первого потока и не покупается только ради расширения охвата.
+
+`status` и `check` не создают state database. Все source-команды намеренно
+используют только фиксированный canonical state
+`state\lead_factory\source_discovery_control.sqlite3`; произвольный
+`--state-path` через launcher не допускается.
+
+Локальный Yandex review также работает только с каноническими базами Source
+Lab и source controller; произвольные пути через launcher не принимаются.
+Контроллер `source-discovery-control-v3` связывает batch с хешем точного
+канонического пути Source Lab. Копия или перенос controller/Source Lab в другой
+каталог не может закрыть исходный batch.
+Просмотр exact batch требует `batch_receipt_sha256` из результата
+соответствующего `source run-one`:
+
+```powershell
+.\scripts\run_safe_lead_flow.ps1 source review-list --attempt-id "ATTEMPT_ID" --expected-receipt-sha256 "64_HEX_FROM_RUN_ONE"
+```
+
+Решение по каждому найденному source-link добавляется отдельно и
+идемпотентно. Передавайте неизменённые receipt hash и `state_digest` самого
+элемента из `review-list`; это защита от решения по устаревшему состоянию:
+
+```powershell
+.\scripts\run_safe_lead_flow.ps1 source review-decide --attempt-id "ATTEMPT_ID" --expected-receipt-sha256 "64_HEX_FROM_RUN_ONE" --review-id "REVIEW_ID" --expected-state-digest "64_HEX_FROM_REVIEW_LIST" --reviewer "OPAQUE_REVIEWER_ID" --decision REJECT --reason "NOT_RELEVANT" --evidence-ref "evidence://local-review/REVIEW_ID" --idempotency-key "YANDEX-DECISION-REVIEW_ID-V1"
+```
+
+Один `idempotency-key` навсегда связывается с неизменяемым намерением решения:
+decision, reviewer, reason, evidence, receipt, review и lease. Повтор после
+сбоя с тем же намерением безопасно завершается без второго решения; попытка
+использовать тот же key для другого решения или evidence завершается
+конфликтом, даже если item уже был reclaimed и получил новый state digest.
+Если сбой произошёл после claim и его lease успела истечь, сначала снова
+выполните `review-list`, затем повторите то же намерение и тот же key с новым
+`state_digest`: старый CAS digest намеренно завершается fail-closed.
+
+Допустимые решения: `APPROVE`, `REJECT`, `NEEDS_RESEARCH`.
+`APPROVE` означает только то, что человек признал локально сохранённую ссылку
+релевантной для дальнейшего исследования. Это **не** квалифицированный лид,
+не promotion permit, не разрешение на CRM/outbox и не разрешение на контакт
+или рассылку. `NEEDS_RESEARCH` оставляет batch незавершённым. `HOLD` намеренно
+не принимается: базовая queue считает его необратимо resolved, тогда как
+контроллер не имеет права закрыть по нему Yandex batch.
+
+Эти команды не читают провайдера и не пишут CRM, outbox или контакт. Для
+локальных review-команд launcher принимает только обязательные именованные
+аргументы и безопасную ASCII-грамматику без пробелов, кавычек, backtick и `$`:
+ID, reviewer/actor и idempotency key — ASCII tokens; reason — верхнерегистровый
+код; digest — 64 lowercase hex; evidence ref — URI. Idempotency key ограничен
+128 символами. Небезопасные символы можно
+percent-encode только внутри evidence URI; свободный текст причины храните в
+связанном evidence artifact, а в `--reason` передавайте его короткий код. Не
+используйте в аргументах секреты или персональные данные. Это token-only
+контракт, а не обещание byte-preservation произвольного текста в Windows
+PowerShell 5.1. Вывод
+`review-list` содержит только публичную ссылку, её evidence semantics,
+служебные ID/digests и состояние review; query, title, snippet, token и raw
+provider response в него не включаются. В Source Lab/controller projection
+сохраняется только HTTPS URL без userinfo, query string и fragment; ссылка с
+любым из этих компонентов туда не записывается и не отражается в review-list
+или сообщении об ошибке. На controller boundary такой hit безопасно исключается
+из review batch; ответ содержит только `discarded_hit_count`. Если пригодных
+ссылок не осталось, attempt завершается без backpressure как
+`COMPLETE_NO_RESULTS` с более точной классификацией
+`NO_SAFE_REVIEWABLE_RESULTS`, а не превращается в постоянный `UNCERTAIN`.
+Все публичные операции Yandex Source Lab bridge при обычной программной ошибке
+`Exception`, а также controller boundary `run_source_discovery_once` при любом
+перехваченном отказе возвращают только код из закрытого allowlist: исходное
+исключение, его `context/cause`, входные пути, query/title/snippet и поля решения
+не остаются достижимыми через production traceback. Самостоятельный bridge-вызов
+намеренно не преобразует управляющие `KeyboardInterrupt`, `SystemExit` и
+`GeneratorExit`; поддерживаемый `run-one` закрывает и этот внешний boundary.
+Нельзя заменять boundaries прямым вызовом внутренних `_..._core` функций или
+логированием внутренних исключений. Для остальных локальных controller-команд
+действует более узкий контракт: не передавайте им секреты или персональные
+данные и не сериализуйте traceback.
+
+Это не означает отсутствие raw storage во всём нативном Yandex-контуре: до
+bridge `radar_yandex_journal` сохраняет raw provider response в своём локальном
+attempt journal до `retain_until_utc`. Хранение raw response задаётся
+`retention_hours=24` — меньшее или большее значение не принимается. Окно
+действия exact job может быть короче, но не превышает 24 часа. До live-read
+отдельно утвердите канонический journal path, ограничьте
+ACL текущим оператором ОС и SYSTEM и назначьте штатный `purge` сразу после
+`retain_until_utc`. Purge удаляет payload и correlation headers; резервные копии
+и копии уровня ОС должны подчиняться тому же сроку. Source Lab minimization не
+заменяет эту privacy-проверку.
+
+## 3. Один отдельно разрешённый provider read
+
+Следующие команды уже не являются offline-проверкой. Они допускаются только
+после проверки точного job/registration, учётной записи, условий использования
+и лимита стоимости.
+
+Постоянные metadata подключения Yandex — идентичность каталога, сервисного
+аккаунта, ключа и его fingerprint без секрета — живут отдельно от разового
+exact job. Они не имеют 24-часового срока задания и сами по себе ничего не
+разрешают. Exact job и его activation создаются заново **после последнего
+изменения кода**, действуют не более 24 часов и закрепляют указание владельца,
+лимит, текущий checkout и независимый `ACCEPT`. Текущий installer создаёт
+шестичасовое окно; это не сокращает обязательное 24-часовое raw-retention.
+
+Code hash задания охватывает всю цепочку до сети: launcher, controller,
+Source Lab bridge, нативные Yandex authority/accounting/transport и фиксированный
+DPAPI broker. Нельзя принять только transport, а затем заменить broker, launcher
+или controller. Любое изменение одного из этих файлов отзывает старые job,
+activation и acceptance; требуется новый exact-комплект.
+
+Yandex:
+
+```powershell
+.\scripts\run_safe_lead_flow.ps1 source run-one --source YANDEX --yandex-job "C:\ABSOLUTE\approved-yandex-job.json" --folder-id "FOLDER_ID" --confirm-one-authorized-read
+```
+
+TenderPlan:
+
+```powershell
+.\scripts\run_safe_lead_flow.ps1 source run-one --source TENDERPLAN --query "алюминиевые конструкции" --tenderplan-registration "C:\ABSOLUTE\verified-registration.json" --confirm-one-authorized-read
+```
+
+Provider read может быть тарифицируемым. `campaign_spend_enabled=false`
+означает только отсутствие рекламной кампании; это не обещание нулевой цены
+API или подписки. Перед Yandex-run нужно отдельно проверить native accounting
+и разрешённый cost cap. Новый внешний вызов нельзя делать ради такой проверки.
+
+Секрет получает только фиксированный DPAPI broker и только после того, как
+нативная authority-проверка завершена и подтверждён cache miss. Cache hit
+возвращается локально: broker не расшифровывает ключ,
+`external_requests_this_run=0`. Cache miss допускает не более одной попытки
+HTTP, после которой `external_requests_this_run=1`, даже если получены timeout,
+ошибка статуса или ошибка разбора. Секрет не выводится в пользовательский
+stdout/stderr, не сериализуется в controller/Source Lab и не передаётся через
+argv или environment: фиксированный
+DPAPI helper возвращает его в приватно захваченный `stdout` pipe, после чего ключ
+существует только в памяти текущего Python-процесса до передачи transport.
+Ссылки удаляются best effort, но физическое зануление неизменяемой Python-строки
+не гарантируется.
+
+Controller принимает результат только вместе с нативным accounting и состоянием
+durable journal. Поле `external_requests_this_run` и journal должны согласованно
+доказывать ровно `0` или `1` внешний запрос. Отсутствие accounting, невозможное
+значение, расхождение с journal или сбой после начала HTTPS переводят попытку в
+`UNCERTAIN`. Это постоянный STOP: требуется ручная сверка controller, Source Lab,
+нативного journal и биллинга; автоматического или «проверочного» повтора нет.
+
+До cache lookup, расшифровки ключа и HTTP controller неизменяемо записывает
+binding receipt с точными digest job, policy, connection, canonical journal path
+и identity самого journal. После результата он добавляет accounting receipt,
+который включает hash binding receipt, outcome, journal counters и значение
+`external_requests_this_run`. Поддерживаемый `status` показывает только
+санитизированные идентификаторы и digest этих записей, чтобы оператор мог сверить
+точную попытку без ключа, query или raw response.
+
+Перед provider read команда локально создаёт либо проверяет schema 17 Source
+Lab и обе integrity-цепочки; corrupt, future-schema или недоступная база
+останавливает команду до обращения к Яндексу. Проверка повторяется после
+durable reservation непосредственно перед provider boundary. На всём интервале
+`source run-one` запрещены backup restore, копирование, замена и ручное изменение
+controller/Source Lab SQLite-файлов; штатное восстановление выполняется только
+после завершения команды. Это обязательный operational invariant: внешняя
+утилита копирования не обязана соблюдать блокировки SQLite. Обнаруженная между
+проверками замена даёт fail-closed reconciliation/`UNCERTAIN` и ноль provider
+reads; вмешательство после последней проверки считается нарушением процедуры и
+требует отдельной сверки до следующего запуска.
+
+Controller и Source Lab сверяются двусторонне по каждому Yandex batch receipt:
+link только в controller и receipt только в Source Lab одинаково считаются
+ошибкой reconciliation. Поэтому нельзя восстанавливать или заменять только один
+из двух файлов; после любого штатного restore сначала нужна согласованная
+проверка пары, а не новый provider read.
+
+После ненулевого результата controller оставляет один
+`READY_FOR_REVIEW` batch. Pilot cap и WIP limit равны `1`; все следующие source
+reads блокируются `BLOCKED_BACKPRESSURE`. После решения всех Yandex-кандидатов
+batch закрывается только явной локальной сверкой:
+
+```powershell
+.\scripts\run_safe_lead_flow.ps1 source review-close --attempt-id "ATTEMPT_ID" --actor "OPAQUE_OPERATOR_ID" --evidence-ref "evidence://local-review/ATTEMPT_ID/close" --idempotency-key "YANDEX-CLOSE-ATTEMPT_ID-V1" --confirm-local-close
+```
+
+Закрытие допускается только для доказуемо полного Yandex batch. Незакрытые
+`NEEDS_RESEARCH`, пропущенные или конфликтующие решения, неверный
+attempt и отсутствие явного `--confirm-local-close` дают fail-closed результат
+и не снимают backpressure. Нельзя удалять или редактировать SQLite state,
+чтобы обойти его. Любой `UNCERTAIN` также является постоянным **STOP** до
+отдельного расследования.
+
+Перед append-only записью закрытия controller повторно сверяет всю пару
+controller/Source Lab и отклоняет даже чужой ранее появившийся orphan receipt.
+Во время `review-close` запрещён любой параллельный прямой writer в Source Lab:
+это две отдельные SQLite-базы без общей распределённой транзакции. Нарушение
+этой сериализации требует ручной reconciliation и не даёт права продолжать
+provider reads.
+
+Для TenderPlan штатное закрытие controller batch пока отложено: используйте
+его нативную локальную review queue, но не пытайтесь закрыть такой attempt
+командой Yandex и не обходите WIP вручную.
+
+## 4. Мегион v4: бесплатный локальный первый слой
+
+Мегион не использует DOM.RF и не требует provider API. Импорт разрешён только
+для exact-публикаций 3 августа и 2 сентября 2026 года, закреплённых в v4 allowlist
+по точным URL, дате публикации, размеру и SHA-256. Будущая публикация, другой URL,
+другой размер или другие байты отклоняются до парсинга и записи. Полный контракт
+приведён в [RADAR_MEGION_PUBLIC_PERMITS.md](RADAR_MEGION_PUBLIC_PERMITS.md).
+Разрешены ровно эти манифесты:
+
+- `https://opendata.admmegion.ru/opendata/csv/31875/data/data-20260803T095353-structure-20240702T122402.csv`,
+  публикация `2026-08-03`, 93 946 байт,
+  SHA-256 `fd5138a8562e2810dca4a8651a536dd103d86dacf103e70e71b932f4158779a9`;
+- `https://opendata.admmegion.ru/opendata/csv/31875/data/data-20260902T145832-structure-20240702T122402.csv`,
+  публикация `2026-09-02`, 93 856 байт,
+  SHA-256 `64da610e83005420bd8e48ffbbeaf6e64b5490144822de3c2440efb2decd95d4`.
+
+В Source Lab/Radar допускаются только контролируемые структурные факты:
+
+- номер разрешения начинается с `86-`, а год в его суффиксе совпадает с датой
+  выдачи;
+- кадастровый номер публикуется только для точной грамматики и префикса
+  `86:19:`; структурно корректный номер другого района скрывается и не участвует
+  в identity;
+- исходные `title`, `address`, `developer_name`, описание и произвольный текст
+  органа всегда скрыты;
+- координаты в v4 всегда скрыты: ни числовая форма, ни `0,0`, ни точка другого
+  города не считаются проверенным location-фактом.
+
+Результат — очередь исследования, а не лид и не разрешение на контакт. Каждый
+объект проходит ручную проверку в Source Lab: первичный источник, актуальная
+стадия, участники, закупщик, предмет потребности и срок. До решения человека
+никакой кандидат не повышается и не передаётся наружу.
+
+## 5. Gold quarantine: локальные действия и STOP
+
+Gold quarantine читает уже существующий Source Lab и пишет только digest-only
+sidecar. Он не пишет CRM/outbox и не является promotion permit.
+
+Локальный агрегированный отчёт:
+
+```powershell
+.\scripts\run_safe_lead_flow.ps1 gold report --source-database "C:\ABSOLUTE\source-lab.sqlite3" --quarantine-database "C:\ABSOLUTE\gold-quarantine.sqlite3"
+```
+
+Подготовка exact approval request требует реальные непротиворечивые ID и
+digests из Source Lab:
+
+```powershell
+.\scripts\run_safe_lead_flow.ps1 gold prepare --source-database "C:\ABSOLUTE\source-lab.sqlite3" --quarantine-database "C:\ABSOLUTE\gold-quarantine.sqlite3" --source-record-id "SOURCE_RECORD_ID" --observation-id "OBSERVATION_ID" --review-id "REVIEW_ID" --latest-resolution-id "RESOLUTION_ID" --reviewer-id "HUMAN_REVIEWER_ID" --demand-id "DEMAND_ID" --product-key "PRODUCT_KEY" --buyer-id "OPAQUE_BUYER_ID" --stage "RFQ_EXPECTED" --purchase-deadline-utc "2026-09-30T12:00:00Z" --capacity-snapshot-sha256 "64_HEX" --economics-snapshot-sha256 "64_HEX" --evidence-sha256 "64_HEX" --idempotency-key "GOLD_IDEMPOTENCY_KEY"
+```
+
+`Gold signer` сейчас **STOP**: production-поставка намеренно не содержит HMAC
+sealer, decoder или verifier, независимо управляемого signer,
+custody/rotation-процедуры и promotion adapter. Команды `gold admit` и
+`gold revalidate` всегда завершаются кодом 2 до чтения environment, approval
+receipt, Source Lab или quarantine state. Launcher удаляет любой ambient
+`TENDERBOT_GOLD_APPROVAL_SECRET_B64` до bootstrap и дочернего процесса, а также
+в `finally`. Формы ниже документируют только будущий интерфейс и сейчас не могут
+выполнить admission или revalidation:
+
+```powershell
+.\scripts\run_safe_lead_flow.ps1 gold admit --source-database "C:\ABSOLUTE\source-lab.sqlite3" --quarantine-database "C:\ABSOLUTE\gold-quarantine.sqlite3" --source-record-id "SOURCE_RECORD_ID" --observation-id "OBSERVATION_ID" --review-id "REVIEW_ID" --latest-resolution-id "RESOLUTION_ID" --reviewer-id "HUMAN_REVIEWER_ID" --demand-id "DEMAND_ID" --product-key "PRODUCT_KEY" --buyer-id "OPAQUE_BUYER_ID" --stage "RFQ_EXPECTED" --purchase-deadline-utc "2026-09-30T12:00:00Z" --capacity-snapshot-sha256 "64_HEX" --economics-snapshot-sha256 "64_HEX" --evidence-sha256 "64_HEX" --idempotency-key "GOLD_IDEMPOTENCY_KEY" --authority-id "APPROVAL_AUTHORITY_ID" --approval-receipt "C:\ABSOLUTE\sealed-receipt.json"
+.\scripts\run_safe_lead_flow.ps1 gold revalidate --source-database "C:\ABSOLUTE\source-lab.sqlite3" --quarantine-database "C:\ABSOLUTE\gold-quarantine.sqlite3" --acceptance-id "ACCEPTANCE_ID" --source-record-id "SOURCE_RECORD_ID" --observation-id "OBSERVATION_ID" --review-id "REVIEW_ID" --latest-resolution-id "RESOLUTION_ID" --reviewer-id "HUMAN_REVIEWER_ID" --demand-id "DEMAND_ID" --product-key "PRODUCT_KEY" --buyer-id "OPAQUE_BUYER_ID" --stage "RFQ_EXPECTED" --purchase-deadline-utc "2026-09-30T12:00:00Z" --capacity-snapshot-sha256 "64_HEX" --economics-snapshot-sha256 "64_HEX" --evidence-sha256 "64_HEX" --idempotency-key "GOLD_IDEMPOTENCY_KEY" --authority-id "APPROVAL_AUTHORITY_ID" --approval-receipt "C:\ABSOLUTE\sealed-receipt.json"
+```
+
+Не помещайте HMAC secret, PAT, персональные данные или raw provider payload в
+командную строку, state database, логи или чат. Для `--query` используйте только
+заранее одобренную неперсональную поисковую формулировку. Переменная
+`TENDERBOT_GOLD_APPROVAL_SECRET_B64` не является поддерживаемым production
+интерфейсом и принудительно очищается launcher-ом.
+
+Gold signing, promotion, CRM write, outbox, email/телефонный outreach и scheduler
+остаются **отключены**. Даже human `APPROVE` в Source Lab разрешает только
+дальнейшее исследование и не включает ни одну из этих возможностей.
+
+## 6. Оставшиеся обязательные gates
+
+До расширения пилота нужны:
+
+1. hash-lock и проверенная provenance всех Python wheels, включая pip/setuptools;
+2. независимый Gold signer с custody, rotation, audit receipt и verifier-only
+   runtime boundary;
+3. отдельный audited bridge и доказуемое закрытие cap-one batch для TenderPlan;
+4. новый exact Yandex job/activation после финального кода, независимый `ACCEPT`,
+   согласованный native accounting и утверждённый cost cap в пределах общего
+   месячного бюджета 30 000 ₽;
+5. проверенные ACL и автоматизируемый операционный контроль exact 24-hour purge
+   нативного raw journal;
+6. formal release/permit для каждого live source;
+7. независимый review и полный offline regression точного release candidate;
+8. отдельный promotion adapter и повторная revalidation перед любым CRM task.
+
+Пока эти пункты не закрыты, корректный статус — безопасный ручной первый срез,
+а не production lead flow.
