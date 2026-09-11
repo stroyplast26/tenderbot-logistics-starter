@@ -101,6 +101,7 @@ def test_launcher_source_is_an_exact_fail_closed_allowlist() -> None:
         "source|review-list",
         "source|review-decide",
         "source|review-close",
+        "source|yandex-prepare",
         "source|yandex-status",
         "source|yandex-purge",
         "gold|prepare",
@@ -110,7 +111,7 @@ def test_launcher_source_is_an_exact_fail_closed_allowlist() -> None:
     }
     for route in expected_routes:
         assert source.count(f"'{route}'") == 1
-    assert source.count(" = @('run_source_discovery_once.py',") == 9
+    assert source.count(" = @('run_source_discovery_once.py',") == 10
     assert source.count(" = @('run_gold_acceptance.py',") == 4
 
     forbidden = (
@@ -379,6 +380,125 @@ def test_source_cli_direct_run_one_is_denied_before_controller_or_state(
     assert "ambient-untrusted-marker" not in captured.err
 
 
+def test_source_cli_direct_yandex_prepare_is_denied_before_local_write(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    private_query = "PRIVATE_DIRECT_QUERY_SENTINEL"
+    with (
+        patch.object(source_cli, "prepare_inactive_yandex_job") as prepare,
+        patch.dict(
+            os.environ,
+            {source_cli.SAFE_LEAD_FLOW_LAUNCH_MARKER_NAME: "ambient-untrusted-marker"},
+        ),
+    ):
+        exit_code = source_cli.main(
+            [
+                "yandex-prepare",
+                "--query",
+                private_query,
+                "--region",
+                "synthetic-region",
+                "--idempotency-key",
+                "prepare-direct-v1",
+                "--confirm-inactive-only",
+            ]
+        )
+
+    assert exit_code == 2
+    prepare.assert_not_called()
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    payload = json.loads(captured.err)
+    assert payload["state"] == "FAILED_CLOSED"
+    assert payload["error_code"] == "SAFE_LEAD_FLOW_LAUNCHER_REQUIRED"
+    assert payload["effects"]["provider_read_may_be_metered"] is False
+    assert private_query not in captured.err
+
+
+def test_source_cli_yandex_prepare_dispatches_only_with_launcher_marker(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    expected = {
+        "authority_verified": False,
+        "created": True,
+        "draft_sha256": "a" * 64,
+        "effects": {"external_requests_this_run": 0},
+        "job_id": "12345678-1234-1234-1234-123456789abc",
+        "launch_allowed": False,
+        "replayed": False,
+        "scope_sha256": "b" * 64,
+        "state": "PREPARED_NOT_ACTIVATED",
+    }
+    with (
+        patch.object(
+            source_cli,
+            "prepare_inactive_yandex_job",
+            return_value=expected,
+        ) as prepare,
+        patch.dict(
+            os.environ,
+            {
+                source_cli.SAFE_LEAD_FLOW_LAUNCH_MARKER_NAME:
+                    source_cli.SAFE_LEAD_FLOW_LAUNCH_MARKER_VALUE
+            },
+        ),
+    ):
+        exit_code = source_cli.main(
+            [
+                "yandex-prepare",
+                "--query",
+                "synthetic public query",
+                "--region",
+                "synthetic region",
+                "--idempotency-key",
+                "prepare-dispatch-v1",
+                "--confirm-inactive-only",
+            ]
+        )
+
+    assert exit_code == 0
+    assert json.loads(capsys.readouterr().out) == expected
+    prepare.assert_called_once_with(
+        "synthetic public query",
+        "synthetic region",
+        "prepare-dispatch-v1",
+        confirmation=source_cli.YANDEX_INACTIVE_PREPARATION_CONFIRMATION,
+    )
+
+
+def test_source_cli_yandex_prepare_error_is_explicitly_local_only(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    private_query = "PRIVATE_UNCONFIRMED_QUERY_SENTINEL"
+    with patch.dict(
+        os.environ,
+        {
+            source_cli.SAFE_LEAD_FLOW_LAUNCH_MARKER_NAME:
+                source_cli.SAFE_LEAD_FLOW_LAUNCH_MARKER_VALUE
+        },
+    ):
+        exit_code = source_cli.main(
+            [
+                "yandex-prepare",
+                "--query",
+                private_query,
+                "--region",
+                "synthetic-region",
+                "--idempotency-key",
+                "prepare-unconfirmed-v1",
+            ]
+        )
+
+    assert exit_code == 2
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    payload = json.loads(captured.err)
+    assert payload["error_code"] == "YANDEX_INACTIVE_PREPARATION_CONFIRMATION_REQUIRED"
+    assert payload["state"] == "FAILED_CLOSED"
+    assert payload["effects"]["provider_read_may_be_metered"] is False
+    assert private_query not in captured.err
+
+
 def test_gold_cli_admit_and_revalidate_stop_before_state_or_receipt_access(
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
@@ -575,6 +695,60 @@ def test_launcher_rejects_noncanonical_or_unconfirmed_yandex_maintenance(
     assert result.returncode == 2
     assert result.stdout == ""
     assert result.stderr.strip() == "SAFE_LEAD_FLOW_FAILED"
+    assert not any(tmp_path.iterdir())
+
+
+@pytest.mark.skipif(
+    os.name != "nt" or not VENV_PYTHON.is_file(),
+    reason="requires Windows PowerShell 5.1 and the repo-local virtual environment",
+)
+@pytest.mark.parametrize(
+    "arguments",
+    (
+        (
+            "source",
+            "yandex-prepare",
+            "--region",
+            "synthetic-region",
+            "--query",
+            "PRIVATE_ORDER_SENTINEL",
+            "--idempotency-key",
+            "prepare-order-v1",
+            "--confirm-inactive-only",
+        ),
+        (
+            "source",
+            "yandex-prepare",
+            "--query",
+            "PRIVATE_CONFIRM_SENTINEL",
+            "--region",
+            "synthetic-region",
+            "--idempotency-key",
+            "prepare-confirm-v1",
+        ),
+        (
+            "source",
+            "yandex-prepare",
+            "--query",
+            "PRIVATE_KEY_SENTINEL",
+            "--region",
+            "synthetic-region",
+            "--idempotency-key",
+            "bad key",
+            "--confirm-inactive-only",
+        ),
+    ),
+)
+def test_launcher_rejects_malformed_yandex_prepare_before_child_dispatch(
+    tmp_path: Path,
+    arguments: tuple[str, ...],
+) -> None:
+    result = _run_launcher(tmp_path, *arguments)
+
+    assert result.returncode == 2
+    assert result.stdout == ""
+    assert result.stderr.strip() == "SAFE_LEAD_FLOW_FAILED"
+    assert "PRIVATE_" not in result.stderr
     assert not any(tmp_path.iterdir())
 
 

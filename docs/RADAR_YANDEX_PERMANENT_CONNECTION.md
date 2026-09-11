@@ -26,10 +26,11 @@
 Постоянные metadata подключения не имеют срока exact job. Само задание и
 activation действуют не более 24 часов, а `retention_hours` raw response обязан
 быть равен ровно 24 часам. Исторический внешний installer создавал шестичасовое
-окно, но сейчас он не поддерживается и не используется. Новый exact-комплект
-создают только через будущий audited installer после финального изменения
-исполняемого кода; старые job/activation не переносятся на новый release
-candidate.
+окно, но сейчас он не поддерживается и не используется. Текущая
+`source yandex-prepare` создаёт только неактивный draft. Exact `request.json` и
+activation сможет создать лишь отдельный будущий audited activator после
+финального изменения исполняемого кода; старые job/activation не переносятся на
+новый release candidate.
 
 Секрет не помещают в Git, описание PR, чат, аргументы команд или текст задания.
 Права каталога ограничивают текущим пользователем Windows и SYSTEM. DPAPI
@@ -72,6 +73,31 @@ hash binding receipt и фиксирует outcome, journal counters и
 `UNCERTAIN`; удаление или перепривязка для повтора не поддерживаются.
 
 ## Команды оператора
+
+Подготовить локальный неактивный draft через общий launcher:
+
+```powershell
+.\scripts\run_safe_lead_flow.ps1 source yandex-prepare --query "ТОЧНЫЙ НЕПЕРСОНАЛЬНЫЙ ЗАПРОС" --region "Краснодарский край" --idempotency-key "YANDEX-PREPARE-FIRST-V1" --confirm-inactive-only
+```
+
+Результат имеет состояние `PREPARED_NOT_ACTIVATED` и не является разрешением
+на Yandex read. Команда создаёт только `request.draft.json`, пустой
+`request.sqlite` и пустой `dispatch-claims` с шестичасовым сроком draft. Она не
+читает credential и не делает HTTP, не создаёт `request.json`,
+owner/reviewer/readiness evidence, retention activation или active pin.
+Успешный и ошибочный JSON не раскрывают query, region, folder ID или локальные
+пути. Точный replay с тем же idempotency key и теми же входами не создаёт второй
+draft; изменённый replay отклоняется без перезаписи. Временные артефакты
+неуспешной попытки очищаются, а опубликованный `PREPARED_NOT_ACTIVATED` draft не
+продлевается, не заменяется и не активируется автоматически. Результат выдаёт
+санитизированные `job_id`, `draft_sha256`, `policy_sha256`, `scope_sha256`,
+`expires_at_utc`, `created`, `replayed`, явные `authority_verified=false` и
+`launch_allowed=false`, а также список ещё не закрытых gates.
+
+После подготовки всё ещё требуются code freeze, exact owner instruction,
+независимый reviewer `ACCEPT`, свежая проверка billing/API/credential и
+отдельный audited activator. Только activator сможет собрать exact job и
+установить pin последним шагом; его в текущем safe flow нет.
 
 Проверить подготовленное задание без чтения секрета и HTTP можно только из
 точного принятого checkout через общий launcher:

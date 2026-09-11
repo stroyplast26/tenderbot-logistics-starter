@@ -30,6 +30,7 @@ _STATE_ROOT = common._trusted_profile() / ".codex/local_state/TenderBot/yandex-s
 _LAUNCHER_FILES = (
     "requirements-dev-win-py311.lock.txt",
     "scripts/bootstrap_python_runtime.ps1",
+    "scripts/check_yandex_state_acl.ps1",
     "scripts/read_yandex_credential.ps1",
     "scripts/run_safe_lead_flow.ps1",
     "scripts/run_source_discovery_once.py",

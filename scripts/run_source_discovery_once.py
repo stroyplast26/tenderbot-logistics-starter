@@ -42,6 +42,11 @@ from lead_factory.radar_yandex_maintenance import (  # noqa: E402
     purge_yandex_journal,
     yandex_journal_status,
 )
+from lead_factory.radar_yandex_job_preparer import (  # noqa: E402
+    YANDEX_INACTIVE_PREPARATION_CONFIRMATION,
+    YandexJobPreparationError,
+    prepare_inactive_yandex_job,
+)
 from lead_factory.source_review_queue import (  # noqa: E402
     ReviewQueueResolutionResult,
 )
@@ -62,7 +67,9 @@ _EVIDENCE_URI = re.compile(
     r"[A-Za-z0-9._~:/?#\[\]@%+=,-]{1,2015}\Z"
 )
 _LOCAL_REVIEW_COMMANDS = frozenset({"review-list", "review-decide", "review-close"})
-_LOCAL_YANDEX_MAINTENANCE_COMMANDS = frozenset({"yandex-status", "yandex-purge"})
+_LOCAL_YANDEX_COMMANDS = frozenset(
+    {"yandex-prepare", "yandex-status", "yandex-purge"}
+)
 
 
 def _validated(value: str, pattern: re.Pattern[str], message: str) -> str:
@@ -174,6 +181,22 @@ def _parser() -> argparse.ArgumentParser:
         action="store_true",
     )
 
+    yandex_prepare = commands.add_parser(
+        "yandex-prepare",
+        help="prepare an inactive local-only Yandex job draft",
+    )
+    yandex_prepare.add_argument("--query", required=True)
+    yandex_prepare.add_argument("--region", required=True)
+    yandex_prepare.add_argument(
+        "--idempotency-key",
+        required=True,
+        type=_idempotency_key,
+    )
+    yandex_prepare.add_argument(
+        "--confirm-inactive-only",
+        action="store_true",
+    )
+
     for name in ("check", "run-one"):
         command = commands.add_parser(name)
         command.add_argument(
@@ -244,7 +267,7 @@ def _emit(value: dict[str, object], *, error: bool = False) -> None:
 
 def main(argv: list[str] | None = None) -> int:
     arguments = _parser().parse_args(argv)
-    if arguments.command == "run-one" and (
+    if arguments.command in {"run-one", "yandex-prepare"} and (
         os.environ.get(SAFE_LEAD_FLOW_LAUNCH_MARKER_NAME)
         != SAFE_LEAD_FLOW_LAUNCH_MARKER_VALUE
     ):
@@ -282,6 +305,17 @@ def main(argv: list[str] | None = None) -> int:
                 confirmation=(
                     YANDEX_RAW_PURGE_CONFIRMATION
                     if arguments.confirm_expired_raw_purge
+                    else None
+                ),
+            )
+        elif arguments.command == "yandex-prepare":
+            result = prepare_inactive_yandex_job(
+                arguments.query,
+                arguments.region,
+                arguments.idempotency_key,
+                confirmation=(
+                    YANDEX_INACTIVE_PREPARATION_CONFIRMATION
+                    if arguments.confirm_inactive_only
                     else None
                 ),
             )
@@ -354,6 +388,7 @@ def main(argv: list[str] | None = None) -> int:
             raise SourceDiscoveryControlError("SOURCE_DISCOVERY_COMMAND_NOT_ALLOWED")
     except (
         SourceDiscoveryControlError,
+        YandexJobPreparationError,
         YandexJournalMaintenanceError,
         YandexSourceLabBridgeError,
     ) as error:
@@ -370,7 +405,7 @@ def main(argv: list[str] | None = None) -> int:
                         arguments.command
                         not in (
                             _LOCAL_REVIEW_COMMANDS
-                            | _LOCAL_YANDEX_MAINTENANCE_COMMANDS
+                            | _LOCAL_YANDEX_COMMANDS
                             | {"check", "plan", "status"}
                         )
                     ),
