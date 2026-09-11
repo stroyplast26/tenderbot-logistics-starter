@@ -4,17 +4,19 @@ import json
 import os
 from pathlib import Path
 import subprocess
+from types import SimpleNamespace
+from unittest.mock import patch
 
 import pytest
+
+import scripts.run_source_discovery_once as source_cli
 
 
 ROOT = Path(__file__).resolve().parents[1]
 LAUNCHER = ROOT / "scripts" / "run_safe_lead_flow.ps1"
 BOOTSTRAP = ROOT / "scripts" / "bootstrap_python_runtime.ps1"
 VENV_PYTHON = ROOT / ".venv" / "Scripts" / "python.exe"
-CANONICAL_SOURCE_STATE = (
-    ROOT / "state" / "lead_factory" / "source_discovery_control.sqlite3"
-)
+CANONICAL_SOURCE_STATE = ROOT / "state" / "lead_factory" / "source_discovery_control.sqlite3"
 
 
 def _windows_powershell() -> Path:
@@ -80,6 +82,9 @@ def test_launcher_source_is_an_exact_fail_closed_allowlist() -> None:
         "source|status",
         "source|check",
         "source|run-one",
+        "source|review-list",
+        "source|review-decide",
+        "source|review-close",
         "gold|prepare",
         "gold|admit",
         "gold|report",
@@ -87,7 +92,7 @@ def test_launcher_source_is_an_exact_fail_closed_allowlist() -> None:
     }
     for route in expected_routes:
         assert source.count(f"'{route}'") == 1
-    assert source.count(" = @('run_source_discovery_once.py',") == 4
+    assert source.count(" = @('run_source_discovery_once.py',") == 7
     assert source.count(" = @('run_gold_acceptance.py',") == 4
 
     forbidden = (
@@ -159,9 +164,7 @@ def test_launcher_runs_local_source_plan_from_any_cwd(tmp_path: Path) -> None:
 def test_launcher_passes_arguments_literally_and_propagates_block(tmp_path: Path) -> None:
     injection_marker = tmp_path / "must-not-be-evaluated.txt"
     literal = f"$([IO.File]::WriteAllText('{injection_marker}','owned'))"
-    state_before = (
-        CANONICAL_SOURCE_STATE.read_bytes() if CANONICAL_SOURCE_STATE.exists() else None
-    )
+    state_before = CANONICAL_SOURCE_STATE.read_bytes() if CANONICAL_SOURCE_STATE.exists() else None
 
     result = _run_launcher(
         tmp_path,
@@ -176,9 +179,7 @@ def test_launcher_passes_arguments_literally_and_propagates_block(tmp_path: Path
     assert result.returncode == 2, result.stdout + result.stderr
     payload = json.loads(result.stdout)
     assert payload["state"] == "BLOCKED_OFFLINE_CONTRACT"
-    state_after = (
-        CANONICAL_SOURCE_STATE.read_bytes() if CANONICAL_SOURCE_STATE.exists() else None
-    )
+    state_after = CANONICAL_SOURCE_STATE.read_bytes() if CANONICAL_SOURCE_STATE.exists() else None
     assert state_after == state_before
     assert not injection_marker.exists()
 
@@ -206,4 +207,334 @@ def test_launcher_and_bootstrap_are_documented_by_the_canonical_runbook() -> Non
     assert "run_safe_lead_flow.ps1" in text
     assert "provider read" in text.casefold()
     assert "Gold signer" in text
+    assert "review-list" in text
+    assert "review-decide" in text
+    assert "review-close" in text
+    assert "APPROVE" in text
+    assert "TenderPlan" in text
     assert "STOP" in text
+
+
+def test_source_cli_review_commands_use_only_canonical_local_paths(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    attempt_id = "sd_" + "1" * 32
+    review_id = "lf_source_review_" + "2" * 32
+    receipt_sha256 = "a" * 64
+    state_digest = "b" * 64
+    listed_item = SimpleNamespace(
+        attempt_id=attempt_id,
+        review_id=review_id,
+        source_record_id="lf_source_record_" + "3" * 32,
+        url="https://public.example/project",
+        evidence_semantics="SUPPLIED_SEARCH_RESPONSE_UNVERIFIED",
+        state="OPEN",
+        state_digest=state_digest,
+        latest_decision="",
+        record_payload_hash="c" * 64,
+        requested_at_utc="2026-09-11T00:00:00Z",
+        query="PRIVATE_QUERY_SENTINEL",
+        title="PRIVATE_TITLE_SENTINEL",
+        token="PRIVATE_TOKEN_SENTINEL",
+    )
+    resolution = SimpleNamespace(
+        created=True,
+        review_id=review_id,
+        decision="REJECT",
+        resolution_id="lf_source_review_resolution_" + "4" * 32,
+        resolution_event_id="lf_event_" + "5" * 32,
+        sequence_number=1,
+        queue_event_id="lf_event_" + "6" * 32,
+        private_payload="PRIVATE_RESOLUTION_SENTINEL",
+    )
+    closed = {"operation": "SOURCE_DISCOVERY_REVIEW_CLOSE_LOCAL", "state": "CLOSED"}
+
+    with patch.object(
+        source_cli, "list_yandex_review_batch", return_value=(listed_item,)
+    ) as list_batch:
+        assert (
+            source_cli.main(
+                [
+                    "review-list",
+                    "--attempt-id",
+                    attempt_id,
+                    "--expected-receipt-sha256",
+                    receipt_sha256,
+                ]
+            )
+            == 0
+        )
+    listed = json.loads(capsys.readouterr().out)
+    assert listed["attempt_id"] == attempt_id
+    assert listed["batch_receipt_sha256"] == receipt_sha256
+    assert listed["effects"]["provider_read_may_be_metered"] is False
+    assert listed["items"] == [
+        {
+            "attempt_id": attempt_id,
+            "evidence_semantics": "SUPPLIED_SEARCH_RESPONSE_UNVERIFIED",
+            "latest_decision": "",
+            "record_payload_hash": "c" * 64,
+            "requested_at_utc": "2026-09-11T00:00:00Z",
+            "review_id": review_id,
+            "source_record_id": "lf_source_record_" + "3" * 32,
+            "state": "OPEN",
+            "state_digest": state_digest,
+            "url": "https://public.example/project",
+        }
+    ]
+    assert "PRIVATE_" not in json.dumps(listed)
+    list_batch.assert_called_once_with(
+        source_lab_path=source_cli.SOURCE_DISCOVERY_SOURCE_LAB_PATH,
+        attempt_id=attempt_id,
+        expected_receipt_sha256=receipt_sha256,
+    )
+
+    with patch.object(
+        source_cli, "decide_yandex_review_candidate", return_value=resolution
+    ) as decide:
+        assert (
+            source_cli.main(
+                [
+                    "review-decide",
+                    "--attempt-id",
+                    attempt_id,
+                    "--expected-receipt-sha256",
+                    receipt_sha256,
+                    "--review-id",
+                    review_id,
+                    "--expected-state-digest",
+                    state_digest,
+                    "--reviewer",
+                    "operator-1",
+                    "--decision",
+                    "REJECT",
+                    "--reason",
+                    "NOT_RELEVANT",
+                    "--evidence-ref",
+                    "evidence://review/1",
+                    "--idempotency-key",
+                    "decision-1",
+                ]
+            )
+            == 0
+        )
+    decided = json.loads(capsys.readouterr().out)
+    assert decided["attempt_id"] == attempt_id
+    assert decided["batch_receipt_sha256"] == receipt_sha256
+    assert decided["effects"]["provider_read_may_be_metered"] is False
+    assert decided["resolution"] == {
+        "created": True,
+        "decision": "REJECT",
+        "queue_event_id": "lf_event_" + "6" * 32,
+        "resolution_event_id": "lf_event_" + "5" * 32,
+        "resolution_id": "lf_source_review_resolution_" + "4" * 32,
+        "review_id": review_id,
+        "sequence_number": 1,
+    }
+    assert "PRIVATE_" not in json.dumps(decided)
+    decide.assert_called_once_with(
+        source_lab_path=source_cli.SOURCE_DISCOVERY_SOURCE_LAB_PATH,
+        attempt_id=attempt_id,
+        expected_receipt_sha256=receipt_sha256,
+        review_id=review_id,
+        expected_state_digest=state_digest,
+        reviewer="operator-1",
+        decision="REJECT",
+        reason="NOT_RELEVANT",
+        evidence_ref="evidence://review/1",
+        idempotency_key="decision-1",
+    )
+
+    with patch.object(source_cli, "close_source_discovery_review", return_value=closed) as close:
+        assert (
+            source_cli.main(
+                [
+                    "review-close",
+                    "--attempt-id",
+                    attempt_id,
+                    "--actor",
+                    "operator-1",
+                    "--evidence-ref",
+                    "evidence://review/close-1",
+                    "--idempotency-key",
+                    "close-1",
+                    "--confirm-local-close",
+                ]
+            )
+            == 0
+        )
+    assert json.loads(capsys.readouterr().out) == closed
+    close.assert_called_once_with(
+        attempt_id=attempt_id,
+        confirmation=source_cli.SOURCE_DISCOVERY_LOCAL_CLOSE_CONFIRMATION,
+        state_path=source_cli.SOURCE_DISCOVERY_STATE_PATH,
+        actor="operator-1",
+        evidence_ref="evidence://review/close-1",
+        idempotency_key="close-1",
+    )
+
+
+def test_source_cli_local_review_errors_report_no_provider_read(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    attempt_id = "sd_" + "1" * 32
+    receipt_sha256 = "a" * 64
+    with patch.object(
+        source_cli,
+        "list_yandex_review_batch",
+        side_effect=source_cli.YandexSourceLabBridgeError("LOCAL_REVIEW_FAILED"),
+    ):
+        assert (
+            source_cli.main(
+                [
+                    "review-list",
+                    "--attempt-id",
+                    attempt_id,
+                    "--expected-receipt-sha256",
+                    receipt_sha256,
+                ]
+            )
+            == 2
+        )
+    payload = json.loads(capsys.readouterr().err)
+    assert payload["state"] == "FAILED_CLOSED"
+    assert payload["error_code"] == "LOCAL_REVIEW_FAILED"
+    assert payload["effects"]["provider_read_may_be_metered"] is False
+
+
+def test_source_cli_rejects_unsafe_review_tokens_before_bridge_call(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    attempt_id = "sd_" + "1" * 32
+    receipt_sha256 = "a" * 64
+    state_digest = "b" * 64
+    unsafe_reviewer = 'review"er'
+    with patch.object(source_cli, "decide_yandex_review_candidate") as decide:
+        with pytest.raises(SystemExit) as captured:
+            source_cli.main(
+                [
+                    "review-decide",
+                    "--attempt-id",
+                    attempt_id,
+                    "--expected-receipt-sha256",
+                    receipt_sha256,
+                    "--review-id",
+                    "lf_source_review_" + "2" * 32,
+                    "--expected-state-digest",
+                    state_digest,
+                    "--reviewer",
+                    unsafe_reviewer,
+                    "--decision",
+                    "REJECT",
+                    "--reason",
+                    "NOT_RELEVANT",
+                    "--evidence-ref",
+                    "evidence://review/1",
+                    "--idempotency-key",
+                    "decision-1",
+                ]
+            )
+    assert captured.value.code == 2
+    decide.assert_not_called()
+    error = capsys.readouterr().err
+    assert unsafe_reviewer not in error
+    assert "invalid reviewer or actor token" in error
+
+    oversized_idempotency_key = "k" * 129
+    with patch.object(source_cli, "decide_yandex_review_candidate") as decide:
+        with pytest.raises(SystemExit) as captured:
+            source_cli.main(
+                [
+                    "review-decide",
+                    "--attempt-id",
+                    attempt_id,
+                    "--expected-receipt-sha256",
+                    receipt_sha256,
+                    "--review-id",
+                    "lf_source_review_" + "2" * 32,
+                    "--expected-state-digest",
+                    state_digest,
+                    "--reviewer",
+                    "operator-1",
+                    "--decision",
+                    "REJECT",
+                    "--reason",
+                    "NOT_RELEVANT",
+                    "--evidence-ref",
+                    "evidence://review/1",
+                    "--idempotency-key",
+                    oversized_idempotency_key,
+                ]
+            )
+    assert captured.value.code == 2
+    decide.assert_not_called()
+    error = capsys.readouterr().err
+    assert oversized_idempotency_key not in error
+    assert "invalid idempotency token" in error
+
+
+@pytest.mark.skipif(
+    os.name != "nt" or not VENV_PYTHON.is_file(),
+    reason="requires the checked repo-local Windows virtual environment",
+)
+def test_launcher_rejects_quote_bearing_review_token_before_native_dispatch(
+    tmp_path: Path,
+) -> None:
+    attempt_id = "sd_" + "1" * 32
+    unsafe_reviewer = 'review"er'
+    result = _run_launcher(
+        tmp_path,
+        "source",
+        "Review-Decide",
+        "--attempt-id",
+        attempt_id,
+        "--expected-receipt-sha256",
+        "a" * 64,
+        "--review-id",
+        "lf_source_review_" + "2" * 32,
+        "--expected-state-digest",
+        "b" * 64,
+        "--reviewer",
+        unsafe_reviewer,
+        "--decision",
+        "REJECT",
+        "--reason",
+        "NOT_RELEVANT",
+        "--evidence-ref",
+        "evidence://review/1",
+        "--idempotency-key",
+        "decision-1",
+    )
+    assert result.returncode == 2
+    assert result.stdout == ""
+    assert result.stderr.strip() == "SAFE_LEAD_FLOW_FAILED"
+    assert unsafe_reviewer not in result.stderr
+
+    secret_decision = "SECRET_API_TOKEN_ABC123"
+    result = _run_launcher(
+        tmp_path,
+        "source",
+        "review-decide",
+        "--attempt-id",
+        attempt_id,
+        "--expected-receipt-sha256",
+        "a" * 64,
+        "--review-id",
+        "lf_source_review_" + "2" * 32,
+        "--expected-state-digest",
+        "b" * 64,
+        "--reviewer",
+        "operator-1",
+        "--decision",
+        secret_decision,
+        "--reason",
+        "NOT_RELEVANT",
+        "--evidence-ref",
+        "evidence://review/1",
+        "--idempotency-key",
+        "decision-1",
+    )
+    assert result.returncode == 2
+    assert secret_decision not in result.stdout
+    assert secret_decision not in result.stderr
+    assert "invalid review decision" in result.stderr
