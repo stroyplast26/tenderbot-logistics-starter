@@ -18,10 +18,19 @@ import re
 import secrets
 import sqlite3
 import time
-from typing import Final
+from typing import Final, Mapping
 
-from lead_factory.radar_yandex_connection import run_manual_yandex_search
+from lead_factory.radar_yandex_connection import (
+    ManualYandexSearchOutcome,
+    run_manual_yandex_search_accounted,
+)
+from lead_factory.radar_yandex_connection_authority import ManualYandexSearchBinding
+from lead_factory.radar_yandex_credential_broker import (
+    YandexCredentialBrokerError,
+    load_yandex_api_key,
+)
 from lead_factory.radar_yandex_search import SearchPage, build_review_queue
+from lead_factory.radar_yandex_transport import YandexTransportError
 from lead_factory.radar_yandex_source_lab_bridge import (
     SOURCE_DISCOVERY_SOURCE_LAB_PATH,
     YandexSourceLabBatchReceipt,
@@ -40,7 +49,7 @@ from lead_factory.tenderplan_read_only_intake import (
 )
 
 
-SOURCE_DISCOVERY_CONTROL_VERSION: Final = "source-discovery-control-v2"
+SOURCE_DISCOVERY_CONTROL_VERSION: Final = "source-discovery-control-v3"
 SOURCE_DISCOVERY_ONE_SHOT_CONFIRMATION: Final = "AUTHORIZE_ONE_PREAUTHORIZED_SOURCE_READ"
 SOURCE_DISCOVERY_LOCAL_CLOSE_CONFIRMATION: Final = "CLOSE_LOCAL_SOURCE_REVIEW_ONLY"
 SOURCE_DISCOVERY_STATE_PATH: Final = (
@@ -55,6 +64,8 @@ _SCHEMA_VISIBILITY_RETRIES: Final = 20
 _SCHEMA_VISIBILITY_RETRY_SECONDS: Final = 0.01
 _WINDOWS_REPARSE_POINT: Final = 0x400
 _APPEND_ONLY_TABLES: Final = (
+    "source_discovery_yandex_bindings",
+    "source_discovery_yandex_accounting",
     "source_discovery_batch_links",
     "source_discovery_review_closures",
 )
@@ -82,6 +93,42 @@ _ATTEMPT_STATES: Final = frozenset(
     {"RUNNING", "READY_FOR_REVIEW", "COMPLETE_NO_RESULTS", "UNCERTAIN"}
 )
 _SHA256: Final = re.compile(r"[0-9a-f]{64}\Z")
+_YANDEX_ACCOUNTING_KEYS: Final = frozenset(
+    {
+        "attempts_reserved",
+        "cost_semantics",
+        "currency",
+        "expires_at_utc",
+        "live_authority_granted",
+        "max_requests",
+        "policy_sha256",
+        "remaining_cost_minor",
+        "reserved_cost_minor",
+        "retained_responses",
+        "states",
+        "stopped",
+    }
+)
+_YANDEX_ACCOUNTING_STATES: Final = (
+    "RESERVED",
+    "DISPATCH_INTENT",
+    "UNCERTAIN",
+    "COMPLETED",
+)
+_SANITIZED_ACCOUNTING_KEYS: Final = frozenset(
+    {
+        "accounting_status",
+        "attempts_reserved",
+        "cost_semantics",
+        "currency",
+        "max_requests",
+        "remaining_cost_minor",
+        "reserved_cost_minor",
+        "retained_responses",
+        "states",
+        "stopped",
+    }
+)
 
 
 class SourceDiscoveryControlError(RuntimeError):
@@ -101,6 +148,104 @@ def _effects() -> dict[str, object]:
         "native_metering_governed": True,
         "outbox_write_enabled": False,
         "provider_read_may_be_metered": True,
+    }
+
+
+def _accounting_marker(status: str) -> dict[str, object]:
+    return {"accounting_status": status}
+
+
+def _validated_yandex_accounting(
+    external_requests_this_run: object,
+    journal: object,
+    *,
+    completed: bool,
+) -> tuple[int, dict[str, object]]:
+    """Validate native evidence before the controller trusts an HTTP count."""
+
+    if (
+        type(external_requests_this_run) is not int
+        or external_requests_this_run not in {0, 1}
+        or not isinstance(journal, Mapping)
+        or set(journal) != _YANDEX_ACCOUNTING_KEYS
+    ):
+        raise SourceDiscoveryControlError("YANDEX_ACCOUNTING_INCONSISTENT")
+    states = journal.get("states")
+    if (
+        not isinstance(states, Mapping)
+        or set(states) != set(_YANDEX_ACCOUNTING_STATES)
+        or any(type(states[state]) is not int for state in _YANDEX_ACCOUNTING_STATES)
+        or any(not 0 <= states[state] <= 1 for state in _YANDEX_ACCOUNTING_STATES)
+    ):
+        raise SourceDiscoveryControlError("YANDEX_ACCOUNTING_INCONSISTENT")
+    attempts = journal.get("attempts_reserved")
+    reserved_cost = journal.get("reserved_cost_minor")
+    remaining_cost = journal.get("remaining_cost_minor")
+    retained = journal.get("retained_responses")
+    if (
+        type(attempts) is not int
+        or attempts not in {0, 1}
+        or type(reserved_cost) is not int
+        or reserved_cost != attempts * 49
+        or type(remaining_cost) is not int
+        or remaining_cost != 49 - reserved_cost
+        or type(retained) is not int
+        or retained != states["COMPLETED"]
+        or sum(states[state] for state in _YANDEX_ACCOUNTING_STATES) != attempts
+        or type(journal.get("max_requests")) is not int
+        or journal.get("max_requests") != 1
+        or journal.get("currency") != "RUB"
+        or journal.get("cost_semantics") != "UPPER_ESTIMATE_NOT_INVOICE"
+        or type(journal.get("stopped")) is not bool
+        or journal.get("live_authority_granted") is not False
+        or type(journal.get("policy_sha256")) is not str
+        or _SHA256.fullmatch(str(journal["policy_sha256"])) is None
+        or type(journal.get("expires_at_utc")) is not str
+        or re.fullmatch(
+            r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z",
+            str(journal["expires_at_utc"]),
+        )
+        is None
+    ):
+        raise SourceDiscoveryControlError("YANDEX_ACCOUNTING_INCONSISTENT")
+    try:
+        datetime.strptime(str(journal["expires_at_utc"]), "%Y-%m-%dT%H:%M:%SZ")
+    except ValueError:
+        raise SourceDiscoveryControlError("YANDEX_ACCOUNTING_INCONSISTENT") from None
+
+    state_counts = {state: int(states[state]) for state in _YANDEX_ACCOUNTING_STATES}
+    if completed:
+        if attempts != 1 or state_counts != {
+            "RESERVED": 0,
+            "DISPATCH_INTENT": 0,
+            "UNCERTAIN": 0,
+            "COMPLETED": 1,
+        }:
+            raise SourceDiscoveryControlError("YANDEX_ACCOUNTING_INCONSISTENT")
+    else:
+        no_attempt = attempts == 0 and all(value == 0 for value in state_counts.values())
+        uncertain_attempt = attempts == 1 and state_counts == {
+            "RESERVED": 0,
+            "DISPATCH_INTENT": 0,
+            "UNCERTAIN": 1,
+            "COMPLETED": 0,
+        }
+        if not (no_attempt or uncertain_attempt):
+            raise SourceDiscoveryControlError("YANDEX_ACCOUNTING_INCONSISTENT")
+        if external_requests_this_run == 1 and not uncertain_attempt:
+            raise SourceDiscoveryControlError("YANDEX_ACCOUNTING_INCONSISTENT")
+
+    return external_requests_this_run, {
+        "accounting_status": "VERIFIED",
+        "attempts_reserved": attempts,
+        "cost_semantics": "UPPER_ESTIMATE_NOT_INVOICE",
+        "currency": "RUB",
+        "max_requests": 1,
+        "remaining_cost_minor": remaining_cost,
+        "reserved_cost_minor": reserved_cost,
+        "retained_responses": retained,
+        "states": state_counts,
+        "stopped": journal["stopped"],
     }
 
 
@@ -181,9 +326,10 @@ def _validate_append_only_triggers(connection: sqlite3.Connection) -> None:
         for table in _APPEND_ONLY_TABLES
         for operation in ("UPDATE", "DELETE")
     }
+    placeholders = ",".join("?" for _ in _APPEND_ONLY_TABLES)
     rows = connection.execute(
-        """SELECT name,tbl_name,sql FROM sqlite_master
-           WHERE type='trigger' AND tbl_name IN (?,?)""",
+        f"""SELECT name,tbl_name,sql FROM sqlite_master
+            WHERE type='trigger' AND tbl_name IN ({placeholders})""",
         _APPEND_ONLY_TABLES,
     ).fetchall()
     actual = {
@@ -289,12 +435,50 @@ def _open_for_write(path: Path) -> sqlite3.Connection:
                 "SELECT name FROM sqlite_master WHERE type='table'"
             ).fetchall()
         }
-        existing_review_tables = set(_APPEND_ONLY_TABLES).intersection(existing_tables)
-        if existing_review_tables and existing_review_tables != set(_APPEND_ONLY_TABLES):
+        existing_append_only_tables = set(_APPEND_ONLY_TABLES).intersection(existing_tables)
+        if existing_append_only_tables and existing_append_only_tables != set(
+            _APPEND_ONLY_TABLES
+        ):
             raise SourceDiscoveryControlError("CONTROL_STATE_INTEGRITY_FAILED")
-        review_schema_preexisting = existing_review_tables == set(_APPEND_ONLY_TABLES)
-        if review_schema_preexisting:
+        append_only_schema_preexisting = existing_append_only_tables == set(
+            _APPEND_ONLY_TABLES
+        )
+        if append_only_schema_preexisting:
             _validate_append_only_triggers(connection)
+        connection.execute(
+            """CREATE TABLE IF NOT EXISTS source_discovery_yandex_bindings(
+                   sequence INTEGER PRIMARY KEY AUTOINCREMENT,
+                   attempt_id TEXT NOT NULL UNIQUE
+                       REFERENCES source_discovery_attempts(attempt_id),
+                   job_id TEXT NOT NULL CHECK(length(job_id)=36),
+                   job_sha256 TEXT NOT NULL CHECK(length(job_sha256)=64),
+                   policy_sha256 TEXT NOT NULL CHECK(length(policy_sha256)=64),
+                   connection_sha256 TEXT NOT NULL CHECK(length(connection_sha256)=64),
+                   journal_path_sha256 TEXT NOT NULL CHECK(length(journal_path_sha256)=64),
+                   journal_identity_sha256 TEXT NOT NULL
+                       CHECK(length(journal_identity_sha256)=64),
+                   binding_receipt_sha256 TEXT NOT NULL
+                       CHECK(length(binding_receipt_sha256)=64),
+                   recorded_at_utc TEXT NOT NULL
+               )"""
+        )
+        connection.execute(
+            """CREATE TABLE IF NOT EXISTS source_discovery_yandex_accounting(
+                   sequence INTEGER PRIMARY KEY AUTOINCREMENT,
+                   attempt_id TEXT NOT NULL UNIQUE
+                       REFERENCES source_discovery_attempts(attempt_id),
+                   outcome TEXT NOT NULL CHECK(outcome IN ('COMPLETED','UNCERTAIN')),
+                   external_requests_this_run INTEGER NOT NULL
+                       CHECK(external_requests_this_run IN (0,1)),
+                   binding_receipt_sha256 TEXT NOT NULL
+                       CHECK(length(binding_receipt_sha256)=64),
+                   sanitized_accounting_sha256 TEXT NOT NULL
+                       CHECK(length(sanitized_accounting_sha256)=64),
+                   accounting_receipt_sha256 TEXT NOT NULL
+                       CHECK(length(accounting_receipt_sha256)=64),
+                   recorded_at_utc TEXT NOT NULL
+               )"""
+        )
         connection.execute(
             """CREATE TABLE IF NOT EXISTS source_discovery_batch_links(
                    sequence INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -338,7 +522,7 @@ def _open_for_write(path: Path) -> sqlite3.Connection:
                    closed_at_utc TEXT NOT NULL
                )"""
         )
-        if not review_schema_preexisting:
+        if not append_only_schema_preexisting:
             for table in _APPEND_ONLY_TABLES:
                 for operation in ("UPDATE", "DELETE"):
                     connection.execute(_append_only_trigger_sql(table, operation))
@@ -363,6 +547,118 @@ def _open_for_write(path: Path) -> sqlite3.Connection:
         raise SourceDiscoveryControlError("CONTROL_STATE_UNAVAILABLE") from None
 
 
+def _valid_recorded_at(value: object) -> bool:
+    if type(value) is not str or re.fullmatch(
+        r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", value
+    ) is None:
+        return False
+    try:
+        datetime.strptime(value, "%Y-%m-%dT%H:%M:%SZ")
+    except ValueError:
+        return False
+    return True
+
+
+def _validate_yandex_receipts(
+    connection: sqlite3.Connection,
+    attempt_rows: tuple[sqlite3.Row, ...] | list[sqlite3.Row],
+) -> None:
+    attempts = {
+        str(row["attempt_id"]): (str(row["source"]), str(row["state"]))
+        for row in attempt_rows
+    }
+    bindings = connection.execute(
+        "SELECT * FROM source_discovery_yandex_bindings ORDER BY sequence"
+    ).fetchall()
+    accounting = connection.execute(
+        "SELECT * FROM source_discovery_yandex_accounting ORDER BY sequence"
+    ).fetchall()
+    binding_attempts = {str(row["attempt_id"]) for row in bindings}
+    binding_receipts = {
+        str(row["attempt_id"]): str(row["binding_receipt_sha256"])
+        for row in bindings
+    }
+    accounting_by_attempt = {str(row["attempt_id"]): row for row in accounting}
+    if len(binding_attempts) != len(bindings) or len(accounting_by_attempt) != len(accounting):
+        raise SourceDiscoveryControlError("CONTROL_STATE_INTEGRITY_FAILED")
+
+    for row in bindings:
+        attempt_id = str(row["attempt_id"])
+        body = {
+            "attempt_id": attempt_id,
+            "connection_sha256": str(row["connection_sha256"]),
+            "job_id": str(row["job_id"]),
+            "job_sha256": str(row["job_sha256"]),
+            "journal_identity_sha256": str(row["journal_identity_sha256"]),
+            "journal_path_sha256": str(row["journal_path_sha256"]),
+            "policy_sha256": str(row["policy_sha256"]),
+            "recorded_at_utc": str(row["recorded_at_utc"]),
+        }
+        if (
+            attempts.get(attempt_id, (None,))[0] != SourceDiscoverySource.YANDEX.value
+            or re.fullmatch(
+                r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}",
+                body["job_id"],
+            )
+            is None
+            or any(
+                _SHA256.fullmatch(body[key]) is None
+                for key in (
+                    "connection_sha256",
+                    "job_sha256",
+                    "journal_identity_sha256",
+                    "journal_path_sha256",
+                    "policy_sha256",
+                )
+            )
+            or not _valid_recorded_at(body["recorded_at_utc"])
+            or _digest(body) != str(row["binding_receipt_sha256"])
+        ):
+            raise SourceDiscoveryControlError("CONTROL_STATE_INTEGRITY_FAILED")
+
+    for row in accounting:
+        attempt_id = str(row["attempt_id"])
+        external_requests = row["external_requests_this_run"]
+        if type(external_requests) is not int:
+            raise SourceDiscoveryControlError("CONTROL_STATE_INTEGRITY_FAILED")
+        body = {
+            "attempt_id": attempt_id,
+            "binding_receipt_sha256": str(row["binding_receipt_sha256"]),
+            "external_requests_this_run": external_requests,
+            "outcome": str(row["outcome"]),
+            "recorded_at_utc": str(row["recorded_at_utc"]),
+            "sanitized_accounting_sha256": str(row["sanitized_accounting_sha256"]),
+        }
+        if (
+            attempt_id not in binding_attempts
+            or attempts.get(attempt_id, (None,))[0] != SourceDiscoverySource.YANDEX.value
+            or body["binding_receipt_sha256"] != binding_receipts.get(attempt_id)
+            or _SHA256.fullmatch(body["binding_receipt_sha256"]) is None
+            or body["outcome"] not in {"COMPLETED", "UNCERTAIN"}
+            or body["external_requests_this_run"] not in {0, 1}
+            or _SHA256.fullmatch(body["sanitized_accounting_sha256"]) is None
+            or not _valid_recorded_at(body["recorded_at_utc"])
+            or _digest(body) != str(row["accounting_receipt_sha256"])
+        ):
+            raise SourceDiscoveryControlError("CONTROL_STATE_INTEGRITY_FAILED")
+
+    for attempt_id, (source, state) in attempts.items():
+        receipt = accounting_by_attempt.get(attempt_id)
+        if source != SourceDiscoverySource.YANDEX.value and (
+            attempt_id in binding_attempts or receipt is not None
+        ):
+            raise SourceDiscoveryControlError("CONTROL_STATE_INTEGRITY_FAILED")
+        if source == SourceDiscoverySource.YANDEX.value and state in {
+            "READY_FOR_REVIEW",
+            "COMPLETE_NO_RESULTS",
+        } and (
+            attempt_id not in binding_attempts
+            or receipt is None
+            or str(receipt["outcome"]) != "COMPLETED"
+        ):
+            raise SourceDiscoveryControlError("CONTROL_STATE_INTEGRITY_FAILED")
+
+
 def _rows(path: Path) -> tuple[sqlite3.Row, ...]:
     for attempt in range(_SCHEMA_VISIBILITY_RETRIES):
         if not path.exists():
@@ -380,13 +676,22 @@ def _rows(path: Path) -> tuple[sqlite3.Row, ...]:
                         "SELECT name FROM sqlite_master WHERE type='table'"
                     ).fetchall()
                 }
-                review_tables = set(_APPEND_ONLY_TABLES).intersection(tables)
-                if review_tables and review_tables != set(_APPEND_ONLY_TABLES):
+                append_only_tables = set(_APPEND_ONLY_TABLES).intersection(tables)
+                if append_only_tables and append_only_tables != set(_APPEND_ONLY_TABLES):
                     raise SourceDiscoveryControlError("CONTROL_STATE_INTEGRITY_FAILED")
-                if review_tables == set(_APPEND_ONLY_TABLES):
+                if append_only_tables == set(_APPEND_ONLY_TABLES):
                     _validate_append_only_triggers(connection)
                     rows = connection.execute(
                         """SELECT a.attempt_id,a.source,a.state,a.review_count,
+                                  b.job_id AS yandex_job_id,
+                                  b.policy_sha256 AS yandex_policy_sha256,
+                                  b.journal_path_sha256 AS yandex_journal_path_sha256,
+                                  b.binding_receipt_sha256 AS yandex_binding_receipt_sha256,
+                                  ya.outcome AS yandex_accounting_outcome,
+                                  ya.external_requests_this_run
+                                    AS yandex_external_requests_this_run,
+                                  ya.accounting_receipt_sha256
+                                    AS yandex_accounting_receipt_sha256,
                                   l.source_lab_batch_id,l.candidate_count,
                                   l.source_lab_receipt_sha256,
                                   l.source_lab_path_sha256,l.review_ids_sha256,
@@ -399,6 +704,10 @@ def _rows(path: Path) -> tuple[sqlite3.Row, ...]:
                                   c.closed_by,c.evidence_ref,c.idempotency_key,
                                   c.closure_command_sha256,c.closed_at_utc
                            FROM source_discovery_attempts a
+                           LEFT JOIN source_discovery_yandex_bindings b
+                             ON b.attempt_id=a.attempt_id
+                           LEFT JOIN source_discovery_yandex_accounting ya
+                             ON ya.attempt_id=a.attempt_id
                            LEFT JOIN source_discovery_batch_links l
                              ON l.attempt_id=a.attempt_id
                            LEFT JOIN source_discovery_review_closures c
@@ -408,6 +717,13 @@ def _rows(path: Path) -> tuple[sqlite3.Row, ...]:
                 else:
                     rows = connection.execute(
                         """SELECT attempt_id,source,state,review_count,
+                                  NULL AS yandex_job_id,
+                                  NULL AS yandex_policy_sha256,
+                                  NULL AS yandex_journal_path_sha256,
+                                  NULL AS yandex_binding_receipt_sha256,
+                                  NULL AS yandex_accounting_outcome,
+                                  NULL AS yandex_external_requests_this_run,
+                                  NULL AS yandex_accounting_receipt_sha256,
                                   NULL AS source_lab_batch_id,
                                   NULL AS candidate_count,
                                   NULL AS source_lab_receipt_sha256,
@@ -514,6 +830,8 @@ def _rows(path: Path) -> tuple[sqlite3.Row, ...]:
                             or _digest(closure_body) != str(row["closure_command_sha256"])
                         ):
                             raise SourceDiscoveryControlError("CONTROL_STATE_INTEGRITY_FAILED")
+                if append_only_tables == set(_APPEND_ONLY_TABLES):
+                    _validate_yandex_receipts(connection, rows)
                 return tuple(rows)
         except SourceDiscoveryControlError:
             raise
@@ -634,6 +952,24 @@ def _snapshot(path: Path, wip_limit: int) -> dict[str, object]:
             "source": str(row["source"]),
             "state": ("CLOSED_LOCAL" if row["closed_at_utc"] is not None else str(row["state"])),
         }
+        if str(row["source"]) == SourceDiscoverySource.YANDEX.value:
+            latest["yandex_reconciliation"] = {
+                "accounting_outcome": str(row["yandex_accounting_outcome"] or ""),
+                "accounting_receipt_sha256": str(
+                    row["yandex_accounting_receipt_sha256"] or ""
+                ),
+                "binding_receipt_sha256": str(
+                    row["yandex_binding_receipt_sha256"] or ""
+                ),
+                "external_requests_this_run": (
+                    int(row["yandex_external_requests_this_run"])
+                    if row["yandex_external_requests_this_run"] is not None
+                    else None
+                ),
+                "job_id": str(row["yandex_job_id"] or ""),
+                "journal_path_sha256": str(row["yandex_journal_path_sha256"] or ""),
+                "policy_sha256": str(row["yandex_policy_sha256"] or ""),
+            }
     return {
         "attempt_count": len(rows),
         "gate": gate,
@@ -735,8 +1071,10 @@ def _blocked_run_report(
 ) -> dict[str, object]:
     return {
         "control": _snapshot(path, wip_limit),
-        "delegate_call_count": 0,
         "effects": _effects(),
+        "external_requests_this_run": 0,
+        "journal": _accounting_marker("NOT_INVOKED"),
+        "native_runner_call_count": 0,
         "operation": "RUN_ONE",
         "review_count": 0,
         "source": selected.value,
@@ -790,6 +1128,201 @@ def _reserve(
         except sqlite3.Error:
             pass
         raise SourceDiscoveryControlError("CONTROL_STATE_UNAVAILABLE") from None
+    finally:
+        connection.close()
+
+
+def _record_yandex_binding(
+    path: Path,
+    attempt_id: str,
+    binding: ManualYandexSearchBinding,
+) -> None:
+    if type(binding) is not ManualYandexSearchBinding:
+        raise SourceDiscoveryControlError("YANDEX_BINDING_INVALID")
+    recorded_at_utc = _now_utc()
+    body = {
+        "attempt_id": attempt_id,
+        "connection_sha256": binding.connection_sha256,
+        "job_id": binding.job_id,
+        "job_sha256": binding.job_sha256,
+        "journal_identity_sha256": binding.journal_identity_sha256,
+        "journal_path_sha256": binding.journal_path_sha256,
+        "policy_sha256": binding.policy_sha256,
+        "recorded_at_utc": recorded_at_utc,
+    }
+    receipt_sha256 = _digest(body)
+    connection = _open_for_write(path)
+    try:
+        connection.execute("BEGIN IMMEDIATE")
+        attempt = connection.execute(
+            "SELECT source,state FROM source_discovery_attempts WHERE attempt_id=?",
+            (attempt_id,),
+        ).fetchone()
+        if (
+            not attempt
+            or str(attempt["source"]) != SourceDiscoverySource.YANDEX.value
+            or str(attempt["state"]) != "RUNNING"
+        ):
+            raise SourceDiscoveryControlError("CONTROL_RECONCILIATION_REQUIRED")
+        existing = connection.execute(
+            "SELECT * FROM source_discovery_yandex_bindings WHERE attempt_id=?",
+            (attempt_id,),
+        ).fetchone()
+        if existing:
+            existing_body = {
+                **{key: value for key, value in body.items() if key != "recorded_at_utc"},
+                "recorded_at_utc": str(existing["recorded_at_utc"]),
+            }
+            if (
+                any(str(existing[key]) != str(value) for key, value in existing_body.items())
+                or str(existing["binding_receipt_sha256"]) != _digest(existing_body)
+            ):
+                raise SourceDiscoveryControlError("CONTROL_RECONCILIATION_REQUIRED")
+            connection.execute("COMMIT")
+            return
+        if connection.execute(
+            "SELECT 1 FROM source_discovery_yandex_accounting WHERE attempt_id=?",
+            (attempt_id,),
+        ).fetchone():
+            raise SourceDiscoveryControlError("CONTROL_RECONCILIATION_REQUIRED")
+        connection.execute(
+            """INSERT INTO source_discovery_yandex_bindings(
+                   attempt_id,job_id,job_sha256,policy_sha256,connection_sha256,
+                   journal_path_sha256,journal_identity_sha256,
+                   binding_receipt_sha256,recorded_at_utc
+               ) VALUES(?,?,?,?,?,?,?,?,?)""",
+            (
+                attempt_id,
+                binding.job_id,
+                binding.job_sha256,
+                binding.policy_sha256,
+                binding.connection_sha256,
+                binding.journal_path_sha256,
+                binding.journal_identity_sha256,
+                receipt_sha256,
+                recorded_at_utc,
+            ),
+        )
+        attempts = connection.execute(
+            "SELECT attempt_id,source,state FROM source_discovery_attempts ORDER BY sequence"
+        ).fetchall()
+        _validate_yandex_receipts(connection, attempts)
+        connection.execute("COMMIT")
+    except SourceDiscoveryControlError:
+        try:
+            connection.execute("ROLLBACK")
+        except sqlite3.Error:
+            pass
+        raise
+    except sqlite3.Error:
+        try:
+            connection.execute("ROLLBACK")
+        except sqlite3.Error:
+            pass
+        raise SourceDiscoveryControlError("CONTROL_RECONCILIATION_REQUIRED") from None
+    finally:
+        connection.close()
+
+
+def _record_yandex_accounting(
+    path: Path,
+    attempt_id: str,
+    external_requests_this_run: int,
+    journal: Mapping[str, object],
+    *,
+    outcome: str,
+) -> None:
+    if (
+        type(external_requests_this_run) is not int
+        or external_requests_this_run not in {0, 1}
+        or outcome not in {"COMPLETED", "UNCERTAIN"}
+        or not isinstance(journal, Mapping)
+        or set(journal) != _SANITIZED_ACCOUNTING_KEYS
+        or journal.get("accounting_status") != "VERIFIED"
+    ):
+        raise SourceDiscoveryControlError("YANDEX_ACCOUNTING_INCONSISTENT")
+    try:
+        accounting_sha256 = _digest(journal)
+    except (TypeError, UnicodeError, ValueError):
+        raise SourceDiscoveryControlError("YANDEX_ACCOUNTING_INCONSISTENT") from None
+    connection = _open_for_write(path)
+    try:
+        connection.execute("BEGIN IMMEDIATE")
+        attempt = connection.execute(
+            "SELECT source,state FROM source_discovery_attempts WHERE attempt_id=?",
+            (attempt_id,),
+        ).fetchone()
+        binding = connection.execute(
+            """SELECT binding_receipt_sha256
+               FROM source_discovery_yandex_bindings WHERE attempt_id=?""",
+            (attempt_id,),
+        ).fetchone()
+        if (
+            not attempt
+            or str(attempt["source"]) != SourceDiscoverySource.YANDEX.value
+            or str(attempt["state"]) != "RUNNING"
+            or not binding
+        ):
+            raise SourceDiscoveryControlError("CONTROL_RECONCILIATION_REQUIRED")
+        recorded_at_utc = _now_utc()
+        body = {
+            "attempt_id": attempt_id,
+            "binding_receipt_sha256": str(binding["binding_receipt_sha256"]),
+            "external_requests_this_run": external_requests_this_run,
+            "outcome": outcome,
+            "recorded_at_utc": recorded_at_utc,
+            "sanitized_accounting_sha256": accounting_sha256,
+        }
+        receipt_sha256 = _digest(body)
+        existing = connection.execute(
+            "SELECT * FROM source_discovery_yandex_accounting WHERE attempt_id=?",
+            (attempt_id,),
+        ).fetchone()
+        if existing:
+            existing_body = {
+                **{key: value for key, value in body.items() if key != "recorded_at_utc"},
+                "recorded_at_utc": str(existing["recorded_at_utc"]),
+            }
+            if (
+                any(str(existing[key]) != str(value) for key, value in existing_body.items())
+                or str(existing["accounting_receipt_sha256"]) != _digest(existing_body)
+            ):
+                raise SourceDiscoveryControlError("CONTROL_RECONCILIATION_REQUIRED")
+            connection.execute("COMMIT")
+            return
+        connection.execute(
+            """INSERT INTO source_discovery_yandex_accounting(
+                   attempt_id,outcome,external_requests_this_run,binding_receipt_sha256,
+                   sanitized_accounting_sha256,accounting_receipt_sha256,
+                   recorded_at_utc
+               ) VALUES(?,?,?,?,?,?,?)""",
+            (
+                attempt_id,
+                outcome,
+                external_requests_this_run,
+                binding["binding_receipt_sha256"],
+                accounting_sha256,
+                receipt_sha256,
+                recorded_at_utc,
+            ),
+        )
+        attempts = connection.execute(
+            "SELECT attempt_id,source,state FROM source_discovery_attempts ORDER BY sequence"
+        ).fetchall()
+        _validate_yandex_receipts(connection, attempts)
+        connection.execute("COMMIT")
+    except SourceDiscoveryControlError:
+        try:
+            connection.execute("ROLLBACK")
+        except sqlite3.Error:
+            pass
+        raise
+    except sqlite3.Error:
+        try:
+            connection.execute("ROLLBACK")
+        except sqlite3.Error:
+            pass
+        raise SourceDiscoveryControlError("CONTROL_RECONCILIATION_REQUIRED") from None
     finally:
         connection.close()
 
@@ -889,6 +1422,26 @@ def _finish(path: Path, attempt_id: str, state: str, review_count: int) -> None:
     connection = _open_for_write(path)
     try:
         connection.execute("BEGIN IMMEDIATE")
+        attempt = connection.execute(
+            "SELECT source,state FROM source_discovery_attempts WHERE attempt_id=?",
+            (attempt_id,),
+        ).fetchone()
+        if not attempt or str(attempt["state"]) != "RUNNING":
+            raise SourceDiscoveryControlError("CONTROL_RECONCILIATION_REQUIRED")
+        if (
+            str(attempt["source"]) == SourceDiscoverySource.YANDEX.value
+            and state in {"READY_FOR_REVIEW", "COMPLETE_NO_RESULTS"}
+        ):
+            durable_accounting = connection.execute(
+                """SELECT a.outcome
+                   FROM source_discovery_yandex_accounting a
+                   INNER JOIN source_discovery_yandex_bindings b
+                     ON b.attempt_id=a.attempt_id
+                   WHERE a.attempt_id=?""",
+                (attempt_id,),
+            ).fetchone()
+            if not durable_accounting or str(durable_accounting["outcome"]) != "COMPLETED":
+                raise SourceDiscoveryControlError("CONTROL_RECONCILIATION_REQUIRED")
         cursor = connection.execute(
             """UPDATE source_discovery_attempts
                SET state=?,finished_at_utc=?,review_count=?
@@ -1129,7 +1682,9 @@ def run_source_discovery_once(
 
     batch_receipt: YandexSourceLabBatchReceipt | None = None
     discarded_hit_count = 0
-    delegate_call_count = 0
+    external_requests_this_run: int | None = 0
+    journal_report = _accounting_marker("NOT_INVOKED")
+    native_runner_call_count = 0
     result_classification = "UNAVAILABLE"
     try:
         if selected is SourceDiscoverySource.YANDEX:
@@ -1140,11 +1695,36 @@ def run_source_discovery_once(
             if lab_path is None:
                 raise TypeError
             preflight_yandex_source_lab(lab_path)
-            delegate_call_count = 1
-            result = run_manual_yandex_search(
+            native_runner_call_count = 1
+            external_requests_this_run = None
+            journal_report = _accounting_marker("UNAVAILABLE")
+
+            def record_binding(binding: ManualYandexSearchBinding) -> None:
+                _record_yandex_binding(path, attempt_id, binding)
+
+            outcome = run_manual_yandex_search_accounted(
                 yandex_job_path,  # type: ignore[arg-type]
                 folder_id=folder_id,  # type: ignore[arg-type]
+                credential_loader=lambda: load_yandex_api_key(
+                    expected_folder_id=folder_id,  # type: ignore[arg-type]
+                ),
+                binding_recorder=record_binding,
             )
+            if type(outcome) is not ManualYandexSearchOutcome:
+                raise TypeError
+            external_requests_this_run, journal_report = _validated_yandex_accounting(
+                outcome.external_requests_this_run,
+                outcome.journal,
+                completed=True,
+            )
+            _record_yandex_accounting(
+                path,
+                attempt_id,
+                external_requests_this_run,
+                journal_report,
+                outcome="COMPLETED",
+            )
+            result = outcome.page
             if type(result) is not SearchPage:
                 raise TypeError
             selection = select_yandex_reviewable_page(result)
@@ -1179,7 +1759,9 @@ def run_source_discovery_once(
                 tenderplan_options["registration_path"] = tenderplan_registration_path
             if tenderplan_store_path is not None:
                 tenderplan_options["store_path"] = tenderplan_store_path
-            delegate_call_count = 1
+            native_runner_call_count = 1
+            external_requests_this_run = None
+            journal_report = _accounting_marker("NOT_EXPOSED_FOR_SOURCE")
             result = run_tenderplan_read_only_intake(
                 tenderplan_query,
                 **tenderplan_options,
@@ -1190,7 +1772,30 @@ def run_source_discovery_once(
             result_classification = "REVIEW_QUEUE_READY" if review_count else "NO_RESULTS"
         if type(review_count) is not int or not 0 <= review_count <= 1000:
             raise ValueError
-    except BaseException:
+    except BaseException as error:
+        if selected is SourceDiscoverySource.YANDEX and isinstance(
+            error,
+            YandexTransportError,
+        ):
+            try:
+                external_requests_this_run, journal_report = _validated_yandex_accounting(
+                    error.external_requests_this_run,
+                    error.journal_status,
+                    completed=False,
+                )
+                _record_yandex_accounting(
+                    path,
+                    attempt_id,
+                    external_requests_this_run,
+                    journal_report,
+                    outcome="UNCERTAIN",
+                )
+            except SourceDiscoveryControlError:
+                external_requests_this_run = None
+                journal_report = _accounting_marker("UNAVAILABLE")
+        elif isinstance(error, YandexCredentialBrokerError):
+            external_requests_this_run = None
+            journal_report = _accounting_marker("UNAVAILABLE")
         # A catchable interruption is sealed as uncertain.  A hard process
         # termination cannot execute this branch and intentionally leaves the
         # durable RUNNING fence for external/manual reconciliation; this slice
@@ -1199,10 +1804,12 @@ def run_source_discovery_once(
         return {
             "attempt_id": attempt_id,
             "control": _snapshot(path, limit),
-            "delegate_call_count": delegate_call_count,
             "discarded_hit_count": discarded_hit_count,
             "effects": _effects(),
             "error_code": "SOURCE_BOUNDARY_UNCERTAIN",
+            "external_requests_this_run": external_requests_this_run,
+            "journal": journal_report,
+            "native_runner_call_count": native_runner_call_count,
             "operation": "RUN_ONE",
             "result_classification": "UNAVAILABLE",
             "review_count": 0,
@@ -1217,9 +1824,11 @@ def run_source_discovery_once(
         "attempt_id": attempt_id,
         "batch_receipt_sha256": (batch_receipt.receipt_sha256 if batch_receipt is not None else ""),
         "control": _snapshot(path, limit),
-        "delegate_call_count": delegate_call_count,
         "discarded_hit_count": discarded_hit_count,
         "effects": _effects(),
+        "external_requests_this_run": external_requests_this_run,
+        "journal": journal_report,
+        "native_runner_call_count": native_runner_call_count,
         "operation": "RUN_ONE",
         "result_classification": result_classification,
         "review_count": review_count,

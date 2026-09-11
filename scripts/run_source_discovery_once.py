@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from pathlib import Path
 import re
 import sys
@@ -23,6 +24,10 @@ from lead_factory.source_discovery_control import (  # noqa: E402
     run_source_discovery_once,
     source_discovery_plan,
     source_discovery_status,
+)
+from lead_factory.radar_yandex_connection import (  # noqa: E402
+    SAFE_LEAD_FLOW_LAUNCH_MARKER_NAME,
+    SAFE_LEAD_FLOW_LAUNCH_MARKER_VALUE,
 )
 from lead_factory.radar_yandex_source_lab_bridge import (  # noqa: E402
     SOURCE_DISCOVERY_SOURCE_LAB_PATH,
@@ -211,6 +216,19 @@ def _emit(value: dict[str, object], *, error: bool = False) -> None:
 
 def main(argv: list[str] | None = None) -> int:
     arguments = _parser().parse_args(argv)
+    if arguments.command == "run-one" and (
+        os.environ.get(SAFE_LEAD_FLOW_LAUNCH_MARKER_NAME)
+        != SAFE_LEAD_FLOW_LAUNCH_MARKER_VALUE
+    ):
+        _emit(
+            {
+                "effects": _local_review_effects(),
+                "error_code": "SAFE_LEAD_FLOW_LAUNCHER_REQUIRED",
+                "state": "FAILED_CLOSED",
+            },
+            error=True,
+        )
+        return 2
     try:
         if arguments.command == "plan":
             result = source_discovery_plan()

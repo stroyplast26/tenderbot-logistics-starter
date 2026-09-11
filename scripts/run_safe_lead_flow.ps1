@@ -29,7 +29,21 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+$SensitiveEnvironmentPath = 'Env:YANDEX_SEARCH_API_KEY'
+$LauncherMarkerPath = 'Env:TENDERBOT_SAFE_LEAD_FLOW_LAUNCHER'
+$LauncherMarkerValue = 'source-discovery-v3'
+$SafeLeadFlowExitCode = 2
+
 try {
+    # Windows PowerShell's Environment provider is case-insensitive on Windows.
+    # Delete the ambient credential without reading its value before any child
+    # process can inherit it, and fail closed if the name remains present.
+    Remove-Item -LiteralPath $SensitiveEnvironmentPath -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath $LauncherMarkerPath -Force -ErrorAction SilentlyContinue
+    if (Test-Path -LiteralPath $SensitiveEnvironmentPath) {
+        throw 'SAFE_LEAD_FLOW_AMBIENT_CREDENTIAL_REJECTED'
+    }
+
     $ScriptDirectory = [IO.Path]::GetFullPath($PSScriptRoot)
     $RepoRoot = [IO.Path]::GetFullPath((Join-Path $ScriptDirectory '..'))
     $BootstrapPath = Join-Path $ScriptDirectory 'bootstrap_python_runtime.ps1'
@@ -141,6 +155,10 @@ try {
         throw 'SAFE_LEAD_FLOW_RUNTIME_UNAVAILABLE'
     }
 
+    if ($Flow -eq 'source' -and $Operation -eq 'run-one') {
+        Set-Item -LiteralPath $LauncherMarkerPath -Value $LauncherMarkerValue -Force
+    }
+
     $Route = $Dispatch[$DispatchKey]
     $EntryPoint = Join-Path $ScriptDirectory ([string]$Route[0])
     if (-not (Test-Path -LiteralPath $EntryPoint -PathType Leaf)) {
@@ -161,8 +179,15 @@ try {
     if ($null -eq $ChildExitCode) {
         throw 'SAFE_LEAD_FLOW_CHILD_EXIT_UNAVAILABLE'
     }
-    exit ([int]$ChildExitCode)
+    $SafeLeadFlowExitCode = [int]$ChildExitCode
 } catch {
     [Console]::Error.WriteLine('SAFE_LEAD_FLOW_FAILED')
-    exit 2
+    $SafeLeadFlowExitCode = 2
+} finally {
+    # Keep the launcher process clean even if validation or child execution
+    # fails after a component attempted to recreate the ambient name.
+    Remove-Item -LiteralPath $SensitiveEnvironmentPath -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath $LauncherMarkerPath -Force -ErrorAction SilentlyContinue
 }
+
+exit $SafeLeadFlowExitCode

@@ -64,9 +64,13 @@ activation pin. Старые entry points этой подготовки сохр
 
 `POST https://searchapi.api.cloud.yandex.net/v2/web/search`, `Authorization: Api-Key`.
 Сервисному аккаунту требуется `search-api.webSearch.user`, API-ключу —
-scope `yc.search-api.execute`. `folderId` задаётся явно и связывается с разрешением;
-runner читает ключ только из локального `YANDEX_SEARCH_API_KEY` после authority.
-Ключ нельзя передавать в чат, PR, аргументы команды или логи.
+scope `yc.search-api.execute`. `folderId` задаётся явно и связывается с разрешением.
+Описанный ниже исторический low-level owner-pilot runner получал ключ из
+`YANDEX_SEARCH_API_KEY`; это отдельный неподдерживаемый для первого safe flow путь,
+у которого сейчас нет activation. Канонический `run_safe_lead_flow.ps1` удаляет
+ambient key и получает секрет только через фиксированный DPAPI broker после
+authority, durable reservation и cache miss. Ключ нельзя передавать в чат, PR,
+аргументы команды или логи.
 [Аутентификация](https://aistudio.yandex.ru/ru/docs/search-api/api-ref/authentication),
 [синхронный поиск](https://aistudio.yandex.ru/ru/docs/search-api/operations/web-search-sync).
 
@@ -221,8 +225,9 @@ python -B -X utf8 -m lead_factory.radar_yandex_transport purge --journal tmp/yan
 сейчас всегда завершается отказом fixed RC1. В CLI нет флага включения live.
 
 Временный raw response хранится только здесь, вне immutable Radar vault.
-`retention_hours` ограничен 1–24 часами и требует отдельного решения о правах
-до live. По истечении доступ запрещён; `purge` удаляет payload и correlation
+`retention_hours` для operational exact job обязан быть равен ровно 24 часам;
+любое другое значение отклоняется и требует нового решения до live. По истечении
+доступ запрещён; `purge` удаляет payload и correlation
 headers, сохраняя hash/расход/состояние. Команду очистки должен запускать оператор:
 фонового таймера нет. SQLite использует DELETE journal и secure_delete; это не
 гарантия удаления резервных копий или восстановления данных средствами ОС.

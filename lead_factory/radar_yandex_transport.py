@@ -89,6 +89,8 @@ def _post_yandex_core(
         raise YandexTransportError("HTTP_INPUT_INVALID")
     connection = http.client.HTTPSConnection(_HOST, timeout=_SOCKET_TIMEOUT)
     watchdog = None
+    response_result: tuple[bytes, dict[str, str]] | None = None
+    failure_code: str | None = None
     try:
         connection.connect()
         # Keep this exact socket: HTTPResponse can detach it from connection
@@ -153,22 +155,71 @@ def _post_yandex_core(
             value = response.getheader(name, "")
             if type(value) is str and _SAFE_ID.fullmatch(value):
                 correlation[name] = value
-        return bytes(result), correlation
+        response_result = (bytes(result), correlation)
     except YandexTransportError as exc:
-        raise YandexTransportError(str(exc), external_requests_this_run=1) from None
+        failure_code = str(exc)
     except (TimeoutError, OSError, http.client.HTTPException, ValueError):
-        raise YandexTransportError("HTTP_IO_UNCERTAIN", external_requests_this_run=1) from None
+        failure_code = "HTTP_IO_UNCERTAIN"
     except Exception:
         # Once connect has been invoked, even an unexpected implementation
         # failure is an externally attempted request and must never look free.
-        raise YandexTransportError("HTTP_UNEXPECTED_UNCERTAIN", external_requests_this_run=1) from None
+        failure_code = "HTTP_UNEXPECTED_UNCERTAIN"
     finally:
         try:
             if watchdog is not None:
                 watchdog.cancel()
             connection.close()
         except (OSError, http.client.HTTPException, RuntimeError, ValueError):
-            raise YandexTransportError("HTTP_IO_UNCERTAIN", external_requests_this_run=1) from None
+            failure_code = "HTTP_IO_UNCERTAIN"
+
+    if failure_code is not None:
+        # Raise only after every handler has exited, and clear sensitive/raw
+        # locals before attaching this frame to the sanitized exception.
+        api_key = ""
+        body = b""
+        request_id = ""
+        capability = None
+        connection = None  # type: ignore[assignment]
+        response_result = None
+        watchdog = None
+        if "response" in locals():
+            response = None  # type: ignore[assignment]
+        if "result" in locals():
+            result.clear()
+        if "chunk" in locals():
+            chunk = b""
+        if "correlation" in locals():
+            correlation.clear()
+        if "value" in locals():
+            value = ""
+        if "declared_size" in locals():
+            declared_size = None
+        if "wire_socket" in locals():
+            wire_socket = None
+        raise YandexTransportError(failure_code, external_requests_this_run=1)
+    if response_result is None:
+        api_key = ""
+        body = b""
+        request_id = ""
+        capability = None
+        connection = None  # type: ignore[assignment]
+        watchdog = None
+        if "response" in locals():
+            response = None  # type: ignore[assignment]
+        if "result" in locals():
+            result.clear()
+        if "chunk" in locals():
+            chunk = b""
+        if "correlation" in locals():
+            correlation.clear()
+        if "value" in locals():
+            value = ""
+        if "declared_size" in locals():
+            declared_size = None
+        if "wire_socket" in locals():
+            wire_socket = None
+        raise YandexTransportError("HTTP_UNEXPECTED_UNCERTAIN", external_requests_this_run=1)
+    return response_result
 
 
 def run_yandex_search(

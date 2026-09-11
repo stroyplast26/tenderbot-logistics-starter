@@ -16,6 +16,7 @@ from lead_factory.radar_yandex_search import MAX_RESPONSE_BYTES, SearchRequest
 from lead_factory.radar_yandex_transport import (
     YandexTransportError,
     _post_yandex,
+    _post_yandex_core,
     main,
     run_yandex_search,
 )
@@ -84,6 +85,80 @@ class SyntheticConnection:
 
 
 class YandexTransportTests(unittest.TestCase):
+    def test_core_sanitized_error_detaches_context_and_clears_credential_frame(self):
+        from lead_factory.radar_yandex_connection_authority import ManualDispatchCapability
+
+        capability = object.__new__(ManualDispatchCapability)
+        connection = SyntheticConnection(
+            request_error=OSError("PRIVATE_TRANSPORT_FAILURE " + KEY)
+        )
+        with patch(
+            "lead_factory.radar_yandex_connection_authority.consume_manual_capability"
+        ), patch(HTTPS, return_value=connection):
+            with self.assertRaises(YandexTransportError) as caught:
+                _post_yandex_core(
+                    b"{}",
+                    api_key=KEY,
+                    request_id="test-1",
+                    capability=capability,
+                )
+
+        error = caught.exception
+        self.assertIsNone(error.__context__)
+        self.assertIsNone(error.__cause__)
+        production_locals: list[str] = []
+        traceback = error.__traceback__
+        while traceback is not None:
+            filename = traceback.tb_frame.f_code.co_filename.replace("\\", "/")
+            if "/lead_factory/" in filename:
+                production_locals.append(repr(traceback.tb_frame.f_locals))
+            traceback = traceback.tb_next
+        self.assertNotIn(KEY, "\n".join(production_locals))
+
+    def test_close_failure_clears_server_correlation_from_traceback_frames(self):
+        from lead_factory.radar_yandex_connection_authority import ManualDispatchCapability
+
+        marker = "server-echoed-private-correlation"
+        capability = object.__new__(ManualDispatchCapability)
+        connection = SyntheticConnection(
+            response=SyntheticResponse(headers={"x-request-id": marker})
+        )
+
+        def fail_close() -> None:
+            connection.closed = True
+            raise OSError("synthetic close failure")
+
+        with patch(
+            "lead_factory.radar_yandex_connection_authority.consume_manual_capability"
+        ), patch(HTTPS, return_value=connection), patch.object(
+            connection,
+            "close",
+            side_effect=fail_close,
+        ):
+            with self.assertRaises(YandexTransportError) as caught:
+                _post_yandex_core(
+                    b"{}",
+                    api_key=KEY,
+                    request_id="test-1",
+                    capability=capability,
+                )
+
+        error = caught.exception
+        self.assertEqual(error.external_requests_this_run, 1)
+        self.assertIsNone(error.__context__)
+        self.assertIsNone(error.__cause__)
+        production_locals: list[str] = []
+        traceback = error.__traceback__
+        while traceback is not None:
+            filename = traceback.tb_frame.f_code.co_filename.replace("\\", "/")
+            if "/lead_factory/" in filename:
+                production_locals.append(repr(traceback.tb_frame.f_locals))
+            traceback = traceback.tb_next
+        frames = "\n".join(production_locals)
+        self.assertNotIn(marker, frames)
+        self.assertNotIn(KEY, frames)
+        self.assertTrue(connection.closed)
+
     def test_watchdog_interrupts_slow_headers_even_after_connection_detaches_socket(self):
         released = threading.Event()
 

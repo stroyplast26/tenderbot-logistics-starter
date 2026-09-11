@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -74,8 +75,17 @@ def test_launcher_source_is_an_exact_fail_closed_allowlist() -> None:
     assert "'.venv\\Scripts\\python.exe'" in source
     assert "& $VenvPython @PythonArguments" in source
     assert ") + @($CommandArguments)" in source
-    assert "exit ([int]$ChildExitCode)" in source
+    assert "exit $SafeLeadFlowExitCode" in source
     assert "SAFE_LEAD_FLOW_FAILED" in source
+    assert source.index("Remove-Item -LiteralPath $SensitiveEnvironmentPath") < source.index(
+        "$ScriptDirectory ="
+    )
+    assert "Test-Path -LiteralPath $SensitiveEnvironmentPath" in source
+    assert "} finally {" in source
+    assert source.index("& $BootstrapPath -CheckOnly") < source.index(
+        "Set-Item -LiteralPath $LauncherMarkerPath"
+    )
+    assert source.count("Remove-Item -LiteralPath $LauncherMarkerPath") == 2
 
     expected_routes = {
         "source|plan",
@@ -133,6 +143,140 @@ def test_launcher_parses_in_windows_powershell_51() -> None:
         timeout=20,
     )
     assert result.returncode == 0, result.stdout + result.stderr
+
+
+@pytest.mark.skipif(
+    os.name != "nt" or not VENV_PYTHON.is_file(),
+    reason="requires Windows PowerShell 5.1 and the repo-local virtual environment",
+)
+def test_launcher_scrubs_case_variant_yandex_key_before_bootstrap_and_entrypoint(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "synthetic-repo"
+    scripts = repo / "scripts"
+    venv_scripts = repo / ".venv" / "Scripts"
+    scripts.mkdir(parents=True)
+    venv_scripts.mkdir(parents=True)
+    shutil.copy2(LAUNCHER, scripts / LAUNCHER.name)
+    shutil.copy2(VENV_PYTHON, venv_scripts / "python.exe")
+    shutil.copy2(ROOT / ".venv" / "pyvenv.cfg", repo / ".venv" / "pyvenv.cfg")
+
+    bootstrap_probe = tmp_path / "bootstrap-environment.txt"
+    entry_probe = tmp_path / "entry-environment.txt"
+    (scripts / "bootstrap_python_runtime.ps1").write_text(
+        """#Requires -Version 5.1
+param([switch]$CheckOnly)
+$CredentialPresent = Test-Path -LiteralPath 'Env:YANDEX_SEARCH_API_KEY'
+$MarkerPresent = Test-Path -LiteralPath 'Env:TENDERBOT_SAFE_LEAD_FLOW_LAUNCHER'
+[IO.File]::WriteAllText(
+    $env:SAFE_LEAD_FLOW_BOOTSTRAP_PROBE,
+    ($CredentialPresent.ToString() + ',' + $MarkerPresent.ToString())
+)
+if ($CredentialPresent -or $MarkerPresent) { throw 'AMBIENT_VALUE_REACHED_BOOTSTRAP' }
+""",
+        encoding="utf-8",
+    )
+    (scripts / "run_source_discovery_once.py").write_text(
+        """import json
+import os
+from pathlib import Path
+
+present = any(
+    name.casefold() == "yandex_search_api_key" for name in os.environ
+)
+marker_present = (
+    os.environ.get("TENDERBOT_SAFE_LEAD_FLOW_LAUNCHER") == "source-discovery-v3"
+)
+Path(os.environ["SAFE_LEAD_FLOW_ENTRY_PROBE"]).write_text(
+    f"credential={present};marker={marker_present}", encoding="utf-8"
+)
+print(json.dumps({"credential_present": present, "launcher_marker_present": marker_present}))
+raise SystemExit(97 if present or not marker_present else 0)
+""",
+        encoding="utf-8",
+    )
+
+    secret_marker = "ambient-yandex-key-must-not-reach-child"
+    environment = {
+        name: value
+        for name, value in os.environ.items()
+        if name.casefold() != "yandex_search_api_key"
+    }
+    environment.update(
+        {
+            "yAnDeX_SeArCh_ApI_kEy": secret_marker,
+            "SAFE_LEAD_FLOW_BOOTSTRAP_PROBE": str(bootstrap_probe),
+            "SAFE_LEAD_FLOW_ENTRY_PROBE": str(entry_probe),
+        }
+    )
+    result = subprocess.run(
+        [
+            str(_windows_powershell()),
+            "-NoLogo",
+            "-NoProfile",
+            "-NonInteractive",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            str(scripts / LAUNCHER.name),
+            "source",
+            "run-one",
+            "--confirm-one-authorized-read",
+        ],
+        cwd=tmp_path,
+        env=environment,
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert json.loads(result.stdout) == {
+        "credential_present": False,
+        "launcher_marker_present": True,
+    }
+    assert bootstrap_probe.read_text(encoding="utf-8") == "False,False"
+    assert entry_probe.read_text(encoding="utf-8") == "credential=False;marker=True"
+    assert secret_marker not in result.stdout
+    assert secret_marker not in result.stderr
+
+
+def test_source_cli_direct_run_one_is_denied_before_controller_or_state(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    state_path = tmp_path / "must-not-exist.sqlite3"
+    with (
+        patch.object(source_cli, "SOURCE_DISCOVERY_STATE_PATH", state_path),
+        patch.object(source_cli, "run_source_discovery_once") as controller,
+        patch.dict(
+            os.environ,
+            {source_cli.SAFE_LEAD_FLOW_LAUNCH_MARKER_NAME: "ambient-untrusted-marker"},
+        ),
+    ):
+        exit_code = source_cli.main(
+            [
+                "run-one",
+                "--source",
+                "YANDEX",
+                "--yandex-job",
+                str(tmp_path / "job.json"),
+                "--folder-id",
+                "folder",
+                "--confirm-one-authorized-read",
+            ]
+        )
+
+    assert exit_code == 2
+    controller.assert_not_called()
+    assert not state_path.exists()
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    payload = json.loads(captured.err)
+    assert payload["state"] == "FAILED_CLOSED"
+    assert payload["error_code"] == "SAFE_LEAD_FLOW_LAUNCHER_REQUIRED"
+    assert "ambient-untrusted-marker" not in captured.err
 
 
 @pytest.mark.skipif(

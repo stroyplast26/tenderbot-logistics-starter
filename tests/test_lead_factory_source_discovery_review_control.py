@@ -8,6 +8,8 @@ from unittest.mock import patch
 
 import pytest
 
+from lead_factory.radar_yandex_connection import ManualYandexSearchOutcome
+from lead_factory.radar_yandex_connection_authority import ManualYandexSearchBinding
 from lead_factory.radar_yandex_search import SearchHit, SearchPage, SearchRequest
 from lead_factory.radar_yandex_source_lab_bridge import (
     SOURCE_DISCOVERY_SOURCE_LAB_PATH,
@@ -47,6 +49,58 @@ def _controller_review_page(*, hits: int = 2) -> SearchPage:
     )
 
 
+def _accounted_review_page(*, hits: int = 2) -> ManualYandexSearchOutcome:
+    return ManualYandexSearchOutcome(
+        page=_controller_review_page(hits=hits),
+        external_requests_this_run=1,
+        journal={
+            "policy_sha256": "f" * 64,
+            "stopped": False,
+            "expires_at_utc": "2026-09-11T23:59:59Z",
+            "attempts_reserved": 1,
+            "max_requests": 1,
+            "reserved_cost_minor": 49,
+            "remaining_cost_minor": 0,
+            "currency": "RUB",
+            "cost_semantics": "UPPER_ESTIMATE_NOT_INVOICE",
+            "states": {
+                "RESERVED": 0,
+                "DISPATCH_INTENT": 0,
+                "UNCERTAIN": 0,
+                "COMPLETED": 1,
+            },
+            "retained_responses": 1,
+            "live_authority_granted": False,
+        },
+    )
+
+
+def _recorded_review_result(outcome: ManualYandexSearchOutcome):
+    def fake_runner(
+        _job_path: object,
+        *,
+        folder_id: object,
+        credential_loader: object,
+        binding_recorder: object,
+    ) -> ManualYandexSearchOutcome:
+        assert folder_id == "folder"
+        assert callable(credential_loader)
+        assert callable(binding_recorder)
+        binding_recorder(
+            ManualYandexSearchBinding(
+                job_id="22222222-2222-4222-8222-222222222222",
+                job_sha256="1" * 64,
+                policy_sha256="2" * 64,
+                connection_sha256="3" * 64,
+                journal_path_sha256="4" * 64,
+                journal_identity_sha256="5" * 64,
+            )
+        )
+        return outcome
+
+    return fake_runner
+
+
 def _run_yandex_review_batch(
     tmp_path: Path, *, hits: int = 2
 ) -> tuple[Path, Path, dict[str, object]]:
@@ -54,8 +108,8 @@ def _run_yandex_review_batch(
     source_lab_path = state_path.with_name(SOURCE_DISCOVERY_SOURCE_LAB_PATH.name)
     with patch.object(
         control,
-        "run_manual_yandex_search",
-        return_value=_controller_review_page(hits=hits),
+        "run_manual_yandex_search_accounted",
+        side_effect=_recorded_review_result(_accounted_review_page(hits=hits)),
     ) as runner:
         report = run_source_discovery_once(
             "YANDEX",
@@ -139,8 +193,8 @@ def test_yandex_review_round_trip_closes_batch_and_releases_backpressure(
 
     with patch.object(
         control,
-        "run_manual_yandex_search",
-        return_value=_controller_review_page(hits=0),
+        "run_manual_yandex_search_accounted",
+        side_effect=_recorded_review_result(_accounted_review_page(hits=0)),
     ) as runner:
         next_report = run_source_discovery_once(
             "YANDEX",
@@ -156,7 +210,7 @@ def test_yandex_review_round_trip_closes_batch_and_releases_backpressure(
     with pytest.raises(SourceDiscoveryControlError) as rolled_back:
         source_discovery_status(state_path=state_path)
     assert rolled_back.value.code == "CONTROL_SOURCE_LAB_RECONCILIATION_REQUIRED"
-    with patch.object(control, "run_manual_yandex_search") as blocked_runner:
+    with patch.object(control, "run_manual_yandex_search_accounted") as blocked_runner:
         with pytest.raises(SourceDiscoveryControlError) as blocked:
             run_source_discovery_once(
                 "YANDEX",
@@ -205,7 +259,7 @@ def test_source_lab_swap_after_preflight_fails_before_provider_read(
 
     with (
         patch.object(control, "_reserve", side_effect=swap_then_reserve),
-        patch.object(control, "run_manual_yandex_search") as runner,
+        patch.object(control, "run_manual_yandex_search_accounted") as runner,
         pytest.raises(SourceDiscoveryControlError) as blocked,
     ):
         run_source_discovery_once(
@@ -225,8 +279,8 @@ def test_controller_rollback_cannot_orphan_source_lab_batch(
     state_path = tmp_path / "source-discovery.sqlite3"
     with patch.object(
         control,
-        "run_manual_yandex_search",
-        return_value=_controller_review_page(hits=0),
+        "run_manual_yandex_search_accounted",
+        side_effect=_recorded_review_result(_accounted_review_page(hits=0)),
     ):
         baseline = run_source_discovery_once(
             "YANDEX",
@@ -241,8 +295,8 @@ def test_controller_rollback_cannot_orphan_source_lab_batch(
 
     with patch.object(
         control,
-        "run_manual_yandex_search",
-        return_value=_controller_review_page(hits=1),
+        "run_manual_yandex_search_accounted",
+        side_effect=_recorded_review_result(_accounted_review_page(hits=1)),
     ):
         batch = run_source_discovery_once(
             "YANDEX",
@@ -255,7 +309,7 @@ def test_controller_rollback_cannot_orphan_source_lab_batch(
     shutil.copy2(controller_backup, state_path)
 
     with (
-        patch.object(control, "run_manual_yandex_search") as runner,
+        patch.object(control, "run_manual_yandex_search_accounted") as runner,
         pytest.raises(SourceDiscoveryControlError) as blocked,
     ):
         run_source_discovery_once(
@@ -277,8 +331,8 @@ def test_yandex_bridge_failure_is_uncertain_and_never_retried(
     with (
         patch.object(
             control,
-            "run_manual_yandex_search",
-            return_value=_controller_review_page(),
+            "run_manual_yandex_search_accounted",
+            side_effect=_recorded_review_result(_accounted_review_page()),
         ) as runner,
         patch.object(
             control,
@@ -299,7 +353,7 @@ def test_yandex_bridge_failure_is_uncertain_and_never_retried(
     assert secret not in json.dumps(uncertain)
     assert secret.encode() not in state_path.read_bytes()
 
-    with patch.object(control, "run_manual_yandex_search") as second_runner:
+    with patch.object(control, "run_manual_yandex_search_accounted") as second_runner:
         blocked = run_source_discovery_once(
             "YANDEX",
             confirmation=SOURCE_DISCOVERY_ONE_SHOT_CONFIRMATION,
@@ -309,7 +363,7 @@ def test_yandex_bridge_failure_is_uncertain_and_never_retried(
         )
     second_runner.assert_not_called()
     assert blocked["state"] == "BLOCKED_UNCERTAIN"
-    assert blocked["delegate_call_count"] == 0
+    assert blocked["native_runner_call_count"] == 0
 
 
 def test_committed_batch_link_then_exception_remains_blocked_uncertain(
@@ -325,8 +379,8 @@ def test_committed_batch_link_then_exception_remains_blocked_uncertain(
     with (
         patch.object(
             control,
-            "run_manual_yandex_search",
-            return_value=_controller_review_page(hits=1),
+            "run_manual_yandex_search_accounted",
+            side_effect=_recorded_review_result(_accounted_review_page(hits=1)),
         ) as runner,
         patch.object(
             control,
@@ -350,7 +404,7 @@ def test_committed_batch_link_then_exception_remains_blocked_uncertain(
         "BLOCKED_UNCERTAIN"
     )
 
-    with patch.object(control, "run_manual_yandex_search") as second_runner:
+    with patch.object(control, "run_manual_yandex_search_accounted") as second_runner:
         blocked = run_source_discovery_once(
             "YANDEX",
             confirmation=SOURCE_DISCOVERY_ONE_SHOT_CONFIRMATION,
@@ -360,7 +414,7 @@ def test_committed_batch_link_then_exception_remains_blocked_uncertain(
         )
     second_runner.assert_not_called()
     assert blocked["state"] == "BLOCKED_UNCERTAIN"
-    assert blocked["delegate_call_count"] == 0
+    assert blocked["native_runner_call_count"] == 0
 
 
 @pytest.mark.parametrize("failure_mode", ("corrupt", "future-schema"))
@@ -376,7 +430,7 @@ def test_corrupt_source_lab_fails_before_yandex_provider_read(
         with sqlite3.connect(source_lab_path) as connection:
             connection.execute("PRAGMA user_version=999")
 
-    with patch.object(control, "run_manual_yandex_search") as runner:
+    with patch.object(control, "run_manual_yandex_search_accounted") as runner:
         with pytest.raises(YandexSourceLabBridgeError) as failed:
             run_source_discovery_once(
                 "YANDEX",
@@ -400,7 +454,7 @@ def test_second_preflight_failure_reports_zero_provider_calls(
             "preflight_yandex_source_lab",
             side_effect=(None, YandexSourceLabBridgeError("PREFLIGHT_STOP")),
         ),
-        patch.object(control, "run_manual_yandex_search") as runner,
+        patch.object(control, "run_manual_yandex_search_accounted") as runner,
     ):
         report = run_source_discovery_once(
             "YANDEX",
@@ -411,7 +465,7 @@ def test_second_preflight_failure_reports_zero_provider_calls(
         )
     runner.assert_not_called()
     assert report["state"] == "UNCERTAIN"
-    assert report["delegate_call_count"] == 0
+    assert report["native_runner_call_count"] == 0
 
 
 def test_query_url_is_discarded_without_wedging_the_controller(
@@ -435,7 +489,17 @@ def test_query_url_is_discarded_without_wedging_the_controller(
         ),
         status="RESULTS",
     )
-    with patch.object(control, "run_manual_yandex_search", return_value=page) as runner:
+    with patch.object(
+        control,
+        "run_manual_yandex_search_accounted",
+        side_effect=_recorded_review_result(
+            ManualYandexSearchOutcome(
+                page=page,
+                external_requests_this_run=1,
+                journal=_accounted_review_page().journal,
+            )
+        ),
+    ) as runner:
         report = run_source_discovery_once(
             "YANDEX",
             confirmation=SOURCE_DISCOVERY_ONE_SHOT_CONFIRMATION,
@@ -453,8 +517,8 @@ def test_query_url_is_discarded_without_wedging_the_controller(
 
     with patch.object(
         control,
-        "run_manual_yandex_search",
-        return_value=_controller_review_page(hits=0),
+        "run_manual_yandex_search_accounted",
+        side_effect=_recorded_review_result(_accounted_review_page(hits=0)),
     ) as second_runner:
         second = run_source_discovery_once(
             "YANDEX",
@@ -483,7 +547,17 @@ def test_mixed_query_and_safe_urls_persist_only_safe_candidate(
         ),
         status="RESULTS",
     )
-    with patch.object(control, "run_manual_yandex_search", return_value=page) as runner:
+    with patch.object(
+        control,
+        "run_manual_yandex_search_accounted",
+        side_effect=_recorded_review_result(
+            ManualYandexSearchOutcome(
+                page=page,
+                external_requests_this_run=1,
+                journal=_accounted_review_page().journal,
+            )
+        ),
+    ) as runner:
         report = run_source_discovery_once(
             "YANDEX",
             confirmation=SOURCE_DISCOVERY_ONE_SHOT_CONFIRMATION,
@@ -541,10 +615,16 @@ def test_controller_schema_creation_rolls_back_after_ddl_failure(
         }
     assert {
         "source_discovery_attempts",
+        "source_discovery_yandex_bindings",
+        "source_discovery_yandex_accounting",
         "source_discovery_batch_links",
         "source_discovery_review_closures",
     }.issubset(tables)
     assert triggers == {
+        "source_discovery_yandex_bindings_no_delete",
+        "source_discovery_yandex_bindings_no_update",
+        "source_discovery_yandex_accounting_no_delete",
+        "source_discovery_yandex_accounting_no_update",
         "source_discovery_batch_links_no_delete",
         "source_discovery_batch_links_no_update",
         "source_discovery_review_closures_no_delete",
@@ -760,10 +840,10 @@ def test_legacy_ready_batch_without_bridge_link_remains_blocked(
         )
 
     status = source_discovery_status(state_path=state_path)
-    assert status["version"] == "source-discovery-control-v2"
+    assert status["version"] == "source-discovery-control-v3"
     assert status["control"]["gate"] == "BLOCKED_BACKPRESSURE"  # type: ignore[index]
     assert status["control"]["open_review_batches"] == 1  # type: ignore[index]
-    with patch.object(control, "run_manual_yandex_search") as runner:
+    with patch.object(control, "run_manual_yandex_search_accounted") as runner:
         blocked = run_source_discovery_once(
             "YANDEX",
             confirmation=SOURCE_DISCOVERY_ONE_SHOT_CONFIRMATION,
