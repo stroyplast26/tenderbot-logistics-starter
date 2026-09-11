@@ -9,11 +9,11 @@ import unittest
 from unittest.mock import patch
 
 from lead_factory.mdos_v7.authority import ExternalAuthorityError
-from lead_factory.radar_yandex_journal import JournalError
+from lead_factory.radar_yandex_journal import JournalError, YandexPilotJournal
 from lead_factory.radar_yandex_pilot import main, run_owner_yandex_pilot
 from lead_factory import radar_yandex_pilot_authority as authority
 from lead_factory.radar_yandex_pilot_authority import PilotAuthorityError, verify_pilot_grant
-from lead_factory.radar_yandex_search import fetch_yandex_search
+from lead_factory.radar_yandex_search import YandexPreparationError, fetch_yandex_search
 from lead_factory.radar_yandex_transport import (
     YandexTransportError, _post_yandex, _post_yandex_core, main as legacy_main, run_yandex_search,
 )
@@ -225,8 +225,182 @@ class YandexOwnerPilotTests(unittest.TestCase):
             try:
                 self.assertEqual(observer.status()["attempts_reserved"], 0)
                 self.assertEqual(observer.status()["reserved_cost_minor"], 0)
+                self.assertEqual(list((bundle.parent / "dispatch-claims").iterdir()), [])
+                stdout = io.StringIO()
+                with redirect_stdout(stdout), patch.dict(
+                        os.environ, {"YANDEX_SEARCH_API_KEY": "unbound-valid-key-1234567890"}), \
+                        patch(HTTPS, side_effect=AssertionError("HTTPS after CLI credential mismatch")):
+                    self.assertEqual(main(["--bundle", str(bundle), "--folder-id", folder,
+                                           "--request-index", "0"]), 2)
+                self.assertEqual(json.loads(stdout.getvalue()), {
+                    "ok": False, "error": "YANDEX_OWNER_PILOT_REJECTED",
+                    "external_requests_this_run": 0,
+                })
             finally:
                 observer.close()
+
+    def test_unbound_key_is_rejected_before_reservation_or_https(self):
+        with active_bundle() as (bundle, _, _, folder):
+            observer = verify_pilot_grant(bundle, now=NOW).open_journal()
+            try:
+                with patch.dict(os.environ, {"YANDEX_SEARCH_API_KEY": "unbound-valid-key-1234567890"}), \
+                        patch(HTTPS, side_effect=AssertionError("HTTPS after credential mismatch")):
+                    with self.assertRaisesRegex(PilotAuthorityError, "^CREDENTIAL_MISMATCH$"):
+                        run_owner_yandex_pilot(bundle, request_index=0, folder_id=folder)
+                self.assertEqual(observer.status()["attempts_reserved"], 0)
+                self.assertEqual(observer.status()["reserved_cost_minor"], 0)
+            finally:
+                observer.close()
+
+    def test_key_swap_after_capability_mint_is_rejected_before_https(self):
+        with active_bundle() as (bundle, policy, _, folder):
+            verified = verify_pilot_grant(bundle, now=NOW)
+            journal = verified.open_journal()
+            try:
+                request = policy.requests[0]
+                verified.authorize_request(journal, request, folder, now=NOW)
+                body = json.dumps(request.body(folder), ensure_ascii=False,
+                                  separators=(",", ":")).encode("utf-8")
+                intent = journal.mark_dispatch_intent(journal.reserve(request, now=NOW), now=NOW)
+                capability = verified.mint_dispatch_capability(journal, intent, body, now=NOW)
+                with patch(HTTPS, side_effect=AssertionError("HTTPS after credential swap")):
+                    with self.assertRaisesRegex(PilotAuthorityError, "^CREDENTIAL_MISMATCH$"):
+                        _post_yandex_core(body, api_key="unbound-valid-key-1234567890",
+                                         request_id=intent.request_id, capability=capability)
+                self.assertEqual(journal.status()["states"]["DISPATCH_INTENT"], 1)
+                with patch(HTTPS, side_effect=AssertionError("HTTPS after burned capability")):
+                    with self.assertRaisesRegex(PilotAuthorityError, "^CAPABILITY_NOT_ISSUED$"):
+                        _post_yandex_core(body, api_key=KEY, request_id=intent.request_id,
+                                          capability=capability)
+            finally:
+                journal.close()
+
+    def test_stop_allows_completed_cache_replay_without_key_or_https(self):
+        with active_bundle() as (bundle, _, pin, folder):
+            with patch.dict(os.environ, {"YANDEX_SEARCH_API_KEY": KEY}), \
+                    patch(HTTPS, return_value=SyntheticConnection()):
+                first = run_owner_yandex_pilot(bundle, request_index=0, folder_id=folder)
+            journal = verify_pilot_grant(bundle, now=NOW).open_journal()
+            try:
+                journal.stop(now=NOW)
+            finally:
+                journal.close()
+            with patch(KEY_LOOKUP, side_effect=AssertionError("key on stopped replay")), \
+                    patch(HTTPS, side_effect=AssertionError("HTTPS on stopped replay")):
+                replay = run_owner_yandex_pilot(bundle, request_index=0, folder_id=folder)
+                with self.assertRaisesRegex(PilotAuthorityError, "^PILOT_STOPPED$"):
+                    run_owner_yandex_pilot(bundle, request_index=1, folder_id=folder)
+                with self.assertRaisesRegex(PilotAuthorityError, "^FOLDER_MISMATCH$"):
+                    run_owner_yandex_pilot(bundle, request_index=0, folder_id=folder + "-other")
+            self.assertEqual(replay, first)
+            activation = json.loads(pin.read_bytes())
+            activation["status"] = "REVOKED"
+            pin.write_bytes(authority._canonical(activation))
+            with patch(KEY_LOOKUP, side_effect=AssertionError("key after revocation")), \
+                    patch(HTTPS, side_effect=AssertionError("HTTPS after revocation")):
+                with self.assertRaisesRegex(PilotAuthorityError, "^ACTIVATION_INACTIVE$"):
+                    run_owner_yandex_pilot(bundle, request_index=0, folder_id=folder)
+
+    def test_cli_reports_dispatch_and_replay_accounting_honestly(self):
+        with active_bundle() as (bundle, _, _, folder):
+            first_out = io.StringIO()
+            with redirect_stdout(first_out), patch.dict(
+                    os.environ, {"YANDEX_SEARCH_API_KEY": KEY}), \
+                    patch(HTTPS, return_value=SyntheticConnection()) as https:
+                self.assertEqual(main(["--bundle", str(bundle), "--folder-id", folder,
+                                       "--request-index", "0"]), 0)
+            first = json.loads(first_out.getvalue())
+            self.assertEqual(https.call_count, 1)
+            self.assertEqual(first["external_requests_this_run"], 1)
+            self.assertEqual(first["review_queue"]["external_requests"], 1)
+            self.assertEqual(first["journal"]["attempts_reserved"], 1)
+            self.assertNotIn(KEY, first_out.getvalue())
+            approved_key_sha = json.loads(bundle.read_bytes())["readiness"]["credential_sha256"]
+            self.assertNotIn(approved_key_sha, first_out.getvalue())
+
+            replay_out = io.StringIO()
+            with redirect_stdout(replay_out), \
+                    patch(KEY_LOOKUP, side_effect=AssertionError("key on CLI replay")), \
+                    patch(HTTPS, side_effect=AssertionError("HTTPS on CLI replay")):
+                self.assertEqual(main(["--bundle", str(bundle), "--folder-id", folder,
+                                       "--request-index", "0"]), 0)
+            replay = json.loads(replay_out.getvalue())
+            self.assertEqual(replay["external_requests_this_run"], 0)
+            self.assertEqual(replay["review_queue"]["external_requests"], 0)
+            self.assertEqual(replay["journal"]["attempts_reserved"], 1)
+
+    def test_cli_failure_accounting_covers_timeout_http_status_and_parse(self):
+        cases = (
+            ("timeout", lambda: SyntheticConnection(SyntheticResponse(
+                read_error=TimeoutError("PRIVATE_TIMEOUT_SENTINEL")))),
+            ("http-status", lambda: SyntheticConnection(SyntheticResponse(status=503))),
+            ("parse", lambda: SyntheticConnection(SyntheticResponse(body=b"{}"))),
+            ("unexpected-request", lambda: SyntheticConnection(
+                request_error=RuntimeError("PRIVATE_RUNTIME_SENTINEL"))),
+        )
+        for label, connection_factory in cases:
+            with self.subTest(case=label), active_bundle() as (bundle, _, _, folder):
+                connection = connection_factory()
+                stdout = io.StringIO()
+                with redirect_stdout(stdout), patch.dict(os.environ, {"YANDEX_SEARCH_API_KEY": KEY}), \
+                        patch(HTTPS, return_value=connection):
+                    self.assertEqual(main(["--bundle", str(bundle), "--folder-id", folder,
+                                           "--request-index", "0"]), 2)
+                result = json.loads(stdout.getvalue())
+                self.assertEqual(result["ok"], False)
+                self.assertEqual(result["error"], "YANDEX_OWNER_PILOT_REJECTED")
+                self.assertEqual(result["external_requests_this_run"], 1)
+                self.assertEqual(result["journal"]["attempts_reserved"], 1)
+                self.assertEqual(result["journal"]["states"]["UNCERTAIN"], 1)
+                self.assertEqual(len(connection.requests), 1)
+                self.assertNotIn(KEY, stdout.getvalue())
+                self.assertNotIn(str(bundle), stdout.getvalue())
+                self.assertNotIn("PRIVATE_TIMEOUT_SENTINEL", stdout.getvalue())
+                self.assertNotIn("PRIVATE_RUNTIME_SENTINEL", stdout.getvalue())
+
+    def test_post_commit_status_failure_keeps_completed_and_replayable(self):
+        with active_bundle() as (bundle, policy, _, folder):
+            original_status = YandexPilotJournal.status
+
+            def fail_after_completed(journal):
+                status = original_status(journal)
+                if status["states"]["COMPLETED"]:
+                    raise JournalError("SYNTHETIC_STATUS_FAILURE")
+                return status
+
+            stdout = io.StringIO()
+            with redirect_stdout(stdout), patch.dict(os.environ, {"YANDEX_SEARCH_API_KEY": KEY}), \
+                    patch(HTTPS, return_value=SyntheticConnection()), \
+                    patch.object(YandexPilotJournal, "status", fail_after_completed):
+                self.assertEqual(main(["--bundle", str(bundle), "--folder-id", folder,
+                                       "--request-index", "0"]), 0)
+            result = json.loads(stdout.getvalue())
+            self.assertEqual(result["external_requests_this_run"], 1)
+            self.assertEqual(result["journal"], {"accounting_status": "UNAVAILABLE"})
+            observer = verify_pilot_grant(bundle, now=NOW).open_journal()
+            try:
+                self.assertEqual(observer.status()["states"]["COMPLETED"], 1)
+                self.assertEqual(observer.status()["states"]["UNCERTAIN"], 0)
+                with patch(KEY_LOOKUP, side_effect=AssertionError("key on post-commit replay")), \
+                        patch(HTTPS, side_effect=AssertionError("HTTPS on post-commit replay")):
+                    replay = run_owner_yandex_pilot(bundle, request_index=0, folder_id=folder)
+                self.assertEqual(replay.request.operation_key, policy.requests[0].operation_key)
+            finally:
+                observer.close()
+
+    def test_post_run_queue_failure_keeps_external_and_completed_accounting(self):
+        with active_bundle() as (bundle, _, _, folder):
+            stdout = io.StringIO()
+            with redirect_stdout(stdout), patch.dict(os.environ, {"YANDEX_SEARCH_API_KEY": KEY}), \
+                    patch(HTTPS, return_value=SyntheticConnection()), \
+                    patch("lead_factory.radar_yandex_pilot.build_review_queue",
+                          side_effect=YandexPreparationError("SYNTHETIC_QUEUE_FAILURE")):
+                self.assertEqual(main(["--bundle", str(bundle), "--folder-id", folder,
+                                       "--request-index", "0"]), 2)
+            result = json.loads(stdout.getvalue())
+            self.assertEqual(result["external_requests_this_run"], 1)
+            self.assertEqual(result["journal"]["states"]["COMPLETED"], 1)
+            self.assertNotIn("SYNTHETIC_QUEUE_FAILURE", stdout.getvalue())
 
     def test_provider_failure_remains_fully_charged_and_no_retry_is_dispatched(self):
         with active_bundle() as (bundle, _, _, folder):
@@ -270,7 +444,9 @@ class YandexOwnerPilotTests(unittest.TestCase):
             code = main(["--bundle", "PRIVATE_PATH_SENTINEL", "--folder-id", "synthetic-folder",
                          "--request-index", "0"])
         self.assertEqual(code, 2)
-        self.assertEqual(json.loads(stdout.getvalue()), {"ok": False, "error": "YANDEX_OWNER_PILOT_REJECTED"})
+        self.assertEqual(json.loads(stdout.getvalue()), {
+            "ok": False, "error": "YANDEX_OWNER_PILOT_REJECTED", "external_requests_this_run": 0,
+        })
 
     def test_cli_has_no_clock_or_authority_override_or_api_key_argument(self):
         for arguments in (["--now", NOW], ["--allow-live"], ["--api-key", "SYNTHETIC_ONLY"],

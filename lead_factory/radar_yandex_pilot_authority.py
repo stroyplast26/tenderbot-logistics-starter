@@ -10,6 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 import hashlib
+import hmac
 import json
 import os
 from pathlib import Path
@@ -29,7 +30,7 @@ _CODE_FILES = (
     "lead_factory/radar_yandex_pilot.py", "lead_factory/radar_yandex_journal.py",
     "lead_factory/radar_yandex_search.py", "lead_factory/mdos_v7/authority.py",
 )
-_BUNDLE_VERSION = "radar-yandex-pilot-authority-v1"
+_BUNDLE_VERSION = "radar-yandex-pilot-authority-v2"
 _PIN_VERSION = "radar-yandex-pilot-activation-v1"
 _FORBIDDEN_EFFECTS = ["OTHER_SOURCES", "CRM_WRITES", "OUTGOING_CONTACT", "MESSAGES", "PUBLICATION", "SCHEDULER"]
 _LOCK = threading.RLock()
@@ -222,6 +223,7 @@ class _VerifiedData:
     journal_identity: dict[str, int]
     claims_identity: dict[str, int]
     last_now: str
+    credential_sha256: str = ""
     journals: dict[int, YandexPilotJournal] = field(default_factory=dict)
 
 
@@ -290,10 +292,19 @@ def _verify_bundle(bundle_path: str | Path, now: str) -> _VerifiedData:
     review = _object(bundle["independent_acceptance"], {"kind", "reviewer_id", "reviewed_at_utc", "verdict",
                                                               "code_sha256", "evidence_sha256", "implementation_author_ids"})
     ready = _object(bundle["readiness"], {"kind", "observed_at_utc", "billing_status", "search_api_status",
-                                                "credential_status", "folder_id_sha256", "evidence_sha256"})
+                                                "credential_status", "folder_id_sha256", "service_account_id",
+                                                "api_key_id", "credential_scope", "credential_sha256",
+                                                "evidence_sha256"})
+    for identifier in (ready["service_account_id"], ready["api_key_id"]):
+        _identity_text(identifier)
+    _sha(ready["credential_sha256"])
     scope_sha = _digest({"policy_sha256": policy.sha256, "journal_path": str(journal_path),
                          "journal_identity": identity, "claims_identity": claims_identity,
-                         "workspace_root": str(_WORKSPACE_ROOT)})
+                         "workspace_root": str(_WORKSPACE_ROOT),
+                         "credential": {"service_account_id": ready["service_account_id"],
+                                        "api_key_id": ready["api_key_id"],
+                                        "scope": ready["credential_scope"],
+                                        "credential_sha256": ready["credential_sha256"]}})
     for identifier in (owner["owner_id"], owner["source_thread_id"], review["reviewer_id"]):
         _identity_text(identifier)
     authors = review["implementation_author_ids"]
@@ -309,12 +320,14 @@ def _verify_bundle(bundle_path: str | Path, now: str) -> _VerifiedData:
             or review["code_sha256"] != code
             or ready["kind"] != "BILLING_API_READINESS" or ready["billing_status"] not in {"ACTIVE", "TRIAL_ACTIVE"}
             or ready["search_api_status"] != "CONFIGURATION_VERIFIED" or ready["credential_status"] != "AVAILABLE"
-            or ready["folder_id_sha256"] != policy.folder_id_sha256):
+            or ready["folder_id_sha256"] != policy.folder_id_sha256
+            or ready["credential_scope"] != "yc.search-api.execute"):
         _fail("ACCEPTANCE_REQUIRED")
     for when in (owner["captured_at_utc"], review["reviewed_at_utc"], ready["observed_at_utc"]):
         if not created - timedelta(hours=24) <= _utc(when) <= activated:
             _fail("RECEIPT_EXPIRED")
-    data = _VerifiedData(exact_bundle, bundle_sha, pin_sha, policy, journal_path, identity, claims_identity, now)
+    data = _VerifiedData(exact_bundle, bundle_sha, pin_sha, policy, journal_path, identity, claims_identity, now,
+                         ready["credential_sha256"])
     # Only an otherwise valid, pinned scope may advance the accounting clock.
     # Commit the observation before an expiry denial, so a new process cannot
     # backdate itself into this already observed expired activation.
@@ -364,8 +377,19 @@ class VerifiedPilotGrant:
                 _fail("FOLDER_MISMATCH")
             if folder_sha != data.policy.folder_id_sha256:
                 _fail("FOLDER_MISMATCH")
+
+    def authorize_new_dispatch(self, journal: YandexPilotJournal, *, now: str) -> None:
+        """Reject a new intent after STOP while leaving completed reads usable."""
+        with _LOCK:
+            data = _fresh(self, now)
+            _check_journal(data, journal)
             if journal.status()["stopped"]:
                 _fail("PILOT_STOPPED")
+
+    def check_credential(self, api_key: str) -> None:
+        """Bind the selected key to the separately approved readiness receipt."""
+        with _LOCK:
+            _check_key(_fresh(self, _now_utc()), api_key)
 
     def mint_dispatch_capability(self, journal: YandexPilotJournal, grant: DispatchGrant,
                                  body: bytes, *, now: str) -> DispatchCapability:
@@ -510,6 +534,13 @@ def _check_body(data: _VerifiedData, request: SearchRequest, body: bytes) -> Non
         _fail("BODY_MISMATCH")
 
 
+def _check_key(data: _VerifiedData, api_key: str) -> None:
+    if (type(api_key) is not str or not re.fullmatch(r"[A-Za-z0-9._~-]{16,512}", api_key)
+            or not hmac.compare_digest(hashlib.sha256(api_key.encode("utf-8")).hexdigest(),
+                                       data.credential_sha256)):
+        _fail("CREDENTIAL_MISMATCH")
+
+
 def verify_pilot_grant(bundle_path: str | Path, *, now: str) -> VerifiedPilotGrant:
     with _LOCK:
         data = _verified_data(bundle_path, now)
@@ -520,8 +551,8 @@ def verify_pilot_grant(bundle_path: str | Path, *, now: str) -> VerifiedPilotGra
         return grant
 
 
-def consume_capability(capability: DispatchCapability, body: bytes, request_id: str) -> None:
-    """Consume once before connection; an invalid attempted use burns the token."""
+def consume_capability(capability: DispatchCapability, body: bytes, request_id: str, api_key: str) -> None:
+    """Burn once, then recheck activation, request binding and approved key before TLS."""
     with _LOCK:
         if type(capability) is not DispatchCapability:
             _fail("CAPABILITY_NOT_ISSUED")
@@ -534,6 +565,7 @@ def consume_capability(capability: DispatchCapability, body: bytes, request_id: 
         if (type(body) is not bytes or hashlib.sha256(body).hexdigest() != body_sha
                 or request_id != grant.request_id):
             _fail("CAPABILITY_BINDING_INVALID")
+        _check_key(data, api_key)
         # STOP can arrive after the durable dispatch intent. This already
         # issued single request may finish, but no second token can be issued.
         try:

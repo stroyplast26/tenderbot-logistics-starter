@@ -128,6 +128,18 @@ class PermanentYandexConnectionTests(unittest.TestCase):
             self.assertFalse(result["cached"])
             self.assertEqual(result["connection"], "PERMANENT")
             self.assertEqual(result["accounting"]["attempts_reserved"], 0)
+            journal = authority.verify_manual_grant(job, now=NOW).open_journal()
+            try:
+                journal.stop(now=NOW)
+            finally:
+                journal.close()
+            stdout = io.StringIO()
+            with redirect_stdout(stdout):
+                self.assertEqual(runner.main(["--job", str(job), "--folder-id", FOLDER, "--check"]), 2)
+            self.assertEqual(json.loads(stdout.getvalue()), {
+                "ok": False, "error": "YANDEX_MANUAL_REQUEST_REJECTED",
+                "external_requests_this_run": 0,
+            })
 
     def test_one_http_only_after_durable_accounting_claim_then_replay_before_key(self):
         with active_job() as (_, job, policy):
@@ -172,6 +184,74 @@ class PermanentYandexConnectionTests(unittest.TestCase):
             finally:
                 journal.close()
 
+    def test_cli_failed_dispatch_reports_one_charged_uncertain_attempt(self):
+        with active_job() as (root, job, _), patch.dict(os.environ, {"YANDEX_SEARCH_API_KEY": KEY}):
+            connection = SyntheticConnection(request_error=OSError("PRIVATE_HTTP_SENTINEL"))
+            stdout = io.StringIO()
+            with redirect_stdout(stdout), patch(HTTPS, return_value=connection):
+                self.assertEqual(runner.main(["--job", str(job), "--folder-id", FOLDER]), 2)
+            result = json.loads(stdout.getvalue())
+            self.assertEqual(result["ok"], False)
+            self.assertEqual(result["error"], "YANDEX_MANUAL_REQUEST_REJECTED")
+            self.assertEqual(result["external_requests_this_run"], 1)
+            self.assertEqual(result["journal"]["attempts_reserved"], 1)
+            self.assertEqual(result["journal"]["states"]["UNCERTAIN"], 1)
+            self.assertEqual(len(connection.requests), 1)
+            self.assertNotIn(KEY, stdout.getvalue())
+            self.assertNotIn(str(root), stdout.getvalue())
+            self.assertNotIn("PRIVATE_HTTP_SENTINEL", stdout.getvalue())
+
+    def test_stop_allows_completed_cache_replay_without_key_or_https(self):
+        with active_job() as (root, job, _):
+            with patch.dict(os.environ, {"YANDEX_SEARCH_API_KEY": KEY}), \
+                    patch(HTTPS, return_value=SyntheticConnection()):
+                first = runner.run_manual_yandex_search(job, folder_id=FOLDER)
+            journal = authority.verify_manual_grant(job, now=NOW).open_journal()
+            try:
+                journal.stop(now=NOW)
+            finally:
+                journal.close()
+            with patch(KEY_LOOKUP, side_effect=AssertionError("key on stopped replay")), \
+                    patch(HTTPS, side_effect=AssertionError("HTTPS on stopped replay")):
+                replay = runner.run_manual_yandex_search(job, folder_id=FOLDER)
+                with self.assertRaisesRegex(authority.ConnectionAuthorityError, "^FOLDER_MISMATCH$"):
+                    runner.run_manual_yandex_search(job, folder_id=FOLDER + "-other")
+                self.assertTrue(runner.check_manual_yandex_search(job, folder_id=FOLDER)["cached"])
+            self.assertEqual(replay, first)
+            connection_path = root / "connection.json"
+            connection = json.loads(connection_path.read_bytes())
+            connection["status"] = "REVOKED"
+            connection_path.write_bytes(common._canonical(connection))
+            with patch(KEY_LOOKUP, side_effect=AssertionError("key after revocation")), \
+                    patch(HTTPS, side_effect=AssertionError("HTTPS after revocation")):
+                with self.assertRaisesRegex(authority.ConnectionAuthorityError, "^CONNECTION_INACTIVE$"):
+                    runner.run_manual_yandex_search(job, folder_id=FOLDER)
+
+    def test_cli_reports_dispatch_and_replay_accounting_honestly(self):
+        with active_job() as (_, job, _):
+            first_out = io.StringIO()
+            with redirect_stdout(first_out), patch.dict(
+                    os.environ, {"YANDEX_SEARCH_API_KEY": KEY}), \
+                    patch(HTTPS, return_value=SyntheticConnection()) as https:
+                self.assertEqual(runner.main(["--job", str(job), "--folder-id", FOLDER]), 0)
+            first = json.loads(first_out.getvalue())
+            self.assertEqual(https.call_count, 1)
+            self.assertEqual(first["external_requests_this_run"], 1)
+            self.assertEqual(first["review_queue"]["external_requests"], 1)
+            self.assertEqual(first["journal"]["attempts_reserved"], 1)
+            self.assertNotIn(KEY, first_out.getvalue())
+            self.assertNotIn(hashlib.sha256(KEY.encode()).hexdigest(), first_out.getvalue())
+
+            replay_out = io.StringIO()
+            with redirect_stdout(replay_out), \
+                    patch(KEY_LOOKUP, side_effect=AssertionError("key on CLI replay")), \
+                    patch(HTTPS, side_effect=AssertionError("HTTPS on CLI replay")):
+                self.assertEqual(runner.main(["--job", str(job), "--folder-id", FOLDER]), 0)
+            replay = json.loads(replay_out.getvalue())
+            self.assertEqual(replay["external_requests_this_run"], 0)
+            self.assertEqual(replay["review_queue"]["external_requests"], 0)
+            self.assertEqual(replay["journal"]["attempts_reserved"], 1)
+
     def test_billing_owner_review_limits_scope_and_source_denied_before_key(self):
         changes = [lambda j: j.update(max_requests=20), lambda j: j.update(max_requests=True),
                    lambda j: j.update(max_cost_minor=6000), lambda j: j.update(reserve_per_request_minor=50),
@@ -204,6 +284,14 @@ class PermanentYandexConnectionTests(unittest.TestCase):
             with self.assertRaisesRegex(authority.ConnectionAuthorityError, "^CREDENTIAL_MISMATCH$"):
                 runner.run_manual_yandex_search(job, folder_id=FOLDER)
             self.assertEqual(runner.check_manual_yandex_search(job, folder_id=FOLDER)["accounting"]["attempts_reserved"], 0)
+            self.assertEqual(list((job.parent / "dispatch-claims").iterdir()), [])
+            stdout = io.StringIO()
+            with redirect_stdout(stdout):
+                self.assertEqual(runner.main(["--job", str(job), "--folder-id", FOLDER]), 2)
+            self.assertEqual(json.loads(stdout.getvalue()), {
+                "ok": False, "error": "YANDEX_MANUAL_REQUEST_REJECTED",
+                "external_requests_this_run": 0,
+            })
 
     def test_journal_replacement_same_bytes_is_rejected(self):
         with active_job() as (_, job, _), patch(KEY_LOOKUP, side_effect=AssertionError("key")):
@@ -231,14 +319,58 @@ class PermanentYandexConnectionTests(unittest.TestCase):
                 intent = journal.mark_dispatch_intent(journal.reserve(policy.requests[0], now=NOW), now=NOW)
                 body = common._canonical(policy.requests[0].body(FOLDER))
                 capability = grant.mint_dispatch_capability(journal, intent, body)
-                with self.assertRaisesRegex(authority.ConnectionAuthorityError, "^CREDENTIAL_MISMATCH$"):
-                    authority.consume_manual_capability(capability, body, intent.request_id, KEY + "wrong")
+                with patch(HTTPS, side_effect=AssertionError("HTTPS after credential swap")):
+                    with self.assertRaisesRegex(authority.ConnectionAuthorityError, "^CREDENTIAL_MISMATCH$"):
+                        _post_yandex_core(body, api_key=KEY + "wrong", request_id=intent.request_id,
+                                          capability=capability)
                 with self.assertRaisesRegex(authority.ConnectionAuthorityError, "^CAPABILITY_NOT_ISSUED$"):
                     authority.consume_manual_capability(capability, body, intent.request_id, KEY)
                 with self.assertRaisesRegex(authority.ConnectionAuthorityError, "^CAPABILITY_ALREADY_ISSUED$"):
                     grant.mint_dispatch_capability(journal, intent, body)
             finally:
                 journal.close()
+
+    def test_post_commit_status_failure_keeps_completed_and_replayable(self):
+        with active_job() as (_, job, policy):
+            original_status = YandexPilotJournal.status
+
+            def fail_after_completed(journal):
+                status = original_status(journal)
+                if status["states"]["COMPLETED"]:
+                    raise JournalError("SYNTHETIC_STATUS_FAILURE")
+                return status
+
+            stdout = io.StringIO()
+            with redirect_stdout(stdout), patch.dict(os.environ, {"YANDEX_SEARCH_API_KEY": KEY}), \
+                    patch(HTTPS, return_value=SyntheticConnection()), \
+                    patch.object(YandexPilotJournal, "status", fail_after_completed):
+                self.assertEqual(runner.main(["--job", str(job), "--folder-id", FOLDER]), 0)
+            result = json.loads(stdout.getvalue())
+            self.assertEqual(result["external_requests_this_run"], 1)
+            self.assertEqual(result["journal"], {"accounting_status": "UNAVAILABLE"})
+            observer = authority.verify_manual_grant(job, now=NOW).open_journal()
+            try:
+                self.assertEqual(observer.status()["states"]["COMPLETED"], 1)
+                self.assertEqual(observer.status()["states"]["UNCERTAIN"], 0)
+                with patch(KEY_LOOKUP, side_effect=AssertionError("key on post-commit replay")), \
+                        patch(HTTPS, side_effect=AssertionError("HTTPS on post-commit replay")):
+                    replay = runner.run_manual_yandex_search(job, folder_id=FOLDER)
+                self.assertEqual(replay.request.operation_key, policy.requests[0].operation_key)
+            finally:
+                observer.close()
+
+    def test_post_run_queue_failure_keeps_external_and_completed_accounting(self):
+        with active_job() as (_, job, _):
+            stdout = io.StringIO()
+            with redirect_stdout(stdout), patch.dict(os.environ, {"YANDEX_SEARCH_API_KEY": KEY}), \
+                    patch(HTTPS, return_value=SyntheticConnection()), \
+                    patch("lead_factory.radar_yandex_connection.build_review_queue",
+                          side_effect=runner.YandexPreparationError("SYNTHETIC_QUEUE_FAILURE")):
+                self.assertEqual(runner.main(["--job", str(job), "--folder-id", FOLDER]), 2)
+            result = json.loads(stdout.getvalue())
+            self.assertEqual(result["external_requests_this_run"], 1)
+            self.assertEqual(result["journal"]["states"]["COMPLETED"], 1)
+            self.assertNotIn("SYNTHETIC_QUEUE_FAILURE", stdout.getvalue())
 
     def test_connection_revoked_between_mint_and_consume_denies_before_http(self):
         with active_job() as (root, job, policy):
@@ -297,7 +429,9 @@ class PermanentYandexConnectionTests(unittest.TestCase):
         with patch(KEY_LOOKUP, side_effect=AssertionError("key")), redirect_stdout(output):
             code = runner.main(["--job", "PRIVATE-PATH-SENTINEL", "--folder-id", FOLDER, "--check"])
         self.assertEqual(code, 2)
-        self.assertEqual(json.loads(output.getvalue()), {"ok": False, "error": "YANDEX_MANUAL_REQUEST_REJECTED"})
+        self.assertEqual(json.loads(output.getvalue()), {
+            "ok": False, "error": "YANDEX_MANUAL_REQUEST_REJECTED", "external_requests_this_run": 0,
+        })
 
 
 if __name__ == "__main__":
