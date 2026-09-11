@@ -165,14 +165,17 @@ provider response в него не включаются. В Source Lab/controlle
 ссылок не осталось, attempt завершается без backpressure как
 `COMPLETE_NO_RESULTS` с более точной классификацией
 `NO_SAFE_REVIEWABLE_RESULTS`, а не превращается в постоянный `UNCERTAIN`.
-Все публичные операции Yandex Source Lab bridge и controller boundary
-`run_source_discovery_once` при отказе возвращают только код из закрытого
-allowlist: исходное исключение, его `context/cause`, входные пути,
-query/title/snippet и поля решения не остаются достижимыми через production
-traceback. Нельзя заменять эти boundaries прямым вызовом внутренних `_..._core`
-функций или логированием внутренних исключений. Для остальных локальных
-controller-команд действует более узкий контракт: не передавайте им секреты
-или персональные данные и не сериализуйте traceback.
+Все публичные операции Yandex Source Lab bridge при обычной программной ошибке
+`Exception`, а также controller boundary `run_source_discovery_once` при любом
+перехваченном отказе возвращают только код из закрытого allowlist: исходное
+исключение, его `context/cause`, входные пути, query/title/snippet и поля решения
+не остаются достижимыми через production traceback. Самостоятельный bridge-вызов
+намеренно не преобразует управляющие `KeyboardInterrupt`, `SystemExit` и
+`GeneratorExit`; поддерживаемый `run-one` закрывает и этот внешний boundary.
+Нельзя заменять boundaries прямым вызовом внутренних `_..._core` функций или
+логированием внутренних исключений. Для остальных локальных controller-команд
+действует более узкий контракт: не передавайте им секреты или персональные
+данные и не сериализуйте traceback.
 
 Это не означает отсутствие raw storage во всём нативном Yandex-контуре: до
 bridge `radar_yandex_journal` сохраняет raw provider response в своём локальном
