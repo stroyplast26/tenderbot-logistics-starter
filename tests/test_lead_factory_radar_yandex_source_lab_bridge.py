@@ -1,5 +1,6 @@
 import base64
-from dataclasses import fields
+from collections.abc import Mapping
+from dataclasses import fields, is_dataclass
 from datetime import datetime, timedelta, timezone
 import json
 from pathlib import Path
@@ -19,9 +20,12 @@ from lead_factory.radar_yandex_source_lab_bridge import (
     decide_yandex_review_candidate,
     inspect_yandex_batch_closure,
     list_yandex_review_batch,
+    list_yandex_review_batch_receipts,
     persist_yandex_review_batch,
     preflight_yandex_source_lab,
+    select_yandex_reviewable_page,
 )
+import lead_factory.radar_yandex_source_lab_bridge as bridge
 from lead_factory.ids import payload_hash
 from lead_factory.source_lab import SourceLabSink
 from lead_factory.source_review_queue import SourceReviewQueue
@@ -34,6 +38,127 @@ SECRET_TITLE = "SECRET_TITLE заказчик и алюминий"
 SECRET_SNIPPET = "SECRET_SNIPPET контакт и телефон"
 SAFE_URL_ONE = "https://example.org/public/project-one"
 SAFE_URL_TWO = "https://example.org/public/project-two"
+
+
+def _contains_supplied_material(
+    value: object,
+    markers: tuple[str, ...],
+    *,
+    seen: set[int],
+    depth: int = 0,
+) -> bool:
+    """Inspect only bounded, data-bearing object state without rendering it."""
+
+    if depth > 10:
+        return False
+    if isinstance(value, str):
+        return any(marker in value for marker in markers)
+    if isinstance(value, bytes):
+        return any(marker.encode("utf-8") in value for marker in markers)
+    if isinstance(value, Path):
+        rendered = str(value)
+        return any(marker in rendered for marker in markers)
+    if value is None or isinstance(value, (bool, int, float, complex)):
+        return False
+    identity = id(value)
+    if identity in seen:
+        return False
+    seen.add(identity)
+    if isinstance(value, Mapping):
+        return any(
+            _contains_supplied_material(item, markers, seen=seen, depth=depth + 1)
+            for pair in value.items()
+            for item in pair
+        )
+    if isinstance(value, (tuple, list, set, frozenset)):
+        return any(
+            _contains_supplied_material(item, markers, seen=seen, depth=depth + 1)
+            for item in value
+        )
+    if is_dataclass(value) and not isinstance(value, type):
+        return any(
+            _contains_supplied_material(
+                object.__getattribute__(value, field.name),
+                markers,
+                seen=seen,
+                depth=depth + 1,
+            )
+            for field in fields(value)
+        )
+    if isinstance(value, BaseException):
+        return _contains_supplied_material(
+            value.args,
+            markers,
+            seen=seen,
+            depth=depth + 1,
+        ) or _contains_supplied_material(
+            vars(value),
+            markers,
+            seen=seen,
+            depth=depth + 1,
+        )
+    value_type = type(value)
+    if value_type.__module__.startswith("lead_factory") and hasattr(value, "__dict__"):
+        return _contains_supplied_material(
+            vars(value),
+            markers,
+            seen=seen,
+            depth=depth + 1,
+        )
+    slots = getattr(value_type, "__slots__", ())
+    if value_type.__module__.startswith("lead_factory") and slots:
+        slot_names = (slots,) if isinstance(slots, str) else slots
+        for slot_name in slot_names:
+            try:
+                slot_value = object.__getattribute__(value, slot_name)
+            except (AttributeError, TypeError):
+                continue
+            if _contains_supplied_material(
+                slot_value,
+                markers,
+                seen=seen,
+                depth=depth + 1,
+            ):
+                return True
+    return False
+
+
+def _assert_exception_graph_is_detached(
+    testcase: unittest.TestCase,
+    error: BaseException,
+    markers: tuple[str, ...],
+) -> None:
+    testcase.assertIsNone(error.__cause__)
+    testcase.assertIsNone(error.__context__)
+    pending = [error]
+    seen_errors: set[int] = set()
+    while pending:
+        current = pending.pop()
+        if id(current) in seen_errors:
+            continue
+        seen_errors.add(id(current))
+        if _contains_supplied_material(current, markers, seen=set()):
+            testcase.fail("exception object retained supplied material")
+        traceback = current.__traceback__
+        while traceback is not None:
+            frame = traceback.tb_frame
+            if "lead_factory" in Path(frame.f_code.co_filename).parts:
+                for local_value in frame.f_locals.values():
+                    if _contains_supplied_material(local_value, markers, seen=set()):
+                        testcase.fail("production traceback retained supplied material")
+            traceback = traceback.tb_next
+        if current.__cause__ is not None:
+            pending.append(current.__cause__)
+        if current.__context__ is not None:
+            pending.append(current.__context__)
+
+
+def _capture_bridge_error(action: object) -> YandexSourceLabBridgeError:
+    try:
+        action()  # type: ignore[operator]
+    except YandexSourceLabBridgeError as error:
+        return error
+    raise AssertionError("bridge operation unexpectedly succeeded")
 
 
 def _page(*urls: str, query: str = SECRET_QUERY):
@@ -774,6 +899,121 @@ class YandexSourceLabBridgeTests(unittest.TestCase):
             )
         self.assertTrue(re.fullmatch(r"[A-Z0-9_]+", raised.exception.code))
         self.assertNotIn(str(self.path), str(raised.exception))
+
+    def test_every_public_bridge_failure_detaches_supplied_material(self):
+        preflight_path = Path(self.temp.name) / "SECRET_PREFLIGHT_PATH.sqlite3"
+        preflight_path.write_bytes(b"not-a-database")
+        preflight_error = _capture_bridge_error(
+            lambda: preflight_yandex_source_lab(preflight_path)
+        )
+        _assert_exception_graph_is_detached(
+            self,
+            preflight_error,
+            ("SECRET_PREFLIGHT_PATH",),
+        )
+
+        secret_page = _page(SAFE_URL_ONE)
+        with patch.object(
+            bridge,
+            "build_review_queue",
+            side_effect=RuntimeError("opaque selection fault"),
+        ):
+            selection_error = _capture_bridge_error(
+                lambda: select_yandex_reviewable_page(secret_page)
+            )
+        _assert_exception_graph_is_detached(
+            self,
+            selection_error,
+            (SECRET_QUERY, SECRET_REGION, SECRET_TITLE, SECRET_SNIPPET),
+        )
+
+        persist_path = Path(self.temp.name) / "SECRET_PERSIST_PATH.sqlite3"
+        with patch.object(
+            SourceLabSink,
+            "ingest_record_with_review",
+            side_effect=RuntimeError("opaque persistence fault"),
+        ):
+            persist_error = _capture_bridge_error(
+                lambda: persist_yandex_review_batch(
+                    attempt_id=self.attempt,
+                    page=secret_page,
+                    source_lab_path=persist_path,
+                )
+            )
+        _assert_exception_graph_is_detached(
+            self,
+            persist_error,
+            (
+                "SECRET_PERSIST_PATH",
+                SECRET_QUERY,
+                SECRET_REGION,
+                SECRET_TITLE,
+                SECRET_SNIPPET,
+            ),
+        )
+
+        receipts_path = Path(self.temp.name) / "SECRET_RECEIPTS_PATH.sqlite3"
+        receipts_path.write_bytes(b"not-a-database")
+        receipts_error = _capture_bridge_error(
+            lambda: list_yandex_review_batch_receipts(receipts_path)
+        )
+        _assert_exception_graph_is_detached(
+            self,
+            receipts_error,
+            ("SECRET_RECEIPTS_PATH",),
+        )
+
+        list_error = _capture_bridge_error(
+            lambda: list_yandex_review_batch(
+                attempt_id="SECRET_LIST_ATTEMPT",
+                source_lab_path=Path(self.temp.name) / "SECRET_LIST_PATH.sqlite3",
+                expected_receipt_sha256="b" * 64,
+            )
+        )
+        _assert_exception_graph_is_detached(
+            self,
+            list_error,
+            ("SECRET_LIST_ATTEMPT", "SECRET_LIST_PATH"),
+        )
+
+        decision_error = _capture_bridge_error(
+            lambda: decide_yandex_review_candidate(
+                attempt_id=self.attempt,
+                source_lab_path=Path(self.temp.name) / "SECRET_DECISION_PATH.sqlite3",
+                expected_receipt_sha256="c" * 64,
+                review_id="lf_review_" + "d" * 32,
+                expected_state_digest="e" * 64,
+                reviewer="SECRET REVIEWER",
+                decision="APPROVE",
+                reason="SECRET DECISION REASON",
+                evidence_ref="evidence://SECRET_DECISION_EVIDENCE",
+                idempotency_key="SECRET_DECISION_IDEMPOTENCY",
+            )
+        )
+        _assert_exception_graph_is_detached(
+            self,
+            decision_error,
+            (
+                "SECRET_DECISION_PATH",
+                "SECRET REVIEWER",
+                "SECRET DECISION REASON",
+                "SECRET_DECISION_EVIDENCE",
+                "SECRET_DECISION_IDEMPOTENCY",
+            ),
+        )
+
+        close_error = _capture_bridge_error(
+            lambda: inspect_yandex_batch_closure(
+                attempt_id="SECRET_CLOSE_ATTEMPT",
+                source_lab_path=Path(self.temp.name) / "SECRET_CLOSE_PATH.sqlite3",
+                expected_receipt_sha256="f" * 64,
+            )
+        )
+        _assert_exception_graph_is_detached(
+            self,
+            close_error,
+            ("SECRET_CLOSE_ATTEMPT", "SECRET_CLOSE_PATH"),
+        )
 
 
 if __name__ == "__main__":

@@ -17,10 +17,7 @@ instance; admission and revalidation never create or silently replace it.
 
 from __future__ import annotations
 
-import base64
-import binascii
 import hashlib
-import hmac
 import json
 import os
 import re
@@ -42,8 +39,6 @@ GOLD_QUARANTINE_APPLICATION_ID = 0x474F4C44  # ``GOLD``
 GOLD_QUARANTINE_STATE = "GOLD_QUARANTINED"
 GOLD_QUARANTINE_ACTION = "CREATE_CRM_TASK"
 GOLD_APPROVAL_REQUEST_VERSION = "gold-quarantine-approval-request-v1"
-GOLD_APPROVAL_RECEIPT_VERSION = "gold-quarantine-approval-receipt-v1"
-GOLD_APPROVAL_ALGORITHM = "HMAC-SHA256"
 GOLD_POLICY_PROFILE_STATUS = "GAP_VERSIONED_STAGE_PROFILE_NOT_BOUND"
 
 _HEX64 = re.compile(r"^[0-9a-f]{64}$")
@@ -474,180 +469,12 @@ def _approval_request_payload(
     }
 
 
-def _secret_bytes(secret: object) -> bytes:
-    if not isinstance(secret, (bytes, bytearray, memoryview)):
-        raise GoldApprovalReceiptError("approval secret is unavailable")
-    result = bytes(secret)
-    if len(result) < 32:
-        raise GoldApprovalReceiptError("approval secret is unavailable")
-    return result
-
-
 def _sealed_receipt_sha256(sealed_receipt: object) -> str:
     if not isinstance(sealed_receipt, bytes) or not (
         1 <= len(sealed_receipt) <= 16_384
     ):
         raise GoldApprovalReceiptError("approval receipt is invalid")
     return hashlib.sha256(sealed_receipt).hexdigest()
-
-
-def _receipt_envelope(
-    *,
-    authority_id: str,
-    receipt_id: str,
-    request_hash: str,
-    issued_at_utc: str,
-    expires_at_utc: str,
-) -> dict[str, str]:
-    return {
-        "receipt_version": GOLD_APPROVAL_RECEIPT_VERSION,
-        "algorithm": GOLD_APPROVAL_ALGORITHM,
-        "authority_id": authority_id,
-        "receipt_id": receipt_id,
-        "request_hash": request_hash,
-        "issued_at_utc": issued_at_utc,
-        "expires_at_utc": expires_at_utc,
-    }
-
-
-def seal_gold_approval(
-    request: GoldAcceptanceApprovalRequest,
-    *,
-    secret: bytes,
-    authority_id: str,
-    receipt_id: str,
-    issued_at_utc: str,
-    expires_at_utc: str,
-) -> bytes:
-    """Create a canonical sealed receipt inside a trusted signing boundary.
-
-    The returned bytes contain no secret.  Callers are responsible for keeping
-    the injected ``secret`` outside files, logs, command lines, and reports.
-    """
-
-    if type(request) is not GoldAcceptanceApprovalRequest:
-        raise GoldApprovalReceiptError("approval request is invalid")
-    key = _secret_bytes(secret)
-    try:
-        authority = _principal(authority_id, "approval authority is invalid")
-        receipt = _safe_id(receipt_id, "approval receipt identity is invalid")
-        request_hash = _sha256(request.request_hash, "approval request is invalid")
-        issued_text, issued = _utc_text(issued_at_utc, "approval receipt time is invalid")
-        expires_text, expires = _utc_text(
-            expires_at_utc, "approval receipt time is invalid"
-        )
-    except GoldQuarantineValidationError:
-        raise GoldApprovalReceiptError("approval receipt is invalid") from None
-    if expires <= issued:
-        raise GoldApprovalReceiptError("approval receipt is invalid")
-    envelope = _receipt_envelope(
-        authority_id=authority,
-        receipt_id=receipt,
-        request_hash=request_hash,
-        issued_at_utc=issued_text,
-        expires_at_utc=expires_text,
-    )
-    body = canonical_json(envelope).encode("utf-8", "strict")
-    signature = hmac.new(key, body, hashlib.sha256).hexdigest()
-    return canonical_json({"envelope": envelope, "signature": signature}).encode(
-        "utf-8", "strict"
-    )
-
-
-class HmacGoldApprovalVerifier:
-    """Verify receipts with an injected key that is never persisted or printed."""
-
-    def __init__(self, secret: bytes, *, expected_authority_id: str) -> None:
-        self._secret = _secret_bytes(secret)
-        try:
-            self._authority_id = _principal(
-                expected_authority_id, "approval authority is invalid"
-            )
-        except GoldQuarantineValidationError:
-            raise GoldApprovalReceiptError("approval authority is invalid") from None
-
-    def __repr__(self) -> str:
-        return "HmacGoldApprovalVerifier(<secret redacted>)"
-
-    def verify(
-        self,
-        request: GoldAcceptanceApprovalRequest,
-        sealed_receipt: bytes,
-        *,
-        at_utc: datetime,
-    ) -> VerifiedGoldApprovalReceipt:
-        if type(request) is not GoldAcceptanceApprovalRequest:
-            raise GoldApprovalReceiptError("approval request is invalid")
-        receipt_sha256 = _sealed_receipt_sha256(sealed_receipt)
-        try:
-            raw = sealed_receipt.decode("utf-8", "strict")
-            token = _strict_json_object(raw, "approval receipt is invalid")
-            envelope = token.get("envelope")
-            signature = token.get("signature")
-            if not isinstance(envelope, dict) or canonical_json(token).encode(
-                "utf-8", "strict"
-            ) != sealed_receipt:
-                raise ValueError("non-canonical receipt")
-            if set(token) != {"envelope", "signature"} or set(envelope) != {
-                "receipt_version",
-                "algorithm",
-                "authority_id",
-                "receipt_id",
-                "request_hash",
-                "issued_at_utc",
-                "expires_at_utc",
-            }:
-                raise ValueError("receipt shape")
-            if (
-                envelope["receipt_version"] != GOLD_APPROVAL_RECEIPT_VERSION
-                or envelope["algorithm"] != GOLD_APPROVAL_ALGORITHM
-                or envelope["authority_id"] != self._authority_id
-                or envelope["request_hash"] != request.request_hash
-                or not isinstance(signature, str)
-                or not _HEX64.fullmatch(signature)
-            ):
-                raise ValueError("receipt binding")
-            receipt_id = _safe_id(
-                envelope["receipt_id"], "approval receipt identity is invalid"
-            )
-            issued_text, issued = _utc_text(
-                envelope["issued_at_utc"], "approval receipt time is invalid"
-            )
-            expires_text, expires = _utc_text(
-                envelope["expires_at_utc"], "approval receipt time is invalid"
-            )
-            if at_utc.tzinfo is None or at_utc.utcoffset() is None:
-                raise ValueError("invalid verification clock")
-            current = at_utc.astimezone(timezone.utc).replace(microsecond=0)
-            if issued > current or expires <= current or expires <= issued:
-                raise ValueError("expired receipt")
-            expected = hmac.new(
-                self._secret,
-                canonical_json(envelope).encode("utf-8", "strict"),
-                hashlib.sha256,
-            ).hexdigest()
-            if not hmac.compare_digest(signature, expected):
-                raise ValueError("invalid receipt signature")
-        except (KeyError, TypeError, ValueError, UnicodeError, GoldQuarantineError):
-            raise GoldApprovalReceiptError("approval receipt verification failed") from None
-        return VerifiedGoldApprovalReceipt(
-            authority_id=self._authority_id,
-            receipt_id=receipt_id,
-            request_hash=request.request_hash,
-            receipt_sha256=receipt_sha256,
-            issued_at_utc=issued_text,
-            expires_at_utc=expires_text,
-        )
-
-
-def decode_injected_secret(value: str) -> bytes:
-    """Decode a base64 secret supplied by the runtime, without logging it."""
-
-    try:
-        secret = base64.b64decode(str(value or ""), validate=True)
-    except (binascii.Error, ValueError):
-        raise GoldApprovalReceiptError("approval secret is unavailable") from None
-    return _secret_bytes(secret)
 
 
 def _validate_draft(
@@ -2388,8 +2215,6 @@ class GoldAcceptanceQuarantine:
 
 
 __all__ = [
-    "GOLD_APPROVAL_ALGORITHM",
-    "GOLD_APPROVAL_RECEIPT_VERSION",
     "GOLD_APPROVAL_REQUEST_VERSION",
     "GOLD_POLICY_PROFILE_STATUS",
     "GOLD_QUARANTINE_ACTION",
@@ -2405,8 +2230,5 @@ __all__ = [
     "GoldQuarantineResult",
     "GoldQuarantineSourceDrift",
     "GoldQuarantineValidationError",
-    "HmacGoldApprovalVerifier",
     "VerifiedGoldApprovalReceipt",
-    "decode_injected_secret",
-    "seal_gold_approval",
 ]

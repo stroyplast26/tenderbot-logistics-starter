@@ -18,7 +18,7 @@ import re
 import secrets
 import sqlite3
 import time
-from typing import Final, Mapping
+from typing import Final, Mapping, NoReturn
 
 from lead_factory.radar_yandex_connection import (
     ManualYandexSearchOutcome,
@@ -68,6 +68,36 @@ _APPEND_ONLY_TABLES: Final = (
     "source_discovery_yandex_accounting",
     "source_discovery_batch_links",
     "source_discovery_review_closures",
+)
+_SAFE_CONTROL_ERROR_CODES: Final = frozenset(
+    {
+        "CONTROL_RECONCILIATION_REQUIRED",
+        "CONTROL_SOURCE_LAB_RECONCILIATION_REQUIRED",
+        "CONTROL_STATE_INTEGRITY_FAILED",
+        "CONTROL_STATE_PATH_INVALID",
+        "CONTROL_STATE_UNAVAILABLE",
+        "LOCAL_CLOSE_CONFIRMATION_REQUIRED",
+        "LOCAL_REVIEW_ACTOR_INVALID",
+        "LOCAL_REVIEW_BATCH_NOT_CLOSABLE",
+        "LOCAL_REVIEW_CLOSE_CONFLICT",
+        "LOCAL_REVIEW_EVIDENCE_INVALID",
+        "LOCAL_REVIEW_IDEMPOTENCY_INVALID",
+        "LOCAL_REVIEW_STORE_MISMATCH",
+        "SOURCE_BOUNDARY_UNCERTAIN",
+        "SOURCE_DISCOVERY_ATTEMPT_INVALID",
+        "SOURCE_DISCOVERY_CONTROL_FAILED",
+        "SOURCE_INVALID",
+        "SOURCE_LAB_BATCH_RECEIPT_INVALID",
+        "WIP_LIMIT_INVALID",
+        "YANDEX_ACCOUNTING_INCONSISTENT",
+        "YANDEX_BINDING_INVALID",
+    }
+)
+_SAFE_YANDEX_CONTROL_ERROR_CODES: Final = frozenset(
+    {
+        "YANDEX_SOURCE_LAB_PATH_INVALID",
+        "YANDEX_SOURCE_LAB_PREFLIGHT_FAILED",
+    }
 )
 
 
@@ -137,6 +167,28 @@ class SourceDiscoveryControlError(RuntimeError):
     def __init__(self, code: str = "SOURCE_DISCOVERY_CONTROL_FAILED") -> None:
         super().__init__(code)
         self.code = code
+
+
+def _known_control_failure_code(
+    error: SourceDiscoveryControlError,
+    fallback: str,
+) -> str:
+    code = error.code
+    if type(code) is str and code in _SAFE_CONTROL_ERROR_CODES:
+        return code
+    return fallback
+
+
+def _raise_detached_control_failure(code: str) -> NoReturn:
+    if code not in _SAFE_CONTROL_ERROR_CODES:
+        code = "SOURCE_DISCOVERY_CONTROL_FAILED"
+    raise SourceDiscoveryControlError(code) from None
+
+
+def _raise_detached_yandex_control_failure(code: str) -> NoReturn:
+    if code not in _SAFE_YANDEX_CONTROL_ERROR_CODES:
+        code = "YANDEX_SOURCE_LAB_PREFLIGHT_FAILED"
+    raise YandexSourceLabBridgeError(code) from None
 
 
 def _effects() -> dict[str, object]:
@@ -1499,6 +1551,7 @@ def close_source_discovery_review(
         raise SourceDiscoveryControlError("LOCAL_REVIEW_BATCH_NOT_CLOSABLE")
     if str(selected["source_lab_path_sha256"]) != lab_path_sha256:
         raise SourceDiscoveryControlError("LOCAL_REVIEW_STORE_MISMATCH")
+    _validate_closed_yandex_batches(path, rows)
     expected_receipt = str(selected["source_lab_receipt_sha256"])
     closure = inspect_yandex_batch_closure(
         attempt_id=attempt,
@@ -1624,7 +1677,7 @@ def close_source_discovery_review(
     }
 
 
-def run_source_discovery_once(
+def _run_source_discovery_once_core(
     source: str | SourceDiscoverySource,
     *,
     confirmation: str | None,
@@ -1839,6 +1892,64 @@ def run_source_discovery_once(
         "state": terminal,
         "version": SOURCE_DISCOVERY_CONTROL_VERSION,
     }
+
+
+def run_source_discovery_once(
+    source: str | SourceDiscoverySource,
+    *,
+    confirmation: str | None,
+    state_path: str | Path = SOURCE_DISCOVERY_STATE_PATH,
+    wip_limit: int = SOURCE_DISCOVERY_DEFAULT_WIP_LIMIT,
+    yandex_job_path: str | Path | None = None,
+    folder_id: str | None = None,
+    tenderplan_query: str = TENDERPLAN_READ_ONLY_DEFAULT_QUERY,
+    tenderplan_registration_path: str | Path | None = None,
+    tenderplan_store_path: str | Path | None = None,
+) -> dict[str, object]:
+    """Run one source behind a detached, sanitized public failure boundary."""
+
+    try:
+        return _run_source_discovery_once_core(
+            source,
+            confirmation=confirmation,
+            state_path=state_path,
+            wip_limit=wip_limit,
+            yandex_job_path=yandex_job_path,
+            folder_id=folder_id,
+            tenderplan_query=tenderplan_query,
+            tenderplan_registration_path=tenderplan_registration_path,
+            tenderplan_store_path=tenderplan_store_path,
+        )
+    except YandexSourceLabBridgeError as error:
+        failure_family = "YANDEX"
+        failure_code = (
+            error.code
+            if type(error.code) is str and error.code in _SAFE_YANDEX_CONTROL_ERROR_CODES
+            else "YANDEX_SOURCE_LAB_PREFLIGHT_FAILED"
+        )
+    except SourceDiscoveryControlError as error:
+        failure_family = "CONTROL"
+        failure_code = _known_control_failure_code(
+            error,
+            "SOURCE_BOUNDARY_UNCERTAIN",
+        )
+    except BaseException:
+        failure_family = "CONTROL"
+        failure_code = "SOURCE_BOUNDARY_UNCERTAIN"
+    del (
+        source,
+        confirmation,
+        state_path,
+        wip_limit,
+        yandex_job_path,
+        folder_id,
+        tenderplan_query,
+        tenderplan_registration_path,
+        tenderplan_store_path,
+    )
+    if failure_family == "YANDEX":
+        _raise_detached_yandex_control_failure(failure_code)
+    _raise_detached_control_failure(failure_code)
 
 
 __all__ = [

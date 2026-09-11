@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import hashlib
+import hmac
 import json
 import os
 import shutil
 import sqlite3
+import subprocess
 import tempfile
 import threading
 import unittest
@@ -13,21 +15,21 @@ from dataclasses import replace
 from datetime import datetime, timezone
 from pathlib import Path
 
+import lead_factory.gold_acceptance_quarantine as gold_module
 from lead_factory.gold_acceptance_quarantine import (
     GOLD_POLICY_PROFILE_STATUS,
     GOLD_QUARANTINE_ACTION,
     GOLD_QUARANTINE_STATE,
+    GoldAcceptanceApprovalRequest,
     GoldAcceptanceDraft,
     GoldAcceptanceQuarantine,
     GoldApprovalReceiptError,
     GoldQuarantineConflict,
     GoldQuarantineIntegrityError,
     GoldQuarantineValidationError,
-    HmacGoldApprovalVerifier,
     VerifiedGoldApprovalReceipt,
-    seal_gold_approval,
 )
-from lead_factory.ids import payload_hash
+from lead_factory.ids import canonical_json, payload_hash
 from lead_factory.source_lab import SourceLabSink
 from lead_factory.source_review_queue import SourceReviewQueue
 from lead_factory.store import FactoryStore
@@ -35,10 +37,123 @@ from lead_factory.store import FactoryStore
 
 NOW = datetime(2026, 9, 10, 12, 0, tzinfo=timezone.utc)
 SECRET = b"gold-acceptance-test-secret-value-0001"
+_SYNTHETIC_RECEIPT_VERSION = "synthetic-gold-approval-receipt-v1"
+_SYNTHETIC_ALGORITHM = "TEST-HMAC-SHA256"
 
 
 def _digest(value: str) -> str:
     return hashlib.sha256(value.encode("utf-8", "strict")).hexdigest()
+
+
+def _synthetic_utc(value: object) -> tuple[str, datetime]:
+    text = str(value or "")
+    try:
+        parsed = datetime.strptime(text, "%Y-%m-%dT%H:%M:%SZ").replace(
+            tzinfo=timezone.utc
+        )
+    except ValueError:
+        raise GoldApprovalReceiptError("synthetic approval receipt is invalid") from None
+    if parsed.strftime("%Y-%m-%dT%H:%M:%SZ") != text:
+        raise GoldApprovalReceiptError("synthetic approval receipt is invalid")
+    return text, parsed
+
+
+def _seal_synthetic_gold_approval(
+    request: GoldAcceptanceApprovalRequest,
+    *,
+    secret: bytes,
+    authority_id: str,
+    receipt_id: str,
+    issued_at_utc: str,
+    expires_at_utc: str,
+) -> bytes:
+    envelope = {
+        "receipt_version": _SYNTHETIC_RECEIPT_VERSION,
+        "algorithm": _SYNTHETIC_ALGORITHM,
+        "authority_id": authority_id,
+        "receipt_id": receipt_id,
+        "request_hash": request.request_hash,
+        "issued_at_utc": issued_at_utc,
+        "expires_at_utc": expires_at_utc,
+    }
+    signature = hmac.new(
+        secret,
+        canonical_json(envelope).encode("utf-8", "strict"),
+        hashlib.sha256,
+    ).hexdigest()
+    return canonical_json({"envelope": envelope, "signature": signature}).encode(
+        "utf-8", "strict"
+    )
+
+
+class _SyntheticGoldApprovalVerifier:
+    """Deterministic test double; production intentionally ships no HMAC runtime."""
+
+    def __init__(self, secret: bytes, *, expected_authority_id: str) -> None:
+        self._secret = secret
+        self._authority_id = expected_authority_id
+
+    def verify(
+        self,
+        request: GoldAcceptanceApprovalRequest,
+        sealed_receipt: bytes,
+        *,
+        at_utc: datetime,
+    ) -> VerifiedGoldApprovalReceipt:
+        receipt_sha256 = hashlib.sha256(sealed_receipt).hexdigest()
+        try:
+            raw = sealed_receipt.decode("utf-8", "strict")
+            token = json.loads(raw)
+            envelope = token["envelope"]
+            signature = token["signature"]
+            if canonical_json(token).encode("utf-8", "strict") != sealed_receipt:
+                raise ValueError("non-canonical receipt")
+            if set(token) != {"envelope", "signature"} or set(envelope) != {
+                "receipt_version",
+                "algorithm",
+                "authority_id",
+                "receipt_id",
+                "request_hash",
+                "issued_at_utc",
+                "expires_at_utc",
+            }:
+                raise ValueError("receipt shape")
+            if (
+                envelope["receipt_version"] != _SYNTHETIC_RECEIPT_VERSION
+                or envelope["algorithm"] != _SYNTHETIC_ALGORITHM
+                or envelope["authority_id"] != self._authority_id
+                or envelope["request_hash"] != request.request_hash
+                or not isinstance(envelope["receipt_id"], str)
+                or not envelope["receipt_id"]
+                or not isinstance(signature, str)
+            ):
+                raise ValueError("receipt binding")
+            issued_text, issued = _synthetic_utc(envelope["issued_at_utc"])
+            expires_text, expires = _synthetic_utc(envelope["expires_at_utc"])
+            if at_utc.tzinfo is None or at_utc.utcoffset() is None:
+                raise ValueError("invalid verification clock")
+            current = at_utc.astimezone(timezone.utc).replace(microsecond=0)
+            if issued > current or expires <= current or expires <= issued:
+                raise ValueError("expired receipt")
+            expected = hmac.new(
+                self._secret,
+                canonical_json(envelope).encode("utf-8", "strict"),
+                hashlib.sha256,
+            ).hexdigest()
+            if not hmac.compare_digest(signature, expected):
+                raise ValueError("invalid receipt signature")
+        except (KeyError, TypeError, ValueError, UnicodeError, json.JSONDecodeError):
+            raise GoldApprovalReceiptError(
+                "synthetic approval receipt verification failed"
+            ) from None
+        return VerifiedGoldApprovalReceipt(
+            authority_id=self._authority_id,
+            receipt_id=envelope["receipt_id"],
+            request_hash=request.request_hash,
+            receipt_sha256=receipt_sha256,
+            issued_at_utc=issued_text,
+            expires_at_utc=expires_text,
+        )
 
 
 class GoldAcceptanceQuarantineTests(unittest.TestCase):
@@ -117,11 +232,21 @@ class GoldAcceptanceQuarantineTests(unittest.TestCase):
     def tearDown(self) -> None:
         self.temp.cleanup()
 
+    def test_production_module_has_no_secret_accepting_hmac_surface(self) -> None:
+        for name in (
+            "GOLD_APPROVAL_ALGORITHM",
+            "GOLD_APPROVAL_RECEIPT_VERSION",
+            "HmacGoldApprovalVerifier",
+            "decode_injected_secret",
+            "seal_gold_approval",
+        ):
+            self.assertFalse(hasattr(gold_module, name), name)
+
     def _quarantine(self, **kwargs) -> GoldAcceptanceQuarantine:
         return GoldAcceptanceQuarantine(
             self.source_database,
             self.quarantine_database,
-            approval_verifier=HmacGoldApprovalVerifier(
+            approval_verifier=_SyntheticGoldApprovalVerifier(
                 SECRET, expected_authority_id="gold-authority-1"
             ),
             clock=lambda: NOW,
@@ -137,7 +262,7 @@ class GoldAcceptanceQuarantineTests(unittest.TestCase):
         expires_at_utc: str = "2026-09-10T13:00:00Z",
     ) -> bytes:
         request = quarantine.prepare_approval(draft or self.draft)
-        return seal_gold_approval(
+        return _seal_synthetic_gold_approval(
             request,
             secret=SECRET,
             authority_id="gold-authority-1",
@@ -398,7 +523,7 @@ class GoldAcceptanceQuarantineTests(unittest.TestCase):
         second = GoldAcceptanceQuarantine(
             self.source_database,
             other_database,
-            approval_verifier=HmacGoldApprovalVerifier(
+            approval_verifier=_SyntheticGoldApprovalVerifier(
                 SECRET, expected_authority_id="gold-authority-1"
             ),
             clock=lambda: NOW,
@@ -417,7 +542,7 @@ class GoldAcceptanceQuarantineTests(unittest.TestCase):
         second = GoldAcceptanceQuarantine(
             self.source_database,
             other_database,
-            approval_verifier=HmacGoldApprovalVerifier(
+            approval_verifier=_SyntheticGoldApprovalVerifier(
                 SECRET, expected_authority_id="gold-authority-1"
             ),
             clock=lambda: NOW,
@@ -452,7 +577,7 @@ class GoldAcceptanceQuarantineTests(unittest.TestCase):
             GoldAcceptanceQuarantine(
                 self.source_database,
                 linked_directory / "gold-quarantine.sqlite3",
-                approval_verifier=HmacGoldApprovalVerifier(
+                approval_verifier=_SyntheticGoldApprovalVerifier(
                     SECRET, expected_authority_id="gold-authority-1"
                 ),
                 clock=lambda: NOW,
@@ -517,7 +642,7 @@ class GoldAcceptanceQuarantineTests(unittest.TestCase):
         reopened = GoldAcceptanceQuarantine(
             self.source_database,
             self.quarantine_database,
-            approval_verifier=HmacGoldApprovalVerifier(
+            approval_verifier=_SyntheticGoldApprovalVerifier(
                 SECRET, expected_authority_id="gold-authority-1"
             ),
             clock=lambda: NOW,
@@ -528,7 +653,7 @@ class GoldAcceptanceQuarantineTests(unittest.TestCase):
         replayed = GoldAcceptanceQuarantine(
             self.source_database,
             self.quarantine_database,
-            approval_verifier=HmacGoldApprovalVerifier(
+            approval_verifier=_SyntheticGoldApprovalVerifier(
                 SECRET, expected_authority_id="gold-authority-1"
             ),
             clock=lambda: NOW,
@@ -546,7 +671,7 @@ class GoldAcceptanceQuarantineTests(unittest.TestCase):
         tampered = GoldAcceptanceQuarantine(
             self.source_database,
             self.quarantine_database,
-            approval_verifier=HmacGoldApprovalVerifier(
+            approval_verifier=_SyntheticGoldApprovalVerifier(
                 SECRET, expected_authority_id="gold-authority-1"
             ),
             clock=lambda: NOW,
@@ -590,7 +715,7 @@ class GoldAcceptanceQuarantineTests(unittest.TestCase):
         first = GoldAcceptanceQuarantine(
             self.source_database,
             first_database,
-            approval_verifier=HmacGoldApprovalVerifier(
+            approval_verifier=_SyntheticGoldApprovalVerifier(
                 SECRET, expected_authority_id="gold-authority-1"
             ),
             clock=lambda: NOW,
@@ -598,7 +723,7 @@ class GoldAcceptanceQuarantineTests(unittest.TestCase):
         second = GoldAcceptanceQuarantine(
             self.source_database,
             second_database,
-            approval_verifier=HmacGoldApprovalVerifier(
+            approval_verifier=_SyntheticGoldApprovalVerifier(
                 SECRET, expected_authority_id="gold-authority-1"
             ),
             clock=lambda: NOW,
@@ -619,7 +744,7 @@ class GoldAcceptanceQuarantineTests(unittest.TestCase):
         quarantine = GoldAcceptanceQuarantine(
             self.source_database,
             self.quarantine_database,
-            approval_verifier=HmacGoldApprovalVerifier(
+            approval_verifier=_SyntheticGoldApprovalVerifier(
                 SECRET, expected_authority_id="gold-authority-1"
             ),
             clock=lambda: clock[0],
@@ -766,6 +891,142 @@ class GoldAcceptanceQuarantineTests(unittest.TestCase):
                 con.execute("DELETE FROM gold_quarantine_entries")
         finally:
             con.close()
+
+    def test_launcher_runs_all_gold_routes_with_fail_closed_secret_custody(
+        self,
+    ) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        launcher = repo_root / "scripts" / "run_safe_lead_flow.ps1"
+        venv_python = repo_root / ".venv" / "Scripts" / "python.exe"
+        if os.name != "nt" or not venv_python.is_file():
+            self.skipTest("requires Windows PowerShell 5.1 and repo-local venv")
+        powershell = (
+            Path(os.environ["SystemRoot"])
+            / "System32"
+            / "WindowsPowerShell"
+            / "v1.0"
+            / "powershell.exe"
+        )
+
+        draft_arguments = [
+            "--source-database",
+            str(self.source_database),
+            "--quarantine-database",
+            str(self.quarantine_database),
+            "--source-record-id",
+            self.draft.source_record_id,
+            "--observation-id",
+            self.draft.observation_id,
+            "--review-id",
+            self.draft.review_id,
+            "--latest-resolution-id",
+            self.draft.latest_resolution_id,
+            "--reviewer-id",
+            self.draft.reviewer_id,
+            "--demand-id",
+            self.draft.demand_id,
+            "--product-key",
+            self.draft.product_key,
+            "--buyer-id",
+            self.draft.buyer_id,
+            "--stage",
+            self.draft.stage,
+            "--purchase-deadline-utc",
+            self.draft.purchase_deadline_utc,
+            "--capacity-snapshot-sha256",
+            self.draft.capacity_snapshot_sha256,
+            "--economics-snapshot-sha256",
+            self.draft.economics_snapshot_sha256,
+            "--evidence-sha256",
+            self.draft.evidence_sha256[0],
+            "--evidence-sha256",
+            self.draft.evidence_sha256[1],
+            "--idempotency-key",
+            self.draft.idempotency_key,
+        ]
+
+        def run(operation: str, arguments: list[str], *, secret_marker: str = ""):
+            environment = {
+                name: value
+                for name, value in os.environ.items()
+                if name.casefold() != "tenderbot_gold_approval_secret_b64"
+            }
+            if secret_marker:
+                environment["TeNdErBoT_GoLd_ApPrOvAl_SeCrEt_B64"] = secret_marker
+            return subprocess.run(
+                [
+                    str(powershell),
+                    "-NoLogo",
+                    "-NoProfile",
+                    "-NonInteractive",
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-File",
+                    str(launcher),
+                    "gold",
+                    operation,
+                    *arguments,
+                ],
+                cwd=self.root,
+                env=environment,
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=45,
+            )
+
+        prepared = run("prepare", draft_arguments)
+        self.assertEqual(prepared.returncode, 0, prepared.stdout + prepared.stderr)
+        self.assertEqual(json.loads(prepared.stdout)["status"], "READY_FOR_HUMAN_SEAL")
+
+        report_arguments = [
+            "--source-database",
+            str(self.source_database),
+            "--quarantine-database",
+            str(self.quarantine_database),
+        ]
+        reported = run("report", report_arguments)
+        self.assertEqual(reported.returncode, 0, reported.stdout + reported.stderr)
+        self.assertEqual(json.loads(reported.stdout)["status"], "OK")
+
+        secret_marker = "GOLD_SECRET_MUST_NOT_REACH_BOOTSTRAP_CHILD_OR_OUTPUT"
+        missing_receipt = self.root / f"{secret_marker}-missing-receipt.json"
+        source_before = self.source_database.read_bytes()
+        quarantine_before = self.quarantine_database.read_bytes()
+        authority_arguments = [
+            "--authority-id",
+            "gold-authority-1",
+            "--approval-receipt",
+            str(missing_receipt),
+        ]
+        stopped_commands = (
+            ("admit", [*draft_arguments, *authority_arguments]),
+            (
+                "revalidate",
+                [
+                    *draft_arguments,
+                    "--acceptance-id",
+                    "lf_gold_quarantine_missing",
+                    *authority_arguments,
+                ],
+            ),
+        )
+        for operation, arguments in stopped_commands:
+            stopped = run(operation, arguments, secret_marker=secret_marker)
+            self.assertEqual(stopped.returncode, 2, stopped.stdout + stopped.stderr)
+            self.assertEqual(stopped.stdout, "")
+            payload = json.loads(stopped.stderr)
+            self.assertEqual(payload["status"], "FAIL_CLOSED")
+            self.assertEqual(
+                payload["error_code"], "GOLD_SIGNER_RUNTIME_UNAVAILABLE"
+            )
+            self.assertEqual(payload["local_persistence_effect"], "NONE")
+            self.assertNotIn(secret_marker, stopped.stdout)
+            self.assertNotIn(secret_marker, stopped.stderr)
+
+        self.assertEqual(self.source_database.read_bytes(), source_before)
+        self.assertEqual(self.quarantine_database.read_bytes(), quarantine_before)
+        self.assertFalse(missing_receipt.exists())
 
 
 if __name__ == "__main__":

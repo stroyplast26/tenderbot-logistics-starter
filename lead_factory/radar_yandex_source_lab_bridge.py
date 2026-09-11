@@ -15,7 +15,7 @@ from pathlib import Path
 import re
 import sqlite3
 from types import MappingProxyType
-from typing import Any, Final, Mapping, Sequence
+from typing import Any, Final, Mapping, NoReturn, Sequence
 from urllib.parse import urlsplit
 
 from .ids import payload_hash
@@ -71,6 +71,25 @@ _CANDIDATE_ID: Final = re.compile(r"search-link-[0-9a-f]{64}\Z")
 _LF_ID: Final = re.compile(r"lf_[a-z0-9_]+_[0-9a-f]{32}\Z")
 _PRINCIPAL: Final = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}\Z")
 _WINDOWS_REPARSE_POINT: Final = 0x400
+_SAFE_PUBLIC_FAILURE_CODES: Final = frozenset(
+    {
+        "YANDEX_REVIEW_BATCH_INCOMPLETE",
+        "YANDEX_REVIEW_CLOSE_FAILED",
+        "YANDEX_REVIEW_DECISION_FAILED",
+        "YANDEX_REVIEW_DECISION_INVALID",
+        "YANDEX_REVIEW_LIST_FAILED",
+        "YANDEX_REVIEW_NOT_IN_BATCH",
+        "YANDEX_SOURCE_LAB_ATTEMPT_INVALID",
+        "YANDEX_SOURCE_LAB_BATCH_NOT_FOUND",
+        "YANDEX_SOURCE_LAB_BRIDGE_FAILED",
+        "YANDEX_SOURCE_LAB_INTEGRITY_FAILED",
+        "YANDEX_SOURCE_LAB_PAGE_INVALID",
+        "YANDEX_SOURCE_LAB_PATH_INVALID",
+        "YANDEX_SOURCE_LAB_PERSIST_FAILED",
+        "YANDEX_SOURCE_LAB_PREFLIGHT_FAILED",
+        "YANDEX_SOURCE_LAB_RECEIPT_INVALID",
+    }
+)
 
 
 class YandexSourceLabBridgeError(RuntimeError):
@@ -149,6 +168,22 @@ def _fail(code: str) -> None:
     raise YandexSourceLabBridgeError(code)
 
 
+def _known_public_failure_code(
+    error: YandexSourceLabBridgeError,
+    fallback: str,
+) -> str:
+    code = error.code
+    if type(code) is str and code in _SAFE_PUBLIC_FAILURE_CODES:
+        return code
+    return fallback
+
+
+def _raise_detached_public_failure(code: str) -> NoReturn:
+    if code not in _SAFE_PUBLIC_FAILURE_CODES:
+        code = "YANDEX_SOURCE_LAB_BRIDGE_FAILED"
+    raise YandexSourceLabBridgeError(code) from None
+
+
 def _attempt_id(value: object) -> str:
     if type(value) is not str or not _ATTEMPT_ID.fullmatch(value):
         _fail("YANDEX_SOURCE_LAB_ATTEMPT_INVALID")
@@ -201,7 +236,7 @@ def _local_database_path(value: str | os.PathLike[str]) -> Path:
     return resolved
 
 
-def preflight_yandex_source_lab(
+def _preflight_yandex_source_lab_core(
     source_lab_path: str | os.PathLike[str] = SOURCE_DISCOVERY_SOURCE_LAB_PATH,
 ) -> None:
     """Initialize and validate the local schema-17 sink before provider I/O."""
@@ -301,7 +336,7 @@ def _require_minimized_review_url(
     return value
 
 
-def select_yandex_reviewable_page(page: SearchPage) -> YandexReviewPageSelection:
+def _select_yandex_reviewable_page_core(page: SearchPage) -> YandexReviewPageSelection:
     """Drop non-persistable URL hits without retaining their sensitive parts."""
 
     try:
@@ -662,7 +697,7 @@ def _load_batch_binding_tx(
     )
 
 
-def persist_yandex_review_batch(
+def _persist_yandex_review_batch_core(
     *,
     attempt_id: str,
     page: SearchPage,
@@ -753,7 +788,7 @@ def _load_batch_binding(
         )
 
 
-def list_yandex_review_batch_receipts(
+def _list_yandex_review_batch_receipts_core(
     source_lab_path: str | os.PathLike[str] = SOURCE_DISCOVERY_SOURCE_LAB_PATH,
 ) -> tuple[YandexSourceLabBatchReceipt, ...]:
     """Read and validate every bridge-owned batch without mutating Source Lab."""
@@ -803,7 +838,7 @@ def list_yandex_review_batch_receipts(
             connection.close()
 
 
-def list_yandex_review_batch(
+def _list_yandex_review_batch_core(
     *,
     attempt_id: str,
     source_lab_path: str | os.PathLike[str] = SOURCE_DISCOVERY_SOURCE_LAB_PATH,
@@ -1272,7 +1307,7 @@ def _bind_yandex_review_decision_intent(
     return intent_sha256
 
 
-def decide_yandex_review_candidate(
+def _decide_yandex_review_candidate_core(
     *,
     attempt_id: str,
     source_lab_path: str | os.PathLike[str] = SOURCE_DISCOVERY_SOURCE_LAB_PATH,
@@ -1397,7 +1432,7 @@ def decide_yandex_review_candidate(
         raise YandexSourceLabBridgeError("YANDEX_REVIEW_DECISION_FAILED") from None
 
 
-def inspect_yandex_batch_closure(
+def _inspect_yandex_batch_closure_core(
     *,
     attempt_id: str,
     source_lab_path: str | os.PathLike[str] = SOURCE_DISCOVERY_SOURCE_LAB_PATH,
@@ -1456,6 +1491,186 @@ def inspect_yandex_batch_closure(
         raise
     except Exception:
         raise YandexSourceLabBridgeError("YANDEX_REVIEW_CLOSE_FAILED") from None
+
+
+def preflight_yandex_source_lab(
+    source_lab_path: str | os.PathLike[str] = SOURCE_DISCOVERY_SOURCE_LAB_PATH,
+) -> None:
+    """Run preflight behind a detached, sanitized public failure boundary."""
+
+    try:
+        return _preflight_yandex_source_lab_core(source_lab_path)
+    except YandexSourceLabBridgeError as error:
+        failure_code = _known_public_failure_code(
+            error,
+            "YANDEX_SOURCE_LAB_PREFLIGHT_FAILED",
+        )
+    except Exception:
+        failure_code = "YANDEX_SOURCE_LAB_PREFLIGHT_FAILED"
+    del source_lab_path
+    _raise_detached_public_failure(failure_code)
+
+
+def select_yandex_reviewable_page(page: SearchPage) -> YandexReviewPageSelection:
+    """Select reviewable results behind a detached public failure boundary."""
+
+    try:
+        return _select_yandex_reviewable_page_core(page)
+    except YandexSourceLabBridgeError as error:
+        failure_code = _known_public_failure_code(
+            error,
+            "YANDEX_SOURCE_LAB_PAGE_INVALID",
+        )
+    except Exception:
+        failure_code = "YANDEX_SOURCE_LAB_PAGE_INVALID"
+    del page
+    _raise_detached_public_failure(failure_code)
+
+
+def persist_yandex_review_batch(
+    *,
+    attempt_id: str,
+    page: SearchPage,
+    source_lab_path: str | os.PathLike[str] = SOURCE_DISCOVERY_SOURCE_LAB_PATH,
+) -> YandexSourceLabBatchReceipt:
+    """Persist one batch behind a detached public failure boundary."""
+
+    try:
+        return _persist_yandex_review_batch_core(
+            attempt_id=attempt_id,
+            page=page,
+            source_lab_path=source_lab_path,
+        )
+    except YandexSourceLabBridgeError as error:
+        failure_code = _known_public_failure_code(
+            error,
+            "YANDEX_SOURCE_LAB_PERSIST_FAILED",
+        )
+    except Exception:
+        failure_code = "YANDEX_SOURCE_LAB_PERSIST_FAILED"
+    del attempt_id, page, source_lab_path
+    _raise_detached_public_failure(failure_code)
+
+
+def list_yandex_review_batch_receipts(
+    source_lab_path: str | os.PathLike[str] = SOURCE_DISCOVERY_SOURCE_LAB_PATH,
+) -> tuple[YandexSourceLabBatchReceipt, ...]:
+    """List receipts behind a detached public failure boundary."""
+
+    try:
+        return _list_yandex_review_batch_receipts_core(source_lab_path)
+    except YandexSourceLabBridgeError as error:
+        failure_code = _known_public_failure_code(
+            error,
+            "YANDEX_SOURCE_LAB_INTEGRITY_FAILED",
+        )
+    except Exception:
+        failure_code = "YANDEX_SOURCE_LAB_INTEGRITY_FAILED"
+    del source_lab_path
+    _raise_detached_public_failure(failure_code)
+
+
+def list_yandex_review_batch(
+    *,
+    attempt_id: str,
+    source_lab_path: str | os.PathLike[str] = SOURCE_DISCOVERY_SOURCE_LAB_PATH,
+    expected_receipt_sha256: str,
+) -> tuple[YandexReviewItem, ...]:
+    """List one batch behind a detached public failure boundary."""
+
+    try:
+        return _list_yandex_review_batch_core(
+            attempt_id=attempt_id,
+            source_lab_path=source_lab_path,
+            expected_receipt_sha256=expected_receipt_sha256,
+        )
+    except YandexSourceLabBridgeError as error:
+        failure_code = _known_public_failure_code(
+            error,
+            "YANDEX_REVIEW_LIST_FAILED",
+        )
+    except Exception:
+        failure_code = "YANDEX_REVIEW_LIST_FAILED"
+    del attempt_id, source_lab_path, expected_receipt_sha256
+    _raise_detached_public_failure(failure_code)
+
+
+def decide_yandex_review_candidate(
+    *,
+    attempt_id: str,
+    source_lab_path: str | os.PathLike[str] = SOURCE_DISCOVERY_SOURCE_LAB_PATH,
+    expected_receipt_sha256: str,
+    review_id: str,
+    expected_state_digest: str,
+    reviewer: str,
+    decision: str,
+    reason: str,
+    evidence_ref: str,
+    idempotency_key: str,
+    lease_seconds: int = 900,
+) -> ReviewQueueResolutionResult:
+    """Resolve one candidate behind a detached public failure boundary."""
+
+    try:
+        return _decide_yandex_review_candidate_core(
+            attempt_id=attempt_id,
+            source_lab_path=source_lab_path,
+            expected_receipt_sha256=expected_receipt_sha256,
+            review_id=review_id,
+            expected_state_digest=expected_state_digest,
+            reviewer=reviewer,
+            decision=decision,
+            reason=reason,
+            evidence_ref=evidence_ref,
+            idempotency_key=idempotency_key,
+            lease_seconds=lease_seconds,
+        )
+    except YandexSourceLabBridgeError as error:
+        failure_code = _known_public_failure_code(
+            error,
+            "YANDEX_REVIEW_DECISION_FAILED",
+        )
+    except Exception:
+        failure_code = "YANDEX_REVIEW_DECISION_FAILED"
+    del (
+        attempt_id,
+        source_lab_path,
+        expected_receipt_sha256,
+        review_id,
+        expected_state_digest,
+        reviewer,
+        decision,
+        reason,
+        evidence_ref,
+        idempotency_key,
+        lease_seconds,
+    )
+    _raise_detached_public_failure(failure_code)
+
+
+def inspect_yandex_batch_closure(
+    *,
+    attempt_id: str,
+    source_lab_path: str | os.PathLike[str] = SOURCE_DISCOVERY_SOURCE_LAB_PATH,
+    expected_receipt_sha256: str,
+) -> YandexBatchClosureSnapshot:
+    """Inspect closure behind a detached public failure boundary."""
+
+    try:
+        return _inspect_yandex_batch_closure_core(
+            attempt_id=attempt_id,
+            source_lab_path=source_lab_path,
+            expected_receipt_sha256=expected_receipt_sha256,
+        )
+    except YandexSourceLabBridgeError as error:
+        failure_code = _known_public_failure_code(
+            error,
+            "YANDEX_REVIEW_CLOSE_FAILED",
+        )
+    except Exception:
+        failure_code = "YANDEX_REVIEW_CLOSE_FAILED"
+    del attempt_id, source_lab_path, expected_receipt_sha256
+    _raise_detached_public_failure(failure_code)
 
 
 __all__ = [

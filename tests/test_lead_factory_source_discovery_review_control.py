@@ -16,6 +16,7 @@ from lead_factory.radar_yandex_source_lab_bridge import (
     YandexSourceLabBridgeError,
     decide_yandex_review_candidate,
     list_yandex_review_batch,
+    persist_yandex_review_batch,
 )
 import lead_factory.source_discovery_control as control
 from lead_factory.source_discovery_control import (
@@ -706,6 +707,49 @@ def test_local_close_requires_terminal_reviews_confirmation_and_exact_replay(
             **{**common, "idempotency_key": "close_conflict"},
         )
     assert conflict.value.code == "LOCAL_REVIEW_CLOSE_CONFLICT"
+
+
+def test_local_close_rejects_preexisting_orphan_before_writing_closure(
+    tmp_path: Path,
+) -> None:
+    state_path, source_lab_path, report = _run_yandex_review_batch(tmp_path, hits=1)
+    item = list_yandex_review_batch(
+        attempt_id=str(report["attempt_id"]),
+        source_lab_path=source_lab_path,
+        expected_receipt_sha256=str(report["batch_receipt_sha256"]),
+    )[0]
+    _decide_review_item(
+        report=report,
+        source_lab_path=source_lab_path,
+        review_id=item.review_id,
+        state_digest=item.state_digest,
+        decision="APPROVE",
+        suffix="orphan-precondition",
+    )
+    persist_yandex_review_batch(
+        attempt_id="sd_" + "9" * 32,
+        page=_controller_review_page(hits=1),
+        source_lab_path=source_lab_path,
+    )
+
+    with pytest.raises(SourceDiscoveryControlError) as blocked:
+        close_source_discovery_review(
+            attempt_id=str(report["attempt_id"]),
+            confirmation=SOURCE_DISCOVERY_LOCAL_CLOSE_CONFIRMATION,
+            state_path=state_path,
+            actor="operator_1",
+            evidence_ref="evidence://local-review/orphan-precondition",
+            idempotency_key="close_orphan_precondition",
+        )
+    assert blocked.value.code == "CONTROL_SOURCE_LAB_RECONCILIATION_REQUIRED"
+    with sqlite3.connect(state_path) as connection:
+        assert connection.execute(
+            "SELECT COUNT(*) FROM source_discovery_review_closures"
+        ).fetchone()[0] == 0
+        assert connection.execute(
+            "SELECT state FROM source_discovery_attempts WHERE attempt_id=?",
+            (str(report["attempt_id"]),),
+        ).fetchone()[0] == "READY_FOR_REVIEW"
 
 
 def test_controller_links_and_closures_are_append_only_and_tamper_evident(

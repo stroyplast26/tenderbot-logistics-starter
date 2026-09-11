@@ -49,6 +49,8 @@ runtime/development dependencies и затем проверяет точный i
 Ограничения, metered provider reads, cap-one и текущий STOP перед Gold
 signer/promotion описаны в
 [`docs/SAFE_LEAD_FLOW_LAUNCH_RUNBOOK.md`](docs/SAFE_LEAD_FLOW_LAUNCH_RUNBOOK.md).
+Production-поставка не содержит Gold HMAC sealer/decoder/verifier:
+`gold admit` и `gold revalidate` fail-closed до чтения secret, receipt или state.
 
 Отдельные lock-файлы `requirements-report-win-py311.lock.txt` и
 `requirements-ocr-win-py311.lock.txt` добавляют Pillow и optional OCR wrapper.

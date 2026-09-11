@@ -10,6 +10,7 @@ from unittest.mock import patch
 
 import pytest
 
+import scripts.run_gold_acceptance as gold_cli
 import scripts.run_source_discovery_once as source_cli
 
 
@@ -80,12 +81,17 @@ def test_launcher_source_is_an_exact_fail_closed_allowlist() -> None:
     assert source.index("Remove-Item -LiteralPath $SensitiveEnvironmentPath") < source.index(
         "$ScriptDirectory ="
     )
+    assert source.index(
+        "Remove-Item -LiteralPath $GoldSensitiveEnvironmentPath"
+    ) < source.index("$ScriptDirectory =")
     assert "Test-Path -LiteralPath $SensitiveEnvironmentPath" in source
+    assert "Test-Path -LiteralPath $GoldSensitiveEnvironmentPath" in source
     assert "} finally {" in source
     assert source.index("& $BootstrapPath -CheckOnly") < source.index(
         "Set-Item -LiteralPath $LauncherMarkerPath"
     )
     assert source.count("Remove-Item -LiteralPath $LauncherMarkerPath") == 2
+    assert source.count("Remove-Item -LiteralPath $GoldSensitiveEnvironmentPath") == 2
 
     expected_routes = {
         "source|plan",
@@ -242,6 +248,98 @@ raise SystemExit(97 if present or not marker_present else 0)
     assert secret_marker not in result.stderr
 
 
+@pytest.mark.skipif(
+    os.name != "nt" or not VENV_PYTHON.is_file(),
+    reason="requires Windows PowerShell 5.1 and the repo-local virtual environment",
+)
+def test_launcher_scrubs_case_variant_gold_secret_before_bootstrap_and_entrypoint(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "synthetic-gold-repo"
+    scripts = repo / "scripts"
+    venv_scripts = repo / ".venv" / "Scripts"
+    scripts.mkdir(parents=True)
+    venv_scripts.mkdir(parents=True)
+    shutil.copy2(LAUNCHER, scripts / LAUNCHER.name)
+    shutil.copy2(VENV_PYTHON, venv_scripts / "python.exe")
+    shutil.copy2(ROOT / ".venv" / "pyvenv.cfg", repo / ".venv" / "pyvenv.cfg")
+
+    bootstrap_probe = tmp_path / "gold-bootstrap-environment.txt"
+    entry_probe = tmp_path / "gold-entry-environment.txt"
+    (scripts / "bootstrap_python_runtime.ps1").write_text(
+        """#Requires -Version 5.1
+param([switch]$CheckOnly)
+$GoldCredentialPresent = Test-Path -LiteralPath 'Env:TENDERBOT_GOLD_APPROVAL_SECRET_B64'
+[IO.File]::WriteAllText(
+    $env:SAFE_LEAD_FLOW_GOLD_BOOTSTRAP_PROBE,
+    $GoldCredentialPresent.ToString()
+)
+if ($GoldCredentialPresent) { throw 'GOLD_SECRET_REACHED_BOOTSTRAP' }
+""",
+        encoding="utf-8",
+    )
+    (scripts / "run_gold_acceptance.py").write_text(
+        """import json
+import os
+from pathlib import Path
+
+present = any(
+    name.casefold() == "tenderbot_gold_approval_secret_b64" for name in os.environ
+)
+Path(os.environ["SAFE_LEAD_FLOW_GOLD_ENTRY_PROBE"]).write_text(
+    f"gold_credential={present}", encoding="utf-8"
+)
+print(json.dumps({"gold_credential_present": present, "status": "FAIL_CLOSED"}))
+raise SystemExit(97 if present else 2)
+""",
+        encoding="utf-8",
+    )
+
+    secret_marker = "ambient-gold-secret-must-not-reach-child"
+    environment = {
+        name: value
+        for name, value in os.environ.items()
+        if name.casefold() != "tenderbot_gold_approval_secret_b64"
+    }
+    environment.update(
+        {
+            "TeNdErBoT_GoLd_ApPrOvAl_SeCrEt_B64": secret_marker,
+            "SAFE_LEAD_FLOW_GOLD_BOOTSTRAP_PROBE": str(bootstrap_probe),
+            "SAFE_LEAD_FLOW_GOLD_ENTRY_PROBE": str(entry_probe),
+        }
+    )
+    result = subprocess.run(
+        [
+            str(_windows_powershell()),
+            "-NoLogo",
+            "-NoProfile",
+            "-NonInteractive",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            str(scripts / LAUNCHER.name),
+            "gold",
+            "admit",
+        ],
+        cwd=tmp_path,
+        env=environment,
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+
+    assert result.returncode == 2, result.stdout + result.stderr
+    assert json.loads(result.stdout) == {
+        "gold_credential_present": False,
+        "status": "FAIL_CLOSED",
+    }
+    assert bootstrap_probe.read_text(encoding="utf-8") == "False"
+    assert entry_probe.read_text(encoding="utf-8") == "gold_credential=False"
+    assert secret_marker not in result.stdout
+    assert secret_marker not in result.stderr
+
+
 def test_source_cli_direct_run_one_is_denied_before_controller_or_state(
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
@@ -277,6 +375,108 @@ def test_source_cli_direct_run_one_is_denied_before_controller_or_state(
     assert payload["state"] == "FAILED_CLOSED"
     assert payload["error_code"] == "SAFE_LEAD_FLOW_LAUNCHER_REQUIRED"
     assert "ambient-untrusted-marker" not in captured.err
+
+
+def test_gold_cli_admit_and_revalidate_stop_before_state_or_receipt_access(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    source_database = tmp_path / "must-not-read-source.sqlite3"
+    quarantine_database = tmp_path / "must-not-create-quarantine.sqlite3"
+    receipt_path = tmp_path / "SECRET_RECEIPT_MARKER-must-not-read.json"
+    draft_arguments = [
+        "--source-record-id",
+        "source-record-1",
+        "--observation-id",
+        "observation-1",
+        "--review-id",
+        "review-1",
+        "--latest-resolution-id",
+        "resolution-1",
+        "--reviewer-id",
+        "reviewer-1",
+        "--demand-id",
+        "demand-1",
+        "--product-key",
+        "product-1",
+        "--buyer-id",
+        "buyer-1",
+        "--stage",
+        "RFQ_EXPECTED",
+        "--purchase-deadline-utc",
+        "2026-09-30T12:00:00Z",
+        "--capacity-snapshot-sha256",
+        "a" * 64,
+        "--economics-snapshot-sha256",
+        "b" * 64,
+        "--evidence-sha256",
+        "c" * 64,
+        "--idempotency-key",
+        "gold-idempotency-1",
+    ]
+    paths = [
+        "--source-database",
+        str(source_database),
+        "--quarantine-database",
+        str(quarantine_database),
+    ]
+    authority = [
+        "--authority-id",
+        "gold-authority-1",
+        "--approval-receipt",
+        str(receipt_path),
+    ]
+
+    for command, additional in (
+        ("admit", []),
+        ("revalidate", ["--acceptance-id", "acceptance-1"]),
+    ):
+        with (
+            patch.object(
+                gold_cli,
+                "GoldAcceptanceQuarantine",
+                side_effect=AssertionError("quarantine must stay untouched"),
+            ) as quarantine,
+            patch.object(
+                gold_cli,
+                "_draft",
+                side_effect=AssertionError("draft must stay untouched"),
+            ) as draft_builder,
+            patch.object(
+                Path,
+                "stat",
+                side_effect=AssertionError("receipt or state must stay untouched"),
+            ) as path_stat,
+            patch.object(
+                Path,
+                "read_bytes",
+                side_effect=AssertionError("receipt or state must stay untouched"),
+            ) as path_read,
+            patch.dict(
+                os.environ,
+                {"TENDERBOT_GOLD_APPROVAL_SECRET_B64": "SECRET_ENV_MARKER"},
+            ),
+        ):
+            exit_code = gold_cli.main(
+                [command, *paths, *additional, *draft_arguments, *authority]
+            )
+
+        assert exit_code == 2
+        quarantine.assert_not_called()
+        draft_builder.assert_not_called()
+        path_stat.assert_not_called()
+        path_read.assert_not_called()
+        captured = capsys.readouterr()
+        assert captured.out == ""
+        payload = json.loads(captured.err)
+        assert payload["status"] == "FAIL_CLOSED"
+        assert payload["error_code"] == "GOLD_SIGNER_RUNTIME_UNAVAILABLE"
+        assert payload["local_persistence_effect"] == "NONE"
+        assert "SECRET_" not in captured.err
+
+    assert not source_database.exists()
+    assert not quarantine_database.exists()
+    assert not receipt_path.exists()
 
 
 @pytest.mark.skipif(

@@ -165,6 +165,11 @@ provider response в него не включаются. В Source Lab/controlle
 ссылок не осталось, attempt завершается без backpressure как
 `COMPLETE_NO_RESULTS` с более точной классификацией
 `NO_SAFE_REVIEWABLE_RESULTS`, а не превращается в постоянный `UNCERTAIN`.
+Публичные bridge/controller boundaries при отказе возвращают только код из
+закрытого allowlist: исходное исключение, его `context/cause`, входные пути,
+query/title/snippet и поля решения не остаются достижимыми через production
+traceback. Нельзя заменять эти boundaries прямым вызовом внутренних `_..._core`
+функций или логированием внутренних исключений.
 
 Это не означает отсутствие raw storage во всём нативном Yandex-контуре: до
 bridge `radar_yandex_journal` сохраняет raw provider response в своём локальном
@@ -276,6 +281,13 @@ attempt и отсутствие явного `--confirm-local-close` дают fa
 чтобы обойти его. Любой `UNCERTAIN` также является постоянным **STOP** до
 отдельного расследования.
 
+Перед append-only записью закрытия controller повторно сверяет всю пару
+controller/Source Lab и отклоняет даже чужой ранее появившийся orphan receipt.
+Во время `review-close` запрещён любой параллельный прямой writer в Source Lab:
+это две отдельные SQLite-базы без общей распределённой транзакции. Нарушение
+этой сериализации требует ручной reconciliation и не даёт права продолжать
+provider reads.
+
 Для TenderPlan штатное закрытие controller batch пока отложено: используйте
 его нативную локальную review queue, но не пытайтесь закрыть такой attempt
 командой Yandex и не обходите WIP вручную.
@@ -331,10 +343,14 @@ digests из Source Lab:
 .\scripts\run_safe_lead_flow.ps1 gold prepare --source-database "C:\ABSOLUTE\source-lab.sqlite3" --quarantine-database "C:\ABSOLUTE\gold-quarantine.sqlite3" --source-record-id "SOURCE_RECORD_ID" --observation-id "OBSERVATION_ID" --review-id "REVIEW_ID" --latest-resolution-id "RESOLUTION_ID" --reviewer-id "HUMAN_REVIEWER_ID" --demand-id "DEMAND_ID" --product-key "PRODUCT_KEY" --buyer-id "OPAQUE_BUYER_ID" --stage "RFQ_EXPECTED" --purchase-deadline-utc "2026-09-30T12:00:00Z" --capacity-snapshot-sha256 "64_HEX" --economics-snapshot-sha256 "64_HEX" --evidence-sha256 "64_HEX" --idempotency-key "GOLD_IDEMPOTENCY_KEY"
 ```
 
-`Gold signer` сейчас **STOP**: в поставке нет независимо управляемого signer,
-утверждённой custody/rotation-процедуры и promotion adapter. Поэтому
-`gold admit` и `gold revalidate` ниже показывают только форму будущей команды,
-но не являются разрешением на её выполнение:
+`Gold signer` сейчас **STOP**: production-поставка намеренно не содержит HMAC
+sealer, decoder или verifier, независимо управляемого signer,
+custody/rotation-процедуры и promotion adapter. Команды `gold admit` и
+`gold revalidate` всегда завершаются кодом 2 до чтения environment, approval
+receipt, Source Lab или quarantine state. Launcher удаляет любой ambient
+`TENDERBOT_GOLD_APPROVAL_SECRET_B64` до bootstrap и дочернего процесса, а также
+в `finally`. Формы ниже документируют только будущий интерфейс и сейчас не могут
+выполнить admission или revalidation:
 
 ```powershell
 .\scripts\run_safe_lead_flow.ps1 gold admit --source-database "C:\ABSOLUTE\source-lab.sqlite3" --quarantine-database "C:\ABSOLUTE\gold-quarantine.sqlite3" --source-record-id "SOURCE_RECORD_ID" --observation-id "OBSERVATION_ID" --review-id "REVIEW_ID" --latest-resolution-id "RESOLUTION_ID" --reviewer-id "HUMAN_REVIEWER_ID" --demand-id "DEMAND_ID" --product-key "PRODUCT_KEY" --buyer-id "OPAQUE_BUYER_ID" --stage "RFQ_EXPECTED" --purchase-deadline-utc "2026-09-30T12:00:00Z" --capacity-snapshot-sha256 "64_HEX" --economics-snapshot-sha256 "64_HEX" --evidence-sha256 "64_HEX" --idempotency-key "GOLD_IDEMPOTENCY_KEY" --authority-id "APPROVAL_AUTHORITY_ID" --approval-receipt "C:\ABSOLUTE\sealed-receipt.json"
@@ -343,9 +359,9 @@ digests из Source Lab:
 
 Не помещайте HMAC secret, PAT, персональные данные или raw provider payload в
 командную строку, state database, логи или чат. Для `--query` используйте только
-заранее одобренную неперсональную поисковую формулировку. До отдельного
-signer/release решения не задавайте `TENDERBOT_GOLD_APPROVAL_SECRET_B64` для
-операционного запуска.
+заранее одобренную неперсональную поисковую формулировку. Переменная
+`TENDERBOT_GOLD_APPROVAL_SECRET_B64` не является поддерживаемым production
+интерфейсом и принудительно очищается launcher-ом.
 
 Gold signing, promotion, CRM write, outbox, email/телефонный outreach и scheduler
 остаются **отключены**. Даже human `APPROVE` в Source Lab разрешает только

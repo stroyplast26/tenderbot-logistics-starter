@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from concurrent.futures import ThreadPoolExecutor
+from dataclasses import fields, is_dataclass
 import json
 import os
 from pathlib import Path
@@ -164,6 +166,116 @@ def _tenderplan_result(*, queued_count: int = 1) -> TenderPlanReadOnlyIntakeResu
 
 def _serialized(value: object) -> str:
     return json.dumps(value, ensure_ascii=False, sort_keys=True)
+
+
+def _contains_boundary_material(
+    value: object,
+    markers: tuple[str, ...],
+    *,
+    seen: set[int],
+    depth: int = 0,
+) -> bool:
+    if depth > 10:
+        return False
+    if isinstance(value, str):
+        return any(marker in value for marker in markers)
+    if isinstance(value, bytes):
+        return any(marker.encode("utf-8") in value for marker in markers)
+    if isinstance(value, Path):
+        rendered = str(value)
+        return any(marker in rendered for marker in markers)
+    if value is None or isinstance(value, (bool, int, float, complex)):
+        return False
+    identity = id(value)
+    if identity in seen:
+        return False
+    seen.add(identity)
+    if isinstance(value, Mapping):
+        return any(
+            _contains_boundary_material(item, markers, seen=seen, depth=depth + 1)
+            for pair in value.items()
+            for item in pair
+        )
+    if isinstance(value, (tuple, list, set, frozenset)):
+        return any(
+            _contains_boundary_material(item, markers, seen=seen, depth=depth + 1)
+            for item in value
+        )
+    if is_dataclass(value) and not isinstance(value, type):
+        return any(
+            _contains_boundary_material(
+                object.__getattribute__(value, field.name),
+                markers,
+                seen=seen,
+                depth=depth + 1,
+            )
+            for field in fields(value)
+        )
+    if isinstance(value, BaseException):
+        return _contains_boundary_material(
+            value.args,
+            markers,
+            seen=seen,
+            depth=depth + 1,
+        ) or _contains_boundary_material(
+            vars(value),
+            markers,
+            seen=seen,
+            depth=depth + 1,
+        )
+    value_type = type(value)
+    if value_type.__module__.startswith("lead_factory") and hasattr(value, "__dict__"):
+        return _contains_boundary_material(
+            vars(value),
+            markers,
+            seen=seen,
+            depth=depth + 1,
+        )
+    slots = getattr(value_type, "__slots__", ())
+    if value_type.__module__.startswith("lead_factory") and slots:
+        slot_names = (slots,) if isinstance(slots, str) else slots
+        for slot_name in slot_names:
+            try:
+                slot_value = object.__getattribute__(value, slot_name)
+            except (AttributeError, TypeError):
+                continue
+            if _contains_boundary_material(
+                slot_value,
+                markers,
+                seen=seen,
+                depth=depth + 1,
+            ):
+                return True
+    return False
+
+
+def _assert_control_exception_is_detached(
+    error: BaseException,
+    markers: tuple[str, ...],
+) -> None:
+    if error.__cause__ is not None or error.__context__ is not None:
+        raise AssertionError("control exception retained a predecessor")
+    pending = [error]
+    seen_errors: set[int] = set()
+    while pending:
+        current = pending.pop()
+        if id(current) in seen_errors:
+            continue
+        seen_errors.add(id(current))
+        if _contains_boundary_material(current, markers, seen=set()):
+            raise AssertionError("exception object retained supplied material")
+        traceback = current.__traceback__
+        while traceback is not None:
+            frame = traceback.tb_frame
+            if "lead_factory" in Path(frame.f_code.co_filename).parts:
+                for local_value in frame.f_locals.values():
+                    if _contains_boundary_material(local_value, markers, seen=set()):
+                        raise AssertionError("production traceback retained supplied material")
+            traceback = traceback.tb_next
+        if current.__cause__ is not None:
+            pending.append(current.__cause__)
+        if current.__context__ is not None:
+            pending.append(current.__context__)
 
 
 def test_plan_status_and_check_are_local_only_and_idempotent(tmp_path: Path) -> None:
@@ -624,6 +736,120 @@ def test_uncertain_result_blocks_every_new_source_call_and_hides_error(
     assert blocked["state"] == "BLOCKED_UNCERTAIN"
     assert secret not in _serialized(uncertain)
     assert secret.encode() not in state_path.read_bytes()
+
+
+def test_secondary_reconciliation_failures_detach_provider_and_input_material(
+    tmp_path: Path,
+) -> None:
+    provider_marker = "SECRET_PROVIDER_RESPONSE"
+    folder_marker = "SECRET_FOLDER_INPUT"
+    original_snapshot = control._snapshot
+    for failing_helper in ("_finish", "_snapshot"):
+        state_path = tmp_path / f"SECRET_STATE_PATH_{failing_helper}.sqlite3"
+        job_path = tmp_path / f"SECRET_JOB_PATH_{failing_helper}.json"
+        snapshot_calls = 0
+
+        def fail_snapshot_after_preflight(path: Path, wip_limit: int) -> dict[str, object]:
+            nonlocal snapshot_calls
+            snapshot_calls += 1
+            if snapshot_calls == 1:
+                return original_snapshot(path, wip_limit)
+            raise RuntimeError("opaque reconciliation fault")
+
+        helper_failure = (
+            fail_snapshot_after_preflight
+            if failing_helper == "_snapshot"
+            else RuntimeError("opaque reconciliation fault")
+        )
+        with (
+            patch(
+                "lead_factory.source_discovery_control.run_manual_yandex_search_accounted",
+                side_effect=RuntimeError(provider_marker),
+            ) as provider,
+            patch.object(
+                control,
+                failing_helper,
+                side_effect=helper_failure,
+            ),
+            pytest.raises(SourceDiscoveryControlError) as captured,
+        ):
+            run_source_discovery_once(
+                "YANDEX",
+                confirmation=SOURCE_DISCOVERY_ONE_SHOT_CONFIRMATION,
+                state_path=state_path,
+                yandex_job_path=job_path,
+                folder_id=folder_marker,
+            )
+        assert provider.call_count == 1
+        assert captured.value.code == "SOURCE_BOUNDARY_UNCERTAIN"
+        _assert_control_exception_is_detached(
+            captured.value,
+            (
+                provider_marker,
+                folder_marker,
+                "SECRET_STATE_PATH",
+                "SECRET_JOB_PATH",
+            ),
+        )
+        with sqlite3.connect(state_path) as connection:
+            assert connection.execute(
+                "SELECT state FROM source_discovery_attempts"
+            ).fetchone()[0] == (
+                "RUNNING" if failing_helper == "_finish" else "UNCERTAIN"
+            )
+
+
+def test_cli_secondary_reconciliation_failure_emits_only_safe_json(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    state_path = tmp_path / "SECRET_CLI_STATE_PATH.sqlite3"
+    job_path = tmp_path / "SECRET_CLI_JOB_PATH.json"
+    provider_marker = "SECRET_CLI_PROVIDER_RESPONSE"
+    folder_marker = "SECRET_CLI_FOLDER_INPUT"
+    with (
+        patch.object(source_cli, "SOURCE_DISCOVERY_STATE_PATH", state_path),
+        patch.dict(
+            os.environ,
+            {
+                source_cli.SAFE_LEAD_FLOW_LAUNCH_MARKER_NAME:
+                    source_cli.SAFE_LEAD_FLOW_LAUNCH_MARKER_VALUE
+            },
+        ),
+        patch(
+            "lead_factory.source_discovery_control.run_manual_yandex_search_accounted",
+            side_effect=RuntimeError(provider_marker),
+        ) as provider,
+        patch.object(
+            control,
+            "_finish",
+            side_effect=RuntimeError("opaque reconciliation fault"),
+        ),
+    ):
+        exit_code = source_cli.main(
+            [
+                "run-one",
+                "--source",
+                "YANDEX",
+                "--yandex-job",
+                str(job_path),
+                "--folder-id",
+                folder_marker,
+                "--confirm-one-authorized-read",
+            ]
+        )
+    output = capsys.readouterr()
+    assert provider.call_count == 1
+    assert exit_code == 2
+    assert output.out == ""
+    assert json.loads(output.err)["error_code"] == "SOURCE_BOUNDARY_UNCERTAIN"
+    for marker in (
+        provider_marker,
+        folder_marker,
+        "SECRET_CLI_STATE_PATH",
+        "SECRET_CLI_JOB_PATH",
+    ):
+        assert marker not in output.err
 
 
 def test_keyboard_interrupt_after_reservation_is_durably_uncertain(

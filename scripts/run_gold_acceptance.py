@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
-"""Prepare, admit, inspect, or revalidate the non-executing Gold quarantine."""
+"""Prepare or inspect Gold quarantine; admission routes are hard-stopped."""
 
 from __future__ import annotations
 
 import argparse
-import os
 import sys
 from pathlib import Path
 
@@ -19,13 +18,8 @@ from lead_factory.gold_acceptance_quarantine import (  # noqa: E402
     GoldAcceptanceDraft,
     GoldAcceptanceQuarantine,
     GoldQuarantineError,
-    HmacGoldApprovalVerifier,
-    decode_injected_secret,
 )
 from lead_factory.ids import canonical_json  # noqa: E402
-
-
-SECRET_ENVIRONMENT_VARIABLE = "TENDERBOT_GOLD_APPROVAL_SECRET_B64"
 
 
 def _add_paths(parser: argparse.ArgumentParser) -> None:
@@ -75,7 +69,7 @@ def _parser() -> argparse.ArgumentParser:
     _add_draft(prepare)
 
     admit = subparsers.add_parser(
-        "admit", help="Verify a sealed receipt and append GOLD_QUARANTINED."
+        "admit", help="Unavailable without a production signer/verifier runtime."
     )
     _add_paths(admit)
     _add_draft(admit)
@@ -89,7 +83,7 @@ def _parser() -> argparse.ArgumentParser:
 
     revalidate = subparsers.add_parser(
         "revalidate",
-        help="Check current source and authority without issuing a promotion permit.",
+        help="Unavailable without a production signer/verifier runtime.",
     )
     _add_paths(revalidate)
     revalidate.add_argument("--acceptance-id", required=True)
@@ -123,29 +117,26 @@ def _emit(payload: dict[str, object], *, stream=None) -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
-    args = _parser().parse_args(argv)
+    command_arguments = list(sys.argv[1:] if argv is None else argv)
+    if command_arguments and command_arguments[0] in {"admit", "revalidate"}:
+        _emit(
+            {
+                "status": "FAIL_CLOSED",
+                "error_code": "GOLD_SIGNER_RUNTIME_UNAVAILABLE",
+                "message": "Gold signer and verifier runtime are unavailable",
+                "local_persistence_effect": "NONE",
+                "external_effect": False,
+                "contains_pii": False,
+                "promotion_permit_issued": False,
+            },
+            stream=sys.stderr,
+        )
+        return 2
+    args = _parser().parse_args(command_arguments)
     try:
-        verifier = None
-        receipt = b""
-        if args.command in {"admit", "revalidate"}:
-            secret = decode_injected_secret(
-                os.environ.get(SECRET_ENVIRONMENT_VARIABLE, "")
-            )
-            verifier = HmacGoldApprovalVerifier(
-                secret, expected_authority_id=args.authority_id
-            )
-            try:
-                if not 1 <= args.approval_receipt.stat().st_size <= 16_384:
-                    raise OSError("receipt size")
-                receipt = args.approval_receipt.read_bytes()
-            except OSError:
-                raise GoldQuarantineError(
-                    "approval receipt file is unavailable"
-                ) from None
         quarantine = GoldAcceptanceQuarantine(
             args.source_database,
             args.quarantine_database,
-            approval_verifier=verifier,
         )
         if args.command == "prepare":
             request = quarantine.prepare_approval(_draft(args))
@@ -169,20 +160,8 @@ def main(argv: list[str] | None = None) -> int:
                     "contains_pii": False,
                 }
             )
-        elif args.command == "admit":
-            result = quarantine.admit(
-                _draft(args), sealed_approval_receipt=receipt
-            )
-            _emit({"status": "OK", **result.safe_report()})
-        elif args.command == "report":
-            _emit({"status": "OK", **quarantine.safe_report()})
         else:
-            result = quarantine.revalidate_for_promotion(
-                args.acceptance_id,
-                _draft(args),
-                sealed_approval_receipt=receipt,
-            )
-            _emit({"status": "OK", **result.safe_report()})
+            _emit({"status": "OK", **quarantine.safe_report()})
         return 0
     except GoldQuarantineError as exc:
         _emit(

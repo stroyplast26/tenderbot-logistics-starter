@@ -30,6 +30,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $SensitiveEnvironmentPath = 'Env:YANDEX_SEARCH_API_KEY'
+$GoldSensitiveEnvironmentPath = 'Env:TENDERBOT_GOLD_APPROVAL_SECRET_B64'
 $LauncherMarkerPath = 'Env:TENDERBOT_SAFE_LEAD_FLOW_LAUNCHER'
 $LauncherMarkerValue = 'source-discovery-v3'
 $SafeLeadFlowExitCode = 2
@@ -39,8 +40,12 @@ try {
     # Delete the ambient credential without reading its value before any child
     # process can inherit it, and fail closed if the name remains present.
     Remove-Item -LiteralPath $SensitiveEnvironmentPath -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath $GoldSensitiveEnvironmentPath -Force -ErrorAction SilentlyContinue
     Remove-Item -LiteralPath $LauncherMarkerPath -Force -ErrorAction SilentlyContinue
-    if (Test-Path -LiteralPath $SensitiveEnvironmentPath) {
+    if (
+        (Test-Path -LiteralPath $SensitiveEnvironmentPath) -or
+        (Test-Path -LiteralPath $GoldSensitiveEnvironmentPath)
+    ) {
         throw 'SAFE_LEAD_FLOW_AMBIENT_CREDENTIAL_REJECTED'
     }
 
@@ -187,6 +192,7 @@ try {
     # Keep the launcher process clean even if validation or child execution
     # fails after a component attempted to recreate the ambient name.
     Remove-Item -LiteralPath $SensitiveEnvironmentPath -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath $GoldSensitiveEnvironmentPath -Force -ErrorAction SilentlyContinue
     Remove-Item -LiteralPath $LauncherMarkerPath -Force -ErrorAction SilentlyContinue
 }
 
