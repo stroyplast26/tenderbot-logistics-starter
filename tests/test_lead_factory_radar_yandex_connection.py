@@ -846,5 +846,22 @@ class PermanentYandexConnectionTests(unittest.TestCase):
         })
 
 
+def test_supplied_pin_validation_needs_no_root_pin_or_grant():
+    with active_job() as (root, job, policy):
+        pin, pin_sha = common._read(root / "request-activation.json")
+        (root / "request-activation.json").unlink()
+        grants_before = tuple(authority._GRANTS)
+        with patch.object(
+            authority,
+            "_check_key",
+            side_effect=AssertionError("credential during candidate validation"),
+        ), patch(HTTPS, side_effect=AssertionError("HTTP during candidate validation")):
+            data = authority._verify_request_with_pin(job, NOW, pin, pin_sha)
+        assert data.bound.policy == policy
+        assert data.bound.bundle_path == job.resolve()
+        assert tuple(authority._GRANTS) == grants_before
+        assert not (root / "request-activation.json").exists()
+
+
 if __name__ == "__main__":
     unittest.main()
