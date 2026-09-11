@@ -55,6 +55,10 @@ _CADASTRAL = re.compile(
     r"^86:19:[0-9]{7}:[0-9]{1,6}"
     r"(?:\s+86:19:[0-9]{7}:[0-9]{1,6})?$"
 )
+_CADASTRAL_SHAPE = re.compile(
+    r"^[0-9]{2}:[0-9]{2}:[0-9]{7}:[0-9]{1,6}"
+    r"(?:\s+[0-9]{2}:[0-9]{2}:[0-9]{7}:[0-9]{1,6})?$"
+)
 _PRIVATE_NAME = re.compile(
     r"(?:\bип\b|индивидуальн\w*\s+предпринимател|физическ\w*\s+лиц|\bфио\b|"
     r"\b[а-яё]+\s+[а-яё]\.\s*[а-яё]\.|"
@@ -379,8 +383,13 @@ def _public_row(row: list[str]) -> dict[str, str]:
         raise ValueError("PRIVATE_OBJECT_TEXT")
     if not cadastral.strip("-") or cadastral.lower() in {"нет", "не указан"}:
         cadastral = ""
-    elif not _CADASTRAL.fullmatch(cadastral) or _CONTACT.search(_pii_probe(cadastral)):
+    elif (_CONTACT.search(_pii_probe(cadastral))
+          or not _CADASTRAL_SHAPE.fullmatch(cadastral)):
         raise ValueError("UNSUPPORTED_CADASTRAL")
+    elif not _CADASTRAL.fullmatch(cadastral):
+        # A well-formed identifier outside 86:19 is not evidence about this
+        # Megion object. Withhold it without discarding the other public facts.
+        cadastral = ""
     issued = _issued_date(row[12])
     if permit_match.group("year") != issued[:4]:
         raise ValueError("PERMIT_YEAR_MISMATCH")

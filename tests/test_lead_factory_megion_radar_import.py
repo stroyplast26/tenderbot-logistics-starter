@@ -229,8 +229,6 @@ class MegionRadarImportTests(unittest.TestCase):
         cases = []
         for index, value in (
             (11, "77-19-999-2026"),
-            (2, "77:19:0010405:1234"),
-            (2, "86:20:0010405:1234"),
             (11, "86-19-999-2025"),
         ):
             candidate = fixture_row()
@@ -240,6 +238,39 @@ class MegionRadarImportTests(unittest.TestCase):
             with self.subTest(candidate=candidate[11]), self.assertRaises(RadarValidationError):
                 self.import_rows([candidate])
             self.assertEqual(self.counts(), before)
+
+    def test_off_region_cadastral_is_withheld_without_cadastral_fact(self):
+        raw_values = ("77:19:0010405:1234", "86:20:0010405:1234")
+        rows = []
+        for index, cadastral in enumerate(raw_values):
+            candidate = fixture_row(f"86-19-{990 + index}-2026")
+            candidate[2] = cadastral
+            rows.append(candidate)
+
+        result = self.import_rows(rows)
+        self.assertEqual(result.created_count, 2)
+        for item in result.items:
+            self.assertEqual(self.metadata(item)["public_fields"]["cadastral_id"], "")
+
+        con = self.store.connect()
+        try:
+            self.assertEqual(
+                con.execute(
+                    "SELECT COUNT(*) FROM radar_object_identity_claims WHERE claim_type='CADASTRAL'"
+                ).fetchone()[0],
+                0,
+            )
+            retained = "\n".join(
+                row[0]
+                for row in con.execute("SELECT payload_json FROM events").fetchall()
+            ).encode("utf-8") + b"\n" + b"\n".join(
+                bytes(row[0])
+                for row in con.execute("SELECT blob FROM radar_evidence_records").fetchall()
+            )
+            for value in raw_values:
+                self.assertNotIn(value.encode("utf-8"), retained)
+        finally:
+            con.close()
 
     def test_zero_and_off_area_coordinates_are_withheld_from_every_projection(self):
         rows = []

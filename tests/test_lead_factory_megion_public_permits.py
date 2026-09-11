@@ -203,15 +203,19 @@ class MegionPublicPermitsTests(unittest.TestCase):
         self.assertEqual((record.longitude, record.latitude), ("", ""))
 
     def test_megion_identifiers_issue_year_and_coordinates_are_fail_closed(self):
-        for index, value in (
-            (11, "77-19-999-2026"),
-            (2, "77:19:0010405:1234"),
-            (2, "86:20:0010405:1234"),
-        ):
-            with self.subTest(index=index, value=value):
+        off_region_permit = row()
+        off_region_permit[11] = "77-19-999-2026"
+        self.assertEqual(parse(csv_bytes([off_region_permit])).records, ())
+
+        for value in ("77:19:0010405:1234", "86:20:0010405:1234"):
+            with self.subTest(cadastral=value):
                 candidate = row()
-                candidate[index] = value
-                self.assertEqual(parse(csv_bytes([candidate])).records, ())
+                candidate[2] = value
+                result = parse(csv_bytes([candidate]))
+                self.assertEqual(len(result.records), 1)
+                self.assertEqual(result.records[0].cadastral_id, "")
+                self.assertNotIn(value, result.records[0].sanitized_row_json)
+                self.assertEqual(dict(result.excluded_counts), {})
 
         mismatch = row()
         mismatch[11] = "86-19-999-2025"
