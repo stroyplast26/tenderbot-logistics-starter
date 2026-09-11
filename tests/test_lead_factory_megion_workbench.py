@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from functools import partial
 import io
 import json
+from unittest.mock import patch
 
 import pytest
 
@@ -18,6 +19,8 @@ from lead_factory.store import FactoryStore
 
 URL = "https://opendata.admmegion.ru/opendata/csv/31875/data/data-20260902T145832-structure-20240702T122402.csv"
 PUBLISHED = "2026-09-02T00:00:00Z"
+CSV_BYTE_LENGTH = 93856
+CSV_SHA256 = "64da610e83005420bd8e48ffbbeaf6e64b5490144822de3c2440efb2decd95d4"
 
 
 @pytest.fixture
@@ -43,16 +46,18 @@ def megion_workspace(tmp_path):
     output = io.StringIO(newline="")
     csv.writer(output).writerows([MEGION_CSV_HEADERS, row])
     blob = output.getvalue().encode("utf-8-sig")
+    blob += b"\n" * (CSV_BYTE_LENGTH - len(blob))
     return store, passport.passport_id, blob
 
 
 def test_megion_dossier_uses_publication_not_import_date_for_freshness(megion_workspace):
     store, passport, blob = megion_workspace
     imported_at = datetime(2026, 9, 11, tzinfo=timezone.utc)
-    result = MegionRadarImporter(store, clock=lambda: imported_at).import_bytes(
-        blob, passport_id=passport, actor="synthetic-test", source_url=URL,
-        published_at_utc=PUBLISHED,
-    )
+    with patch("lead_factory.megion_radar_import._csv_sha256", return_value=CSV_SHA256):
+        result = MegionRadarImporter(store, clock=lambda: imported_at).import_bytes(
+            blob, passport_id=passport, actor="synthetic-test", source_url=URL,
+            published_at_utc=PUBLISHED,
+        )
     workspace = RadarResearchWorkbench(
         store, actor="manager-1", clock=lambda: datetime(2026, 9, 12, tzinfo=timezone.utc)
     )
@@ -67,6 +72,8 @@ def test_megion_dossier_uses_publication_not_import_date_for_freshness(megion_wo
     assert signal["public_fields"]["developer_legal_form"] == "ООО"
     assert signal["public_fields"]["building_scope"] == "BUILDING"
     assert signal["public_fields"]["source_text_withheld"] == "true"
+    assert signal["public_fields"]["latitude"] == ""
+    assert signal["public_fields"]["longitude"] == ""
     assert signal["public_fields"]["issued_at_utc"] == "2026-07-30T00:00:00Z"
     assert signal["acquisition_label"]
     assert not dossier["participants"] and not dossier["predictions"]
@@ -87,11 +94,12 @@ def test_megion_cli_import_and_replay_are_local(megion_workspace, tmp_path, caps
     args = ["import-megion", "--workspace-db", str(store.path), "--actor", "synthetic-test",
             "--passport", passport, "--file", str(source), "--source-url", URL,
             "--published-at", PUBLISHED]
-    assert main(args) == 0
-    first = json.loads(capsys.readouterr().out)
-    assert first["created_count"] == 1
-    assert main(args) == 0
-    replay = json.loads(capsys.readouterr().out)
+    with patch("lead_factory.megion_radar_import._csv_sha256", return_value=CSV_SHA256):
+        assert main(args) == 0
+        first = json.loads(capsys.readouterr().out)
+        assert first["created_count"] == 1
+        assert main(args) == 0
+        replay = json.loads(capsys.readouterr().out)
     assert replay["replayed"] and replay["created_count"] == 0
     with store.connect() as con:
         for table in ("opportunities", "crm_outbox", "outbox", "human_tasks"):

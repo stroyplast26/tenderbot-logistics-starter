@@ -10,7 +10,6 @@ from __future__ import annotations
 import csv
 from dataclasses import dataclass
 from datetime import datetime
-from decimal import Decimal, InvalidOperation
 import hashlib
 import io
 import json
@@ -50,9 +49,13 @@ _SOURCE_PATH = re.compile(
 )
 _NUMBER = re.compile(r"^[+-]?[0-9]+(?:[.,][0-9]+)?$")
 _PERMIT = re.compile(
-    r"^[0-9]{2}-(?:RU[0-9]{6,8}-[0-9]{2,4}|[0-9]{2}-[0-9]{2,4})-[0-9]{4}$"
+    r"^86-(?:RU[0-9]{6,8}-[0-9]{2,4}|[0-9]{2}-[0-9]{2,4})-(?P<year>[0-9]{4})$"
 )
 _CADASTRAL = re.compile(
+    r"^86:19:[0-9]{7}:[0-9]{1,6}"
+    r"(?:\s+86:19:[0-9]{7}:[0-9]{1,6})?$"
+)
+_CADASTRAL_SHAPE = re.compile(
     r"^[0-9]{2}:[0-9]{2}:[0-9]{7}:[0-9]{1,6}"
     r"(?:\s+[0-9]{2}:[0-9]{2}:[0-9]{7}:[0-9]{1,6})?$"
 )
@@ -332,20 +335,11 @@ def _issued_date(value: str) -> str:
 
 
 def _coordinates(longitude: str, latitude: str) -> tuple[str, str]:
-    values = (_clean(longitude), _clean(latitude))
-    # Links such as 2GIS are not coordinate systems. Do not parse them as points.
-    if not all(_NUMBER.fullmatch(value) for value in values):
-        return "", ""
-    try:
-        lon, lat = (Decimal(value.replace(",", ".")) for value in values)
-        if not (-180 <= lon <= 180 and -90 <= lat <= 90):
-            return "", ""
-    except InvalidOperation:
-        return "", ""
-    def normalize(number: Decimal) -> str:
-        return format(number.normalize(), "f") if number else "0"
-
-    return normalize(lon), normalize(lat)
+    # Dataset 31875 does not publish a reviewed coordinate reference system or
+    # a repository-backed Megion polygon. Numeric shape alone cannot establish
+    # that a point belongs to Megion, so v4 withholds every coordinate pair.
+    del longitude, latitude
+    return "", ""
 
 
 def _public_row(row: list[str]) -> dict[str, str]:
@@ -373,7 +367,8 @@ def _public_row(row: list[str]) -> dict[str, str]:
     if not developer or len(developer) > 512 or _has_private_text(developer):
         raise ValueError("UNSAFE_OR_MISSING_LEGAL_NAME")
     permit, issuer, municipality = (_clean(row[index]) for index in (11, 15, 16))
-    if not _PERMIT.fullmatch(permit) or _CONTACT.search(_pii_probe(permit)):
+    permit_match = _PERMIT.fullmatch(permit)
+    if not permit_match or _CONTACT.search(_pii_probe(permit)):
         raise ValueError("INVALID_PERMIT_NUMBER")
     canonical_issuer = _MEGION_ISSUERS.get(issuer)
     if canonical_issuer is None or _has_private_text(issuer):
@@ -388,9 +383,16 @@ def _public_row(row: list[str]) -> dict[str, str]:
         raise ValueError("PRIVATE_OBJECT_TEXT")
     if not cadastral.strip("-") or cadastral.lower() in {"нет", "не указан"}:
         cadastral = ""
-    elif not _CADASTRAL.fullmatch(cadastral) or _CONTACT.search(_pii_probe(cadastral)):
+    elif (_CONTACT.search(_pii_probe(cadastral))
+          or not _CADASTRAL_SHAPE.fullmatch(cadastral)):
         raise ValueError("UNSUPPORTED_CADASTRAL")
+    elif not _CADASTRAL.fullmatch(cadastral):
+        # A well-formed identifier outside 86:19 is not evidence about this
+        # Megion object. Withhold it without discarding the other public facts.
+        cadastral = ""
     issued = _issued_date(row[12])
+    if permit_match.group("year") != issued[:4]:
+        raise ValueError("PERMIT_YEAR_MISMATCH")
     lon, lat = _coordinates(row[7], row[8])
     scope = megion_public_scope(raw_title)
     return {
