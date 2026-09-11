@@ -14,6 +14,8 @@ param(
         'review-list',
         'review-decide',
         'review-close',
+        'yandex-status',
+        'yandex-purge',
         'prepare',
         'admit',
         'report',
@@ -62,6 +64,8 @@ try {
         'source|review-list' = @('run_source_discovery_once.py', 'review-list')
         'source|review-decide' = @('run_source_discovery_once.py', 'review-decide')
         'source|review-close' = @('run_source_discovery_once.py', 'review-close')
+        'source|yandex-status' = @('run_source_discovery_once.py', 'yandex-status')
+        'source|yandex-purge' = @('run_source_discovery_once.py', 'yandex-purge')
         'gold|prepare' = @('run_gold_acceptance.py', 'prepare')
         'gold|admit' = @('run_gold_acceptance.py', 'admit')
         'gold|report' = @('run_gold_acceptance.py', 'report')
@@ -150,6 +154,23 @@ try {
             if (-not $SeenReviewFlags.ContainsKey($RequiredReviewFlag)) {
                 throw 'SAFE_LEAD_FLOW_REVIEW_ARGUMENTS_INVALID'
             }
+        }
+    }
+
+    $YandexMaintenanceOperations = @('yandex-status', 'yandex-purge')
+    if ($Flow -eq 'source' -and $YandexMaintenanceOperations -contains $Operation) {
+        $ExpectedMaintenanceCount = if ($Operation -eq 'yandex-purge') { 3 } else { 2 }
+        if (
+            $CommandArguments.Count -ne $ExpectedMaintenanceCount -or
+            [string]$CommandArguments[0] -cne '--job-id' -or
+            [string]$CommandArguments[1] -cnotmatch
+                '\A[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}\z' -or
+            (
+                $Operation -eq 'yandex-purge' -and
+                [string]$CommandArguments[2] -cne '--confirm-expired-raw-purge'
+            )
+        ) {
+            throw 'SAFE_LEAD_FLOW_YANDEX_MAINTENANCE_ARGUMENTS_INVALID'
         }
     }
 

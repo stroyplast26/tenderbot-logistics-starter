@@ -101,6 +101,8 @@ def test_launcher_source_is_an_exact_fail_closed_allowlist() -> None:
         "source|review-list",
         "source|review-decide",
         "source|review-close",
+        "source|yandex-status",
+        "source|yandex-purge",
         "gold|prepare",
         "gold|admit",
         "gold|report",
@@ -108,7 +110,7 @@ def test_launcher_source_is_an_exact_fail_closed_allowlist() -> None:
     }
     for route in expected_routes:
         assert source.count(f"'{route}'") == 1
-    assert source.count(" = @('run_source_discovery_once.py',") == 7
+    assert source.count(" = @('run_source_discovery_once.py',") == 9
     assert source.count(" = @('run_gold_acceptance.py',") == 4
 
     forbidden = (
@@ -540,6 +542,39 @@ def test_launcher_rejects_cross_flow_operation_before_child_dispatch(
     assert result.returncode == 2
     assert result.stdout == ""
     assert "SAFE_LEAD_FLOW_FAILED" in result.stderr
+    assert not any(tmp_path.iterdir())
+
+
+@pytest.mark.skipif(
+    os.name != "nt" or not VENV_PYTHON.is_file(),
+    reason="requires the checked repo-local Windows virtual environment",
+)
+@pytest.mark.parametrize(
+    "arguments",
+    (
+        (
+            "source",
+            "yandex-status",
+            "--job-id",
+            "12345678-1234-1234-1234-123456789ABC",
+        ),
+        (
+            "source",
+            "yandex-purge",
+            "--job-id",
+            "12345678-1234-1234-1234-123456789abc",
+        ),
+    ),
+)
+def test_launcher_rejects_noncanonical_or_unconfirmed_yandex_maintenance(
+    tmp_path: Path,
+    arguments: tuple[str, ...],
+) -> None:
+    result = _run_launcher(tmp_path, *arguments)
+
+    assert result.returncode == 2
+    assert result.stdout == ""
+    assert result.stderr.strip() == "SAFE_LEAD_FLOW_FAILED"
     assert not any(tmp_path.iterdir())
 
 

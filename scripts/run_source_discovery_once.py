@@ -19,11 +19,11 @@ from lead_factory.source_discovery_control import (  # noqa: E402
     SOURCE_DISCOVERY_ONE_SHOT_CONFIRMATION,
     SOURCE_DISCOVERY_STATE_PATH,
     SourceDiscoveryControlError,
-    check_source_discovery,
     close_source_discovery_review,
     run_source_discovery_once,
     source_discovery_plan,
     source_discovery_status,
+    verify_source_discovery_authority,
 )
 from lead_factory.radar_yandex_connection import (  # noqa: E402
     SAFE_LEAD_FLOW_LAUNCH_MARKER_NAME,
@@ -36,6 +36,12 @@ from lead_factory.radar_yandex_source_lab_bridge import (  # noqa: E402
     decide_yandex_review_candidate,
     list_yandex_review_batch,
 )
+from lead_factory.radar_yandex_maintenance import (  # noqa: E402
+    YANDEX_RAW_PURGE_CONFIRMATION,
+    YandexJournalMaintenanceError,
+    purge_yandex_journal,
+    yandex_journal_status,
+)
 from lead_factory.source_review_queue import (  # noqa: E402
     ReviewQueueResolutionResult,
 )
@@ -45,6 +51,7 @@ from lead_factory.tenderplan_read_only_intake import (  # noqa: E402
 
 
 _ATTEMPT_ID = re.compile(r"sd_[0-9a-f]{32}\Z")
+_JOB_ID = re.compile(r"[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}\Z")
 _REVIEW_ID = re.compile(r"lf_[a-z0-9_]+_[0-9a-f]{32}\Z")
 _SHA256 = re.compile(r"[0-9a-f]{64}\Z")
 _PRINCIPAL = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}\Z")
@@ -55,6 +62,7 @@ _EVIDENCE_URI = re.compile(
     r"[A-Za-z0-9._~:/?#\[\]@%+=,-]{1,2015}\Z"
 )
 _LOCAL_REVIEW_COMMANDS = frozenset({"review-list", "review-decide", "review-close"})
+_LOCAL_YANDEX_MAINTENANCE_COMMANDS = frozenset({"yandex-status", "yandex-purge"})
 
 
 def _validated(value: str, pattern: re.Pattern[str], message: str) -> str:
@@ -69,6 +77,10 @@ def _attempt_id(value: str) -> str:
 
 def _review_id(value: str) -> str:
     return _validated(value, _REVIEW_ID, "invalid source review id")
+
+
+def _job_id(value: str) -> str:
+    return _validated(value, _JOB_ID, "invalid Yandex job id")
 
 
 def _sha256(value: str) -> str:
@@ -145,6 +157,22 @@ def _parser() -> argparse.ArgumentParser:
 
     status = commands.add_parser("status", help="read durable local status")
     status.add_argument("--wip-limit", type=int, default=1)
+
+    yandex_status = commands.add_parser(
+        "yandex-status",
+        help="inspect one canonical Yandex journal without provider access",
+    )
+    yandex_status.add_argument("--job-id", required=True, type=_job_id)
+
+    yandex_purge = commands.add_parser(
+        "yandex-purge",
+        help="purge only expired raw Yandex responses from one canonical journal",
+    )
+    yandex_purge.add_argument("--job-id", required=True, type=_job_id)
+    yandex_purge.add_argument(
+        "--confirm-expired-raw-purge",
+        action="store_true",
+    )
 
     for name in ("check", "run-one"):
         command = commands.add_parser(name)
@@ -238,13 +266,24 @@ def main(argv: list[str] | None = None) -> int:
                 wip_limit=arguments.wip_limit,
             )
         elif arguments.command == "check":
-            result = check_source_discovery(
+            result = verify_source_discovery_authority(
                 arguments.source,
                 state_path=SOURCE_DISCOVERY_STATE_PATH,
                 wip_limit=arguments.wip_limit,
                 yandex_job_path=arguments.yandex_job,
                 folder_id=arguments.folder_id,
                 tenderplan_query=arguments.query,
+            )
+        elif arguments.command == "yandex-status":
+            result = yandex_journal_status(arguments.job_id)
+        elif arguments.command == "yandex-purge":
+            result = purge_yandex_journal(
+                arguments.job_id,
+                confirmation=(
+                    YANDEX_RAW_PURGE_CONFIRMATION
+                    if arguments.confirm_expired_raw_purge
+                    else None
+                ),
             )
         elif arguments.command == "run-one":
             result = run_source_discovery_once(
@@ -313,7 +352,11 @@ def main(argv: list[str] | None = None) -> int:
             )
         else:
             raise SourceDiscoveryControlError("SOURCE_DISCOVERY_COMMAND_NOT_ALLOWED")
-    except (SourceDiscoveryControlError, YandexSourceLabBridgeError) as error:
+    except (
+        SourceDiscoveryControlError,
+        YandexJournalMaintenanceError,
+        YandexSourceLabBridgeError,
+    ) as error:
         _emit(
             {
                 "effects": {
@@ -324,7 +367,12 @@ def main(argv: list[str] | None = None) -> int:
                     "native_metering_governed": True,
                     "outbox_write_enabled": False,
                     "provider_read_may_be_metered": (
-                        arguments.command not in _LOCAL_REVIEW_COMMANDS
+                        arguments.command
+                        not in (
+                            _LOCAL_REVIEW_COMMANDS
+                            | _LOCAL_YANDEX_MAINTENANCE_COMMANDS
+                            | {"check", "plan", "status"}
+                        )
                     ),
                 },
                 "error_code": error.code,

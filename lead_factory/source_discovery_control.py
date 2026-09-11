@@ -22,6 +22,7 @@ from typing import Final, Mapping, NoReturn
 
 from lead_factory.radar_yandex_connection import (
     ManualYandexSearchOutcome,
+    check_manual_yandex_search,
     run_manual_yandex_search_accounted,
 )
 from lead_factory.radar_yandex_connection_authority import ManualYandexSearchBinding
@@ -49,7 +50,7 @@ from lead_factory.tenderplan_read_only_intake import (
 )
 
 
-SOURCE_DISCOVERY_CONTROL_VERSION: Final = "source-discovery-control-v3"
+SOURCE_DISCOVERY_CONTROL_VERSION: Final = "source-discovery-control-v4"
 SOURCE_DISCOVERY_ONE_SHOT_CONFIRMATION: Final = "AUTHORIZE_ONE_PREAUTHORIZED_SOURCE_READ"
 SOURCE_DISCOVERY_LOCAL_CLOSE_CONFIRMATION: Final = "CLOSE_LOCAL_SOURCE_REVIEW_ONLY"
 SOURCE_DISCOVERY_STATE_PATH: Final = (
@@ -90,6 +91,7 @@ _SAFE_CONTROL_ERROR_CODES: Final = frozenset(
         "SOURCE_LAB_BATCH_RECEIPT_INVALID",
         "WIP_LIMIT_INVALID",
         "YANDEX_ACCOUNTING_INCONSISTENT",
+        "YANDEX_AUTHORITY_CHECK_REJECTED",
         "YANDEX_BINDING_INVALID",
     }
 )
@@ -1114,6 +1116,158 @@ def check_source_discovery(
     }
 
 
+def _sanitized_yandex_preflight_accounting(journal: object) -> dict[str, object]:
+    """Validate local native status without returning job, request, or path data."""
+
+    if not isinstance(journal, Mapping) or set(journal) != _YANDEX_ACCOUNTING_KEYS:
+        raise SourceDiscoveryControlError("YANDEX_ACCOUNTING_INCONSISTENT")
+    states = journal.get("states")
+    if (
+        not isinstance(states, Mapping)
+        or set(states) != set(_YANDEX_ACCOUNTING_STATES)
+        or any(type(states[state]) is not int for state in _YANDEX_ACCOUNTING_STATES)
+        or any(not 0 <= states[state] <= 1 for state in _YANDEX_ACCOUNTING_STATES)
+    ):
+        raise SourceDiscoveryControlError("YANDEX_ACCOUNTING_INCONSISTENT")
+    state_counts = {state: int(states[state]) for state in _YANDEX_ACCOUNTING_STATES}
+    attempts = journal.get("attempts_reserved")
+    reserved_cost = journal.get("reserved_cost_minor")
+    remaining_cost = journal.get("remaining_cost_minor")
+    retained = journal.get("retained_responses")
+    empty = attempts == 0 and all(value == 0 for value in state_counts.values())
+    cached = attempts == 1 and state_counts == {
+        "RESERVED": 0,
+        "DISPATCH_INTENT": 0,
+        "UNCERTAIN": 0,
+        "COMPLETED": 1,
+    }
+    if (
+        type(attempts) is not int
+        or type(reserved_cost) is not int
+        or reserved_cost != attempts * 49
+        or type(remaining_cost) is not int
+        or remaining_cost != 49 - reserved_cost
+        or type(retained) is not int
+        or retained != (1 if cached else 0)
+        or not (empty or cached)
+        or type(journal.get("max_requests")) is not int
+        or journal.get("max_requests") != 1
+        or journal.get("currency") != "RUB"
+        or journal.get("cost_semantics") != "UPPER_ESTIMATE_NOT_INVOICE"
+        or type(journal.get("stopped")) is not bool
+        or journal.get("live_authority_granted") is not False
+        or type(journal.get("policy_sha256")) is not str
+        or _SHA256.fullmatch(str(journal["policy_sha256"])) is None
+        or type(journal.get("expires_at_utc")) is not str
+        or re.fullmatch(
+            r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z",
+            str(journal["expires_at_utc"]),
+        )
+        is None
+    ):
+        raise SourceDiscoveryControlError("YANDEX_ACCOUNTING_INCONSISTENT")
+    try:
+        datetime.strptime(str(journal["expires_at_utc"]), "%Y-%m-%dT%H:%M:%SZ")
+    except ValueError:
+        raise SourceDiscoveryControlError("YANDEX_ACCOUNTING_INCONSISTENT") from None
+    return {
+        "accounting_status": "VERIFIED",
+        "attempts_reserved": attempts,
+        "cost_semantics": "UPPER_ESTIMATE_NOT_INVOICE",
+        "currency": "RUB",
+        "max_requests": 1,
+        "remaining_cost_minor": remaining_cost,
+        "reserved_cost_minor": reserved_cost,
+        "retained_responses": retained,
+        "states": state_counts,
+        "stopped": journal["stopped"],
+    }
+
+
+def _verify_source_discovery_authority_core(
+    source: str | SourceDiscoverySource,
+    *,
+    state_path: str | Path,
+    wip_limit: int,
+    yandex_job_path: str | Path | None,
+    folder_id: str | None,
+    tenderplan_query: str,
+) -> dict[str, object]:
+    report = check_source_discovery(
+        source,
+        state_path=state_path,
+        wip_limit=wip_limit,
+        yandex_job_path=yandex_job_path,
+        folder_id=folder_id,
+        tenderplan_query=tenderplan_query,
+    )
+    selected = _source(source)
+    if (
+        selected is not SourceDiscoverySource.YANDEX
+        or report["state"] != "READY_FOR_SEPARATE_AUTHORITY_CHECK"
+    ):
+        return report
+    native = check_manual_yandex_search(
+        yandex_job_path,  # type: ignore[arg-type]
+        folder_id=folder_id,  # type: ignore[arg-type]
+    )
+    if (
+        type(native) is not dict
+        or set(native) != {"ok", "connection", "request", "cached", "accounting"}
+        or native["ok"] is not True
+        or native["connection"] != "PERMANENT"
+        or type(native["cached"]) is not bool
+        or type(native["request"]) is not dict
+        or set(native["request"]) != {"query_text", "region_label", "page"}
+    ):
+        raise SourceDiscoveryControlError("YANDEX_AUTHORITY_CHECK_REJECTED")
+    accounting = _sanitized_yandex_preflight_accounting(native["accounting"])
+    if native["cached"] != (accounting["attempts_reserved"] == 1):
+        raise SourceDiscoveryControlError("YANDEX_ACCOUNTING_INCONSISTENT")
+    return {
+        "authority_verified": True,
+        "cached": native["cached"],
+        "control": report["control"],
+        "effects": {**_effects(), "provider_read_may_be_metered": False},
+        "journal": accounting,
+        "operation": "CHECK_NATIVE_AUTHORITY_LOCAL_ONLY",
+        "source": selected.value,
+        "state": "READY_FOR_EXPLICIT_CONFIRMATION",
+        "version": SOURCE_DISCOVERY_CONTROL_VERSION,
+    }
+
+
+def verify_source_discovery_authority(
+    source: str | SourceDiscoverySource,
+    *,
+    state_path: str | Path = SOURCE_DISCOVERY_STATE_PATH,
+    wip_limit: int = SOURCE_DISCOVERY_DEFAULT_WIP_LIMIT,
+    yandex_job_path: str | Path | None = None,
+    folder_id: str | None = None,
+    tenderplan_query: str = TENDERPLAN_READ_ONLY_DEFAULT_QUERY,
+) -> dict[str, object]:
+    """Run the supported local authority check without credentials or provider I/O."""
+
+    try:
+        return _verify_source_discovery_authority_core(
+            source,
+            state_path=state_path,
+            wip_limit=wip_limit,
+            yandex_job_path=yandex_job_path,
+            folder_id=folder_id,
+            tenderplan_query=tenderplan_query,
+        )
+    except SourceDiscoveryControlError as error:
+        failure_code = _known_control_failure_code(
+            error,
+            "YANDEX_AUTHORITY_CHECK_REJECTED",
+        )
+    except BaseException:
+        failure_code = "YANDEX_AUTHORITY_CHECK_REJECTED"
+    del source, state_path, wip_limit, yandex_job_path, folder_id, tenderplan_query
+    _raise_detached_control_failure(failure_code)
+
+
 def _blocked_run_report(
     selected: SourceDiscoverySource,
     state: str,
@@ -1966,4 +2120,5 @@ __all__ = [
     "run_source_discovery_once",
     "source_discovery_plan",
     "source_discovery_status",
+    "verify_source_discovery_authority",
 ]
