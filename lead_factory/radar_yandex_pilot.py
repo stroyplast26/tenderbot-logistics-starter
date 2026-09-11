@@ -51,7 +51,11 @@ def _run_owner_yandex_pilot_with_accounting(
         verified.authorize_request(journal, request, folder_id, now=_now_utc())
         cached = journal.read_completed(request, now=_now_utc())
         if cached is not None:
-            return cached, 0, _journal_accounting(journal)
+            accounting = _journal_accounting(journal)
+            # Authority files and the journal have no shared OS transaction;
+            # revalidate at the last local boundary before releasing the page.
+            verified.authorize_request(journal, request, folder_id, now=_now_utc())
+            return cached, 0, accounting
         body = json.dumps(request.body(folder_id), ensure_ascii=False, separators=(",", ":")).encode("utf-8")
         verified.authorize_new_dispatch(journal, now=_now_utc())
         key = _api_key()
@@ -80,7 +84,12 @@ def _run_owner_yandex_pilot_with_accounting(
             ) from None
         return page, 1, _journal_accounting(journal)
     finally:
-        journal.close()
+        try:
+            journal.close()
+        except Exception:
+            # A local cleanup failure must not overwrite the already captured
+            # dispatch outcome or make an attempted request look free.
+            pass
 
 
 def main(argv: list[str] | None = None) -> int:

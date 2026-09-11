@@ -32,12 +32,20 @@ def check_manual_yandex_search(job_path: str | Path, *, folder_id: str) -> dict:
     try:
         request = grant.authorize_request(journal, folder_id)
         cached = journal.read_completed(request, now=_now_utc())
+        result = {"ok": True, "connection": "PERMANENT", "request": asdict(request),
+                  "cached": cached is not None, "accounting": journal.status()}
         if cached is None:
             grant.authorize_new_dispatch(journal)
-        return {"ok": True, "connection": "PERMANENT", "request": asdict(request),
-                "cached": cached is not None, "accounting": journal.status()}
+        else:
+            # This remains a read authorization: STOP is intentionally not
+            # checked, but connection/pin/job/journal bindings are refreshed.
+            grant.authorize_request(journal, folder_id)
+        return result
     finally:
-        journal.close()
+        try:
+            journal.close()
+        except Exception:
+            pass
 
 
 def run_manual_yandex_search(job_path: str | Path, *, folder_id: str) -> SearchPage:
@@ -53,7 +61,11 @@ def _run_manual_yandex_search_with_accounting(
         request = grant.authorize_request(journal, folder_id)
         cached = journal.read_completed(request, now=_now_utc())
         if cached is not None:
-            return cached, 0, _journal_accounting(journal)
+            accounting = _journal_accounting(journal)
+            # Separate authority files and SQLite cannot share an OS
+            # transaction; refresh at the last local release boundary.
+            grant.authorize_request(journal, folder_id)
+            return cached, 0, accounting
         body = json.dumps(request.body(folder_id), ensure_ascii=False, separators=(",", ":")).encode("utf-8")
         grant.authorize_new_dispatch(journal)
         key = _api_key()
@@ -80,7 +92,11 @@ def _run_manual_yandex_search_with_accounting(
             ) from None
         return page, 1, _journal_accounting(journal)
     finally:
-        journal.close()
+        try:
+            journal.close()
+        except Exception:
+            # Preserve the known outcome/accounting across cleanup failure.
+            pass
 
 
 def main(argv: list[str] | None = None) -> int:

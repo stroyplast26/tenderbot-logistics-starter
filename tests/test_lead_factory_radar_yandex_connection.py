@@ -227,6 +227,66 @@ class PermanentYandexConnectionTests(unittest.TestCase):
                 with self.assertRaisesRegex(authority.ConnectionAuthorityError, "^CONNECTION_INACTIVE$"):
                     runner.run_manual_yandex_search(job, folder_id=FOLDER)
 
+    def test_cache_replay_rechecks_current_authority_after_read(self):
+        for fault in ("connection-revoked", "activation-revoked", "hash", "path", "expiry"):
+            with self.subTest(fault=fault), active_job() as (root, job, _):
+                with patch.dict(os.environ, {"YANDEX_SEARCH_API_KEY": KEY}), \
+                        patch(HTTPS, return_value=SyntheticConnection()):
+                    runner.run_manual_yandex_search(job, folder_id=FOLDER)
+                original_read = YandexPilotJournal.read_completed
+
+                def change_authority_after_read(journal, request, *, now):
+                    cached = original_read(journal, request, now=now)
+                    if fault == "connection-revoked":
+                        path = root / "connection.json"
+                        value = json.loads(path.read_bytes())
+                        value["status"] = "REVOKED"
+                    else:
+                        path = root / "request-activation.json"
+                        value = json.loads(path.read_bytes())
+                        if fault == "activation-revoked":
+                            value["status"] = "REVOKED"
+                        elif fault == "hash":
+                            value["connection_sha256"] = "0" * 64
+                        elif fault == "path":
+                            value["job_path"] = str(job.with_name("other-request.json").resolve())
+                        else:
+                            value["expires_at_utc"] = NOW
+                    path.write_bytes(common._canonical(value))
+                    return cached
+
+                stdout = io.StringIO()
+                with redirect_stdout(stdout), \
+                        patch.object(YandexPilotJournal, "read_completed", change_authority_after_read), \
+                        patch(KEY_LOOKUP, side_effect=AssertionError("key after cached authority swap")), \
+                        patch(HTTPS, side_effect=AssertionError("HTTPS after cached authority swap")):
+                    self.assertEqual(runner.main(["--job", str(job), "--folder-id", FOLDER]), 2)
+                self.assertEqual(json.loads(stdout.getvalue()), {
+                    "ok": False, "error": "YANDEX_MANUAL_REQUEST_REJECTED",
+                    "external_requests_this_run": 0,
+                })
+
+    def test_check_rechecks_current_authority_after_cached_read(self):
+        with active_job() as (root, job, _):
+            with patch.dict(os.environ, {"YANDEX_SEARCH_API_KEY": KEY}), \
+                    patch(HTTPS, return_value=SyntheticConnection()):
+                runner.run_manual_yandex_search(job, folder_id=FOLDER)
+            original_read = YandexPilotJournal.read_completed
+
+            def revoke_connection_after_read(journal, request, *, now):
+                cached = original_read(journal, request, now=now)
+                path = root / "connection.json"
+                connection = json.loads(path.read_bytes())
+                connection["status"] = "REVOKED"
+                path.write_bytes(common._canonical(connection))
+                return cached
+
+            with patch.object(YandexPilotJournal, "read_completed", revoke_connection_after_read), \
+                    patch(KEY_LOOKUP, side_effect=AssertionError("key from check authority swap")), \
+                    patch(HTTPS, side_effect=AssertionError("HTTPS from check authority swap")):
+                with self.assertRaisesRegex(authority.ConnectionAuthorityError, "^CONNECTION_INACTIVE$"):
+                    runner.check_manual_yandex_search(job, folder_id=FOLDER)
+
     def test_cli_reports_dispatch_and_replay_accounting_honestly(self):
         with active_job() as (_, job, _):
             first_out = io.StringIO()
@@ -371,6 +431,34 @@ class PermanentYandexConnectionTests(unittest.TestCase):
             self.assertEqual(result["external_requests_this_run"], 1)
             self.assertEqual(result["journal"]["states"]["COMPLETED"], 1)
             self.assertNotIn("SYNTHETIC_QUEUE_FAILURE", stdout.getvalue())
+
+    def test_close_failure_preserves_completed_and_uncertain_accounting(self):
+        original_close = YandexPilotJournal.close
+        original_status = YandexPilotJournal.status
+
+        def fail_terminal_close(journal):
+            status = original_status(journal)
+            original_close(journal)
+            if status["states"]["COMPLETED"] or status["states"]["UNCERTAIN"]:
+                raise JournalError("SYNTHETIC_CLOSE_FAILURE")
+
+        cases = (
+            ("completed", SyntheticConnection(), 0, "COMPLETED"),
+            ("uncertain", SyntheticConnection(request_error=OSError("PRIVATE_CLOSE_SENTINEL")), 2, "UNCERTAIN"),
+        )
+        for label, connection, expected_code, expected_state in cases:
+            with self.subTest(case=label), active_job() as (_, job, _):
+                stdout = io.StringIO()
+                with redirect_stdout(stdout), patch.dict(os.environ, {"YANDEX_SEARCH_API_KEY": KEY}), \
+                        patch(HTTPS, return_value=connection), \
+                        patch.object(YandexPilotJournal, "close", fail_terminal_close):
+                    self.assertEqual(runner.main(["--job", str(job), "--folder-id", FOLDER]), expected_code)
+                result = json.loads(stdout.getvalue())
+                self.assertEqual(result["external_requests_this_run"], 1)
+                self.assertEqual(result["journal"]["states"][expected_state], 1)
+                self.assertEqual(len(connection.requests), 1)
+                self.assertNotIn("SYNTHETIC_CLOSE_FAILURE", stdout.getvalue())
+                self.assertNotIn("PRIVATE_CLOSE_SENTINEL", stdout.getvalue())
 
     def test_connection_revoked_between_mint_and_consume_denies_before_http(self):
         with active_job() as (root, job, policy):
