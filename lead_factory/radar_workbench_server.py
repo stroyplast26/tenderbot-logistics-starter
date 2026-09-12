@@ -15,6 +15,7 @@ from urllib.parse import parse_qs, urlsplit
 from .radar_workbench import RadarResearchWorkbench, RadarWorkbenchConflict
 from .radar_workbench_demo import is_demo_workspace
 from .store import FactoryStore
+from .tenderplan_workbench_review import TenderPlanWorkbenchReview, TenderPlanWorkbenchReviewError
 
 
 MAX_BODY_BYTES = 16_384
@@ -22,7 +23,8 @@ ASSET_ROOT = Path(__file__).with_name("radar_workbench_assets")
 
 
 def create_radar_workbench_server(
-    store: FactoryStore, *, actor: str, port: int = 8766, demo: bool = False
+    store: FactoryStore, *, actor: str, port: int = 8766, demo: bool = False,
+    tenderplan_review_store: str | Path | None = None,
 ) -> ThreadingHTTPServer:
     """Bind one local operator session; writes require its same-origin token."""
     if type(port) is not int or not 0 <= port <= 65535:
@@ -35,6 +37,10 @@ def create_radar_workbench_server(
         raise ValueError("Radar schema 15 or later is required; no automatic migration")
     demo = demo or is_demo_workspace(store)
     token = secrets.token_urlsafe(32)
+    tenderplan_review = (
+        TenderPlanWorkbenchReview(tenderplan_review_store)
+        if tenderplan_review_store is not None else None
+    )
 
     class Handler(BaseHTTPRequestHandler):
         protocol_version = "HTTP/1.1"
@@ -91,6 +97,7 @@ def create_radar_workbench_server(
                 "/": ("index.html", "text/html; charset=utf-8"),
                 "/workspace.css": ("workspace.css", "text/css; charset=utf-8"),
                 "/workspace.js": ("workspace.js", "text/javascript; charset=utf-8"),
+                "/tenderplan-review.js": ("tenderplan-review.js", "text/javascript; charset=utf-8"),
             }
             if parsed.path in assets:
                 filename, media_type = assets[parsed.path]
@@ -98,7 +105,33 @@ def create_radar_workbench_server(
                 return
             try:
                 if parsed.path == "/api/session":
-                    self._json(200, {"actor": actor.strip(), "token": token, "demo": demo})
+                    self._json(200, {
+                        "actor": actor.strip(), "token": token, "demo": demo,
+                        "tenderplan_review_enabled": tenderplan_review is not None,
+                    })
+                elif parsed.path == "/api/tenderplan/reviews" or parsed.path.startswith("/api/tenderplan/reviews/"):
+                    if tenderplan_review is None:
+                        self._json(404, {"error": "Просмотр источника не включён."})
+                        return
+                    if not secrets.compare_digest(self.headers.get("X-Workspace-Token", ""), token):
+                        self._json(403, {"error": "Обновите страницу рабочего места."})
+                        return
+                    query = parse_qs(parsed.query, keep_blank_values=True)
+                    if parsed.path == "/api/tenderplan/reviews":
+                        if set(query) - {"limit", "offset"} or any(len(values) != 1 for values in query.values()):
+                            raise TenderPlanWorkbenchReviewError("INVALID")
+                        result = tenderplan_review.list_references(
+                            limit=int(query.get("limit", ["50"])[0]),
+                            offset=int(query.get("offset", ["0"])[0]),
+                        )
+                    else:
+                        if set(query) != {"reference_id"} or len(query["reference_id"]) != 1:
+                            raise TenderPlanWorkbenchReviewError("INVALID")
+                        result = tenderplan_review.detail(
+                            parsed.path.removeprefix("/api/tenderplan/reviews/"),
+                            reference_id=query["reference_id"][0],
+                        )
+                    self._json(200, result)
                 elif parsed.path == "/api/objects":
                     query = parse_qs(parsed.query)
                     limit = int(query.get("limit", ["100"])[0])
@@ -109,6 +142,8 @@ def create_radar_workbench_server(
                     self._json(200, workspace.dossier(object_id))
                 else:
                     self._json(404, {"error": "Страница не найдена."})
+            except TenderPlanWorkbenchReviewError as error:
+                self._json(error.status, {"error": str(error), "code": error.code})
             except KeyError:
                 self._json(404, {"error": "Объект не найден."})
             except (ValueError, TypeError):

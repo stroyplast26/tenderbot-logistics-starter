@@ -57,6 +57,7 @@ async function loadQueue() {
   items = result.items; total = result.total; renderQueue();
 }
 async function selectObject(id) {
+  document.dispatchEvent(new Event("radar:object-selected"));
   const request = ++selectionRequest;
   selected = id; dossier = null; $("dossier").hidden = true; $("empty").hidden = false; renderQueue();
   const result = await api(`/api/objects/${encodeURIComponent(id)}`);
