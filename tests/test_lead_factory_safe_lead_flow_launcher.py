@@ -1105,6 +1105,24 @@ def test_launcher_and_bootstrap_are_documented_by_the_canonical_runbook() -> Non
     assert "STOP" in text
 
 
+def test_runbooks_document_local_activation_before_separate_provider_read() -> None:
+    runbooks = (
+        ROOT / "docs" / "SAFE_LEAD_FLOW_LAUNCH_RUNBOOK.md",
+        ROOT / "docs" / "RADAR_YANDEX_PERMANENT_CONNECTION.md",
+    )
+    for runbook in runbooks:
+        text = runbook.read_text(encoding="utf-8")
+        assert "source yandex-activate --job-id" in text
+        assert "--expected-draft-sha256" in text
+        assert "--expected-scope-sha256" in text
+        assert "--evidence-sha256" in text
+        assert "--confirm-final-activation" in text
+        assert "activation-evidence\\<job_id>\\<evidence_sha256>.json" in text
+        assert "ACTIVATED_AWAITING_EXPLICIT_RUN_ONE" in text
+        assert "launch_allowed=false" in text
+        assert "run-one" in text
+
+
 def test_source_cli_review_commands_use_only_canonical_local_paths(
     capsys: pytest.CaptureFixture[str],
 ) -> None:

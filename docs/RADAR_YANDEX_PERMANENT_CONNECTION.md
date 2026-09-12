@@ -23,14 +23,13 @@
 - Отдельное задание закрепляет точный запрос, проверенную версию кода, локальный
   журнал, указание владельца, независимую приёмку и готовность биллинга.
 
-Постоянные metadata подключения не имеют срока exact job. Само задание и
-activation действуют не более 24 часов, а `retention_hours` raw response обязан
-быть равен ровно 24 часам. Исторический внешний installer создавал шестичасовое
-окно, но сейчас он не поддерживается и не используется. Текущая
-`source yandex-prepare` создаёт только неактивный draft. Exact `request.json` и
-activation сможет создать лишь отдельный будущий audited activator после
-финального изменения исполняемого кода; старые job/activation не переносятся на
-новый release candidate.
+Постоянные metadata подключения не имеют срока exact job. Текущий
+`source yandex-prepare` создаёт неактивный draft на шесть часов, а
+`retention_hours` raw response обязан быть равен ровно 24 часам. Существующий
+`source yandex-activate` после code freeze и реальных evidence публикует exact
+`request.json` и activation, не продлевая исходные шесть часов. Старые
+job/activation не переносятся на новый release candidate. Исторический внешний
+installer не поддерживается и не используется.
 
 Секрет не помещают в Git, описание PR, чат, аргументы команд или текст задания.
 Права каталога ограничивают текущим пользователем Windows и SYSTEM. DPAPI
@@ -95,9 +94,35 @@ draft; изменённый replay отклоняется без перезап�
 `launch_allowed=false`, а также список ещё не закрытых gates.
 
 После подготовки всё ещё требуются code freeze, exact owner instruction,
-независимый reviewer `ACCEPT`, свежая проверка billing/API/credential и
-отдельный audited activator. Только activator сможет собрать exact job и
-установить pin последним шагом; его в текущем safe flow нет.
+независимый reviewer `ACCEPT` и свежая проверка billing/API/credential. Эти три
+реальные привязки оформляются вне activator в каноническом UTF-8 JSON версии
+`radar-yandex-manual-activation-evidence-v1` по единственному пути:
+
+```text
+%USERPROFILE%\.codex\local_state\TenderBot\yandex-search\activation-evidence\<job_id>\<evidence_sha256>.json
+```
+
+Evidence обязан связать exact `job_id`, `draft_sha256`, `scope_sha256`, code,
+connection и folder; содержать owner receipt, независимый `ACCEPT` и readiness
+с активным billing, проверенной Search API configuration и доступным credential.
+Reviewer не может быть владельцем или автором реализации. Owner/readiness
+фиксируются не раньше draft, review допускается не более чем за 24 часа до него,
+и все времена должны быть не позже активации. Activator не создаёт и не
+исправляет этот файл.
+
+Активировать точный draft локально, без чтения ключа и без HTTP:
+
+```powershell
+.\scripts\run_safe_lead_flow.ps1 source yandex-activate --job-id "JOB_ID_FROM_PREPARE" --expected-draft-sha256 "DRAFT_SHA256_FROM_PREPARE" --expected-scope-sha256 "SCOPE_SHA256_FROM_PREPARE" --evidence-sha256 "SHA256_OF_CANONICAL_EVIDENCE" --confirm-final-activation
+```
+
+Команда принимает ровно показанный порядок и строчный UUID/SHA, повторно
+проверяет весь exact scope, ACL, времена и пустой journal, затем публикует
+`request.json`, `retention-activation.json` и корневой pin последним. Успех
+возвращает `ACTIVATED_AWAITING_EXPLICIT_RUN_ONE`, `authority_verified=true` и
+`launch_allowed=false`. Это всё ещё не provider read: credential, HTTP, spend,
+CRM, contact, outbox, campaign и schedule не затрагиваются. Шестичасовой срок
+draft не продлевается; после его истечения нужны новый draft и новый evidence.
 
 Проверить подготовленное задание без чтения секрета и HTTP можно только из
 точного принятого checkout через общий launcher:
@@ -112,7 +137,8 @@ draft; изменённый replay отклоняется без перезап�
 не создаёт reservation/intent и не вызывает HTTP. `authority_verified=false`
 или любой fail-closed ответ не является допуском к запуску.
 
-Один отдельно разрешённый read выполняет тот же launcher:
+Только после отдельного `check` один отдельно разрешённый read выполняет тот же
+launcher:
 
 ```powershell
 .\scripts\run_safe_lead_flow.ps1 source run-one --source YANDEX --yandex-job "C:\ABSOLUTE\approved-yandex-job.json" --folder-id "FOLDER_ID" --confirm-one-authorized-read
@@ -126,11 +152,11 @@ DPAPI broker → transport. Exact code hash задания связывает к
 `ACCEPT`.
 
 Перед bootstrap launcher удаляет ambient `YANDEX_SEARCH_API_KEY`, а несекретный
-маркер разрешённого child выставляет только после успешного `-CheckOnly` и
-удаляет в `finally`. Проверка маркера блокирует случайный прямой запуск, но маркер
-известен и не является защитой от злонамеренного процесса того же пользователя
-ОС. Граница доверия такого процесса остаётся операционной, как и для локального
-state и DPAPI CurrentUser.
+маркер для `yandex-prepare`, `yandex-activate` и `run-one` выставляет только после
+успешного `-CheckOnly` и удаляет в `finally`. Проверка маркера блокирует случайный
+прямой запуск, но маркер известен и не является защитой от злонамеренного
+процесса того же пользователя ОС. Граница доверия такого процесса остаётся
+операционной, как и для локального state и DPAPI CurrentUser.
 
 На настроенном Windows-хосте broker при cache miss получает ключ из
 фиксированного DPAPI helper через приватно захваченный `stdout` pipe, держит его
@@ -148,19 +174,21 @@ state и DPAPI CurrentUser.
 accounting receipts, job ID, policy digest, journal-path digest, outcome и число
 внешних попыток; query, raw response, ключ и его fingerprint туда не входят.
 
-Задание находится в `requests/<UUID>/request.json`; рядом расположены
-`request.sqlite` и `dispatch-claims`. `request-activation.json` в корне
-подключения закрепляет точные байты одного действующего задания. Запуск не
-создаёт эти файлы, не продлевает допуск и не подставляет автоматическое согласие.
-Для дальнейшего privacy-обслуживания сохраняется exact retention-привязка
-каждого job. Предпочтительно она лежит в
-`requests/<UUID>/retention-activation.json`. Если per-job копии ещё нет,
-допустима точно совпадающая корневая `request-activation.json`, а после
-замены active pin — её архив `request-activation.<archive>.json`. Эта
-привязка позволяет проверить и очистить старый journal после замены
-активного job, не перепривязывая его к новой activation и не продлевая
-просроченный допуск. Архивные журналы и claims сохраняются при установке
-следующего задания.
+Draft находится в `requests/<UUID>/request.draft.json`; activator рядом
+публикует `request.json`, затем обязательный per-job
+`retention-activation.json`, а `request-activation.json` в корне подключения —
+только последним шагом. `request.sqlite` и `dispatch-claims` остаются теми же
+exact объектами. `run-one` эти файлы не создаёт, не продлевает допуск и не
+подставляет автоматическое согласие.
+
+Для задач нового activator per-job retention pin обязателен. Если он существует,
+но повреждён или не совпадает с job, maintenance завершается fail-closed и не
+переходит к root/archive. Корневая `request-activation.json` или её архив
+`request-activation.<archive>.json` могут служить fallback только для старых
+задач при физическом отсутствии per-job файла. Эта привязка позволяет проверить
+и очистить старый journal после замены активного job, не перепривязывая его к
+новой activation и не продлевая просроченный допуск. Архивные журналы и claims
+сохраняются при установке следующего задания.
 
 Проверить журнал и удалить только просроченный raw response через тот же launcher:
 
