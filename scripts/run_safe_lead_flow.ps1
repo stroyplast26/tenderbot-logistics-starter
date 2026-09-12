@@ -14,6 +14,7 @@ param(
         'review-list',
         'review-decide',
         'review-close',
+        'yandex-activate',
         'yandex-prepare',
         'yandex-status',
         'yandex-purge',
@@ -65,6 +66,7 @@ try {
         'source|review-list' = @('run_source_discovery_once.py', 'review-list')
         'source|review-decide' = @('run_source_discovery_once.py', 'review-decide')
         'source|review-close' = @('run_source_discovery_once.py', 'review-close')
+        'source|yandex-activate' = @('run_source_discovery_once.py', 'yandex-activate')
         'source|yandex-prepare' = @('run_source_discovery_once.py', 'yandex-prepare')
         'source|yandex-status' = @('run_source_discovery_once.py', 'yandex-status')
         'source|yandex-purge' = @('run_source_discovery_once.py', 'yandex-purge')
@@ -196,6 +198,26 @@ try {
         }
     }
 
+    if ($Flow -eq 'source' -and $Operation -eq 'yandex-activate') {
+        if (
+            $Flow -cne 'source' -or
+            $Operation -cne 'yandex-activate' -or
+            $CommandArguments.Count -ne 9 -or
+            [string]$CommandArguments[0] -cne '--job-id' -or
+            [string]$CommandArguments[1] -cnotmatch
+                '\A[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}\z' -or
+            [string]$CommandArguments[2] -cne '--expected-draft-sha256' -or
+            [string]$CommandArguments[3] -cnotmatch '\A[0-9a-f]{64}\z' -or
+            [string]$CommandArguments[4] -cne '--expected-scope-sha256' -or
+            [string]$CommandArguments[5] -cnotmatch '\A[0-9a-f]{64}\z' -or
+            [string]$CommandArguments[6] -cne '--evidence-sha256' -or
+            [string]$CommandArguments[7] -cnotmatch '\A[0-9a-f]{64}\z' -or
+            [string]$CommandArguments[8] -cne '--confirm-final-activation'
+        ) {
+            throw 'SAFE_LEAD_FLOW_YANDEX_ACTIVATION_ARGUMENTS_INVALID'
+        }
+    }
+
     # The bootstrap check is the admission gate. It returns to this script only
     # after validating the exact repo-local interpreter and package set.
     $null = & $BootstrapPath -CheckOnly
@@ -205,7 +227,7 @@ try {
 
     if (
         $Flow -eq 'source' -and
-        $Operation -in @('run-one', 'yandex-prepare')
+        $Operation -in @('run-one', 'yandex-activate', 'yandex-prepare')
     ) {
         Set-Item -LiteralPath $LauncherMarkerPath -Value $LauncherMarkerValue -Force
     }

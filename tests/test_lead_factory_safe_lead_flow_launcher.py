@@ -101,6 +101,7 @@ def test_launcher_source_is_an_exact_fail_closed_allowlist() -> None:
         "source|review-list",
         "source|review-decide",
         "source|review-close",
+        "source|yandex-activate",
         "source|yandex-prepare",
         "source|yandex-status",
         "source|yandex-purge",
@@ -111,7 +112,7 @@ def test_launcher_source_is_an_exact_fail_closed_allowlist() -> None:
     }
     for route in expected_routes:
         assert source.count(f"'{route}'") == 1
-    assert source.count(" = @('run_source_discovery_once.py',") == 10
+    assert source.count(" = @('run_source_discovery_once.py',") == 11
     assert source.count(" = @('run_gold_acceptance.py',") == 4
 
     forbidden = (
@@ -413,6 +414,146 @@ def test_source_cli_direct_yandex_prepare_is_denied_before_local_write(
     assert payload["error_code"] == "SAFE_LEAD_FLOW_LAUNCHER_REQUIRED"
     assert payload["effects"]["provider_read_may_be_metered"] is False
     assert private_query not in captured.err
+
+
+def test_source_cli_direct_yandex_activate_is_denied_before_local_write(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    job_id = "12345678-1234-1234-1234-123456789abc"
+    with (
+        patch.object(source_cli, "activate_prepared_yandex_job") as activate,
+        patch.dict(
+            os.environ,
+            {source_cli.SAFE_LEAD_FLOW_LAUNCH_MARKER_NAME: "ambient-untrusted-marker"},
+        ),
+    ):
+        exit_code = source_cli.main(
+            [
+                "yandex-activate",
+                "--job-id",
+                job_id,
+                "--expected-draft-sha256",
+                "a" * 64,
+                "--expected-scope-sha256",
+                "b" * 64,
+                "--evidence-sha256",
+                "c" * 64,
+                "--confirm-final-activation",
+            ]
+        )
+
+    assert exit_code == 2
+    activate.assert_not_called()
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    payload = json.loads(captured.err)
+    assert payload["state"] == "FAILED_CLOSED"
+    assert payload["error_code"] == "SAFE_LEAD_FLOW_LAUNCHER_REQUIRED"
+    assert payload["effects"]["provider_read_may_be_metered"] is False
+    assert job_id not in captured.err
+
+
+def test_source_cli_yandex_activate_dispatches_exact_pins_with_launcher_marker(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    job_id = "12345678-1234-1234-1234-123456789abc"
+    draft_sha256 = "a" * 64
+    scope_sha256 = "b" * 64
+    evidence_sha256 = "c" * 64
+    expected = {
+        "authority_verified": True,
+        "created": True,
+        "effects": {"external_requests_this_run": 0},
+        "job_id": job_id,
+        "launch_allowed": False,
+        "state": "ACTIVATED_AWAITING_EXPLICIT_RUN_ONE",
+    }
+    with (
+        patch.object(
+            source_cli,
+            "activate_prepared_yandex_job",
+            return_value=expected,
+        ) as activate,
+        patch.dict(
+            os.environ,
+            {
+                source_cli.SAFE_LEAD_FLOW_LAUNCH_MARKER_NAME:
+                    source_cli.SAFE_LEAD_FLOW_LAUNCH_MARKER_VALUE
+            },
+        ),
+    ):
+        exit_code = source_cli.main(
+            [
+                "yandex-activate",
+                "--job-id",
+                job_id,
+                "--expected-draft-sha256",
+                draft_sha256,
+                "--expected-scope-sha256",
+                scope_sha256,
+                "--evidence-sha256",
+                evidence_sha256,
+                "--confirm-final-activation",
+            ]
+        )
+
+    assert exit_code == 0
+    assert json.loads(capsys.readouterr().out) == expected
+    activate.assert_called_once_with(
+        job_id,
+        draft_sha256,
+        scope_sha256,
+        evidence_sha256,
+        confirmation=source_cli.YANDEX_JOB_ACTIVATION_CONFIRMATION,
+    )
+
+
+def test_source_cli_yandex_activate_error_is_explicitly_local_only(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    job_id = "12345678-1234-1234-1234-123456789abc"
+    private_sha256 = "d" * 64
+    with (
+        patch.object(
+            source_cli,
+            "activate_prepared_yandex_job",
+            side_effect=source_cli.YandexJobActivationError(
+                "YANDEX_JOB_ACTIVATION_REJECTED"
+            ),
+        ),
+        patch.dict(
+            os.environ,
+            {
+                source_cli.SAFE_LEAD_FLOW_LAUNCH_MARKER_NAME:
+                    source_cli.SAFE_LEAD_FLOW_LAUNCH_MARKER_VALUE
+            },
+        ),
+    ):
+        exit_code = source_cli.main(
+            [
+                "yandex-activate",
+                "--job-id",
+                job_id,
+                "--expected-draft-sha256",
+                "a" * 64,
+                "--expected-scope-sha256",
+                "b" * 64,
+                "--evidence-sha256",
+                private_sha256,
+                "--confirm-final-activation",
+            ]
+        )
+
+    assert exit_code == 2
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    payload = json.loads(captured.err)
+    assert payload["error_code"] == "YANDEX_JOB_ACTIVATION_REJECTED"
+    assert payload["state"] == "FAILED_CLOSED"
+    assert payload["effects"]["provider_read_may_be_metered"] is False
+    assert job_id not in captured.err
+    assert private_sha256 not in captured.err
+    assert "Traceback" not in captured.err
 
 
 def test_source_cli_yandex_prepare_dispatches_only_with_launcher_marker(
@@ -749,6 +890,202 @@ def test_launcher_rejects_malformed_yandex_prepare_before_child_dispatch(
     assert result.stdout == ""
     assert result.stderr.strip() == "SAFE_LEAD_FLOW_FAILED"
     assert "PRIVATE_" not in result.stderr
+    assert not any(tmp_path.iterdir())
+
+
+@pytest.mark.skipif(
+    os.name != "nt" or not VENV_PYTHON.is_file(),
+    reason="requires Windows PowerShell 5.1 and the repo-local virtual environment",
+)
+def test_launcher_passes_exact_yandex_activation_only_after_bootstrap(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "synthetic-activation-repo"
+    scripts = repo / "scripts"
+    venv_scripts = repo / ".venv" / "Scripts"
+    scripts.mkdir(parents=True)
+    venv_scripts.mkdir(parents=True)
+    shutil.copy2(LAUNCHER, scripts / LAUNCHER.name)
+    shutil.copy2(VENV_PYTHON, venv_scripts / "python.exe")
+    shutil.copy2(ROOT / ".venv" / "pyvenv.cfg", repo / ".venv" / "pyvenv.cfg")
+
+    bootstrap_probe = tmp_path / "activation-bootstrap.txt"
+    entry_probe = tmp_path / "activation-entry.json"
+    (scripts / "bootstrap_python_runtime.ps1").write_text(
+        """#Requires -Version 5.1
+param([switch]$CheckOnly)
+$MarkerPresent = Test-Path -LiteralPath 'Env:TENDERBOT_SAFE_LEAD_FLOW_LAUNCHER'
+[IO.File]::WriteAllText(
+    $env:SAFE_LEAD_FLOW_BOOTSTRAP_PROBE,
+    $MarkerPresent.ToString()
+)
+if ($MarkerPresent) { throw 'MARKER_REACHED_BOOTSTRAP' }
+""",
+        encoding="utf-8",
+    )
+    (scripts / "run_source_discovery_once.py").write_text(
+        """import json
+import os
+from pathlib import Path
+import sys
+
+payload = {
+    "arguments": sys.argv[1:],
+    "launcher_marker": os.environ.get("TENDERBOT_SAFE_LEAD_FLOW_LAUNCHER"),
+}
+Path(os.environ["SAFE_LEAD_FLOW_ENTRY_PROBE"]).write_text(
+    json.dumps(payload), encoding="utf-8"
+)
+print(json.dumps({"state": "SYNTHETIC_ACTIVATION_DISPATCHED"}))
+""",
+        encoding="utf-8",
+    )
+    job_id = "12345678-1234-1234-1234-123456789abc"
+    activation_arguments = [
+        "--job-id",
+        job_id,
+        "--expected-draft-sha256",
+        "a" * 64,
+        "--expected-scope-sha256",
+        "b" * 64,
+        "--evidence-sha256",
+        "c" * 64,
+        "--confirm-final-activation",
+    ]
+    environment = os.environ.copy()
+    environment.update(
+        {
+            "SAFE_LEAD_FLOW_BOOTSTRAP_PROBE": str(bootstrap_probe),
+            "SAFE_LEAD_FLOW_ENTRY_PROBE": str(entry_probe),
+        }
+    )
+    result = subprocess.run(
+        [
+            str(_windows_powershell()),
+            "-NoLogo",
+            "-NoProfile",
+            "-NonInteractive",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            str(scripts / LAUNCHER.name),
+            "source",
+            "yandex-activate",
+            *activation_arguments,
+        ],
+        cwd=tmp_path,
+        env=environment,
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert json.loads(result.stdout) == {"state": "SYNTHETIC_ACTIVATION_DISPATCHED"}
+    assert bootstrap_probe.read_text(encoding="utf-8") == "False"
+    assert json.loads(entry_probe.read_text(encoding="utf-8")) == {
+        "arguments": ["yandex-activate", *activation_arguments],
+        "launcher_marker": "source-discovery-v3",
+    }
+
+
+@pytest.mark.skipif(
+    os.name != "nt" or not VENV_PYTHON.is_file(),
+    reason="requires Windows PowerShell 5.1 and the repo-local virtual environment",
+)
+@pytest.mark.parametrize(
+    "arguments",
+    (
+        (
+            "source", "yandex-activate", "--job-id",
+            "12345678-1234-1234-1234-123456789abc", "--expected-draft-sha256",
+            "a" * 64, "--expected-scope-sha256", "b" * 64,
+            "--evidence-sha256", "c" * 64,
+        ),
+        (
+            "source", "yandex-activate", "--job-id",
+            "12345678-1234-1234-1234-123456789abc", "--expected-draft-sha256",
+            "a" * 64, "--expected-scope-sha256", "b" * 64,
+            "--evidence-sha256", "c" * 64, "--confirm-final-activation", "EXTRA",
+        ),
+        (
+            "source", "yandex-activate", "--expected-draft-sha256", "a" * 64,
+            "--job-id", "12345678-1234-1234-1234-123456789abc",
+            "--expected-scope-sha256", "b" * 64, "--evidence-sha256", "c" * 64,
+            "--confirm-final-activation",
+        ),
+        (
+            "source", "yandex-activate", "--Job-Id",
+            "12345678-1234-1234-1234-123456789abc", "--expected-draft-sha256",
+            "a" * 64, "--expected-scope-sha256", "b" * 64,
+            "--evidence-sha256", "c" * 64, "--confirm-final-activation",
+        ),
+        (
+            "source", "yandex-activate", "--job-id",
+            "12345678-1234-1234-1234-123456789ABC", "--expected-draft-sha256",
+            "a" * 64, "--expected-scope-sha256", "b" * 64,
+            "--evidence-sha256", "c" * 64, "--confirm-final-activation",
+        ),
+        (
+            "source", "yandex-activate", "--job-id",
+            "12345678-1234-1234-1234-123456789abc", "--expected-draft-sha256",
+            "A" * 64, "--expected-scope-sha256", "b" * 64,
+            "--evidence-sha256", "c" * 64, "--confirm-final-activation",
+        ),
+        (
+            "source", "yandex-activate", "--job-id",
+            "12345678-1234-1234-1234-123456789abc", "--expected-draft-sha256",
+            "a" * 63, "--expected-scope-sha256", "b" * 64,
+            "--evidence-sha256", "c" * 64, "--confirm-final-activation",
+        ),
+        (
+            "source", "yandex-activate", "--job-id",
+            "12345678-1234-1234-1234-123456789abc", "--expected-draft-sha256",
+            "a" * 65, "--expected-scope-sha256", "b" * 64,
+            "--evidence-sha256", "c" * 64, "--confirm-final-activation",
+        ),
+        (
+            "source", "yandex-activate", "--job-id",
+            "12345678-1234-1234-1234-123456789abc", "--expected-draft-sha256",
+            "a" * 64, "--expected-scope-sha256", "b" * 64,
+            "--evidence-sha256", ("c" * 63) + "g", "--confirm-final-activation",
+        ),
+        (
+            "source", "yandex-activate", "--job-id",
+            "12345678-1234-1234-1234-123456789abc", "--expected-draft-sha256",
+            "a" * 64, "--expected-scope-sha256", "b" * 64,
+            "--evidence-sha256", "c" * 64, "--evidence-sha256",
+        ),
+        (
+            "source", "yandex-activate", "--job-id",
+            "12345678-1234-1234-1234-123456789abc", "--expected-draft-sha256",
+            "a" * 64, "--expected-scope-sha256", "b" * 64,
+            "--evidence-sha256", "c" * 64, "--Confirm-Final-Activation",
+        ),
+        (
+            "source", "Yandex-Activate", "--job-id",
+            "12345678-1234-1234-1234-123456789abc", "--expected-draft-sha256",
+            "a" * 64, "--expected-scope-sha256", "b" * 64,
+            "--evidence-sha256", "c" * 64, "--confirm-final-activation",
+        ),
+        (
+            "Source", "yandex-activate", "--job-id",
+            "12345678-1234-1234-1234-123456789abc", "--expected-draft-sha256",
+            "a" * 64, "--expected-scope-sha256", "b" * 64,
+            "--evidence-sha256", "c" * 64, "--confirm-final-activation",
+        ),
+    ),
+)
+def test_launcher_rejects_malformed_yandex_activation_before_child_dispatch(
+    tmp_path: Path,
+    arguments: tuple[str, ...],
+) -> None:
+    result = _run_launcher(tmp_path, *arguments)
+
+    assert result.returncode == 2
+    assert result.stdout == ""
+    assert result.stderr.strip() == "SAFE_LEAD_FLOW_FAILED"
     assert not any(tmp_path.iterdir())
 
 

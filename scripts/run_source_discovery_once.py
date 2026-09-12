@@ -47,6 +47,11 @@ from lead_factory.radar_yandex_job_preparer import (  # noqa: E402
     YandexJobPreparationError,
     prepare_inactive_yandex_job,
 )
+from lead_factory.radar_yandex_job_activator import (  # noqa: E402
+    YANDEX_JOB_ACTIVATION_CONFIRMATION,
+    YandexJobActivationError,
+    activate_prepared_yandex_job,
+)
 from lead_factory.source_review_queue import (  # noqa: E402
     ReviewQueueResolutionResult,
 )
@@ -68,7 +73,7 @@ _EVIDENCE_URI = re.compile(
 )
 _LOCAL_REVIEW_COMMANDS = frozenset({"review-list", "review-decide", "review-close"})
 _LOCAL_YANDEX_COMMANDS = frozenset(
-    {"yandex-prepare", "yandex-status", "yandex-purge"}
+    {"yandex-activate", "yandex-prepare", "yandex-status", "yandex-purge"}
 )
 
 
@@ -197,6 +202,31 @@ def _parser() -> argparse.ArgumentParser:
         action="store_true",
     )
 
+    yandex_activate = commands.add_parser(
+        "yandex-activate",
+        help="activate one exact prepared Yandex job without provider access",
+    )
+    yandex_activate.add_argument("--job-id", required=True, type=_job_id)
+    yandex_activate.add_argument(
+        "--expected-draft-sha256",
+        required=True,
+        type=_sha256,
+    )
+    yandex_activate.add_argument(
+        "--expected-scope-sha256",
+        required=True,
+        type=_sha256,
+    )
+    yandex_activate.add_argument(
+        "--evidence-sha256",
+        required=True,
+        type=_sha256,
+    )
+    yandex_activate.add_argument(
+        "--confirm-final-activation",
+        action="store_true",
+    )
+
     for name in ("check", "run-one"):
         command = commands.add_parser(name)
         command.add_argument(
@@ -267,7 +297,7 @@ def _emit(value: dict[str, object], *, error: bool = False) -> None:
 
 def main(argv: list[str] | None = None) -> int:
     arguments = _parser().parse_args(argv)
-    if arguments.command in {"run-one", "yandex-prepare"} and (
+    if arguments.command in {"run-one", "yandex-activate", "yandex-prepare"} and (
         os.environ.get(SAFE_LEAD_FLOW_LAUNCH_MARKER_NAME)
         != SAFE_LEAD_FLOW_LAUNCH_MARKER_VALUE
     ):
@@ -316,6 +346,18 @@ def main(argv: list[str] | None = None) -> int:
                 confirmation=(
                     YANDEX_INACTIVE_PREPARATION_CONFIRMATION
                     if arguments.confirm_inactive_only
+                    else None
+                ),
+            )
+        elif arguments.command == "yandex-activate":
+            result = activate_prepared_yandex_job(
+                arguments.job_id,
+                arguments.expected_draft_sha256,
+                arguments.expected_scope_sha256,
+                arguments.evidence_sha256,
+                confirmation=(
+                    YANDEX_JOB_ACTIVATION_CONFIRMATION
+                    if arguments.confirm_final_activation
                     else None
                 ),
             )
@@ -388,6 +430,7 @@ def main(argv: list[str] | None = None) -> int:
             raise SourceDiscoveryControlError("SOURCE_DISCOVERY_COMMAND_NOT_ALLOWED")
     except (
         SourceDiscoveryControlError,
+        YandexJobActivationError,
         YandexJobPreparationError,
         YandexJournalMaintenanceError,
         YandexSourceLabBridgeError,
