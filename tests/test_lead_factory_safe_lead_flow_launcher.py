@@ -1,13 +1,10 @@
 from __future__ import annotations
 
-from concurrent.futures import ThreadPoolExecutor
-import hashlib
 import json
 import os
 from pathlib import Path
 import shutil
 import subprocess
-import tempfile
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -106,6 +103,7 @@ def test_launcher_source_is_an_exact_fail_closed_allowlist() -> None:
         "source|review-close",
         "source|yandex-activate",
         "source|yandex-prepare",
+        "source|yandex-publish-evidence",
         "source|yandex-status",
         "source|yandex-purge",
         "gold|prepare",
@@ -115,7 +113,7 @@ def test_launcher_source_is_an_exact_fail_closed_allowlist() -> None:
     }
     for route in expected_routes:
         assert source.count(f"'{route}'") == 1
-    assert source.count(" = @('run_source_discovery_once.py',") == 11
+    assert source.count(" = @('run_source_discovery_once.py',") == 12
     assert source.count(" = @('run_gold_acceptance.py',") == 4
 
     forbidden = (
@@ -900,8 +898,10 @@ def test_launcher_rejects_malformed_yandex_prepare_before_child_dispatch(
     os.name != "nt" or not VENV_PYTHON.is_file(),
     reason="requires Windows PowerShell 5.1 and the repo-local virtual environment",
 )
+@pytest.mark.parametrize("operation", ("yandex-activate", "yandex-publish-evidence"))
 def test_launcher_passes_exact_yandex_activation_only_after_bootstrap(
     tmp_path: Path,
+    operation: str,
 ) -> None:
     repo = tmp_path / "synthetic-activation-repo"
     scripts = repo / "scripts"
@@ -955,6 +955,9 @@ print(json.dumps({"state": "SYNTHETIC_ACTIVATION_DISPATCHED"}))
         "c" * 64,
         "--confirm-final-activation",
     ]
+    if operation == "yandex-publish-evidence":
+        activation_arguments[6] = "--expected-candidate-sha256"
+        activation_arguments[8] = "--confirm-local-publication"
     environment = os.environ.copy()
     environment.update(
         {
@@ -973,7 +976,7 @@ print(json.dumps({"state": "SYNTHETIC_ACTIVATION_DISPATCHED"}))
             "-File",
             str(scripts / LAUNCHER.name),
             "source",
-            "yandex-activate",
+            operation,
             *activation_arguments,
         ],
         cwd=tmp_path,
@@ -988,7 +991,7 @@ print(json.dumps({"state": "SYNTHETIC_ACTIVATION_DISPATCHED"}))
     assert json.loads(result.stdout) == {"state": "SYNTHETIC_ACTIVATION_DISPATCHED"}
     assert bootstrap_probe.read_text(encoding="utf-8") == "False"
     assert json.loads(entry_probe.read_text(encoding="utf-8")) == {
-        "arguments": ["yandex-activate", *activation_arguments],
+        "arguments": [operation, *activation_arguments],
         "launcher_marker": "source-discovery-v3",
     }
 
@@ -1158,125 +1161,14 @@ def test_runbooks_publish_exact_evidence_without_rotation_or_ambient_profile() -
         "ACTIVATED_AWAITING_EXPLICIT_RUN_ONE",
     ):
         assert constant in evidence
-    assert "sort_keys=True" in evidence
-    assert "os.O_EXCL" in evidence
-    assert "os.rename(stage, target)" in evidence
+    assert "source yandex-publish-evidence --job-id" in evidence
+    assert "--expected-candidate-sha256" in evidence
+    assert "--confirm-local-publication" in evidence
+    assert "activation-candidates" in evidence
+    assert "EVIDENCE_PUBLISHED_AWAITING_ACTIVATION" in evidence
+    assert "$Publisher =" not in evidence
     assert "requests\\$JobId\\request.json" in evidence
     assert "V1 не поддерживает rotation" in evidence
-
-
-def test_documented_evidence_publisher_is_canonical_and_no_replace(
-    tmp_path: Path,
-    request: pytest.FixtureRequest,
-) -> None:
-    documentation = (
-        ROOT / "docs" / "RADAR_YANDEX_ACTIVATION_EVIDENCE.md"
-    ).read_text(encoding="utf-8")
-    publisher = documentation.split("$Publisher = @'\n", 1)[1].split("\n'@", 1)[0]
-    job_id = "00000000-0000-0000-0000-000000000000"
-    draft_sha256 = "0" * 64
-    scope_sha256 = "1" * 64
-    value = {
-        "version": "radar-yandex-manual-activation-evidence-v1",
-        "job_id": job_id,
-        "draft_sha256": draft_sha256,
-        "scope_sha256": scope_sha256,
-        "owner_receipt": {
-            "kind": "CAPTURED_OWNER_INSTRUCTION",
-            "owner_id": "owner",
-            "source_thread_id": "owner-thread",
-            "instruction_sha256": "2" * 64,
-            "captured_at_utc": "2026-09-12T10:00:00Z",
-            "scope_sha256": scope_sha256,
-        },
-        "independent_acceptance": {
-            "kind": "INDEPENDENT_CODE_ACCEPTANCE",
-            "reviewer_id": "reviewer",
-            "reviewed_at_utc": "2026-09-12T10:00:00Z",
-            "verdict": "ACCEPT",
-            "code_sha256": {"synthetic.py": "3" * 64},
-            "evidence_sha256": "4" * 64,
-            "implementation_author_ids": ["implementer"],
-        },
-        "readiness": {
-            "kind": "BILLING_API_READINESS",
-            "observed_at_utc": "2026-09-12T10:00:00Z",
-            "billing_status": "ACTIVE",
-            "search_api_status": "CONFIGURATION_VERIFIED",
-            "credential_status": "AVAILABLE",
-            "folder_id_sha256": "5" * 64,
-            "connection_sha256": "6" * 64,
-            "evidence_sha256": "7" * 64,
-        },
-    }
-    candidate = tmp_path / "evidence.candidate.json"
-    candidate.write_text(json.dumps(value, ensure_ascii=False, indent=2), encoding="utf-8")
-    profile = Path(tempfile.mkdtemp(prefix="e"))
-    request.addfinalizer(lambda: shutil.rmtree(profile, ignore_errors=True))
-    command = [
-        str(VENV_PYTHON),
-        "-I",
-        "-c",
-        publisher,
-        str(candidate),
-        str(profile),
-        job_id,
-        draft_sha256,
-        scope_sha256,
-    ]
-
-    with ThreadPoolExecutor(max_workers=2) as pool:
-        futures = [
-            pool.submit(
-                subprocess.run,
-                command,
-                check=False,
-                capture_output=True,
-                text=True,
-                timeout=20,
-            )
-            for _ in range(2)
-        ]
-        attempts = [future.result(timeout=30) for future in futures]
-    assert sorted(attempt.returncode for attempt in attempts) == [0, 2]
-    first = next(attempt for attempt in attempts if attempt.returncode == 0)
-    collision = next(attempt for attempt in attempts if attempt.returncode == 2)
-
-    canonical = json.dumps(
-        value,
-        ensure_ascii=False,
-        sort_keys=True,
-        separators=(",", ":"),
-    ).encode("utf-8")
-    digest = first.stdout.strip()
-    target = (
-        profile
-        / ".codex"
-        / "local_state"
-        / "TenderBot"
-        / "yandex-search"
-        / "activation-evidence"
-        / job_id
-        / f"{digest}.json"
-    )
-    assert first.returncode == 0, first.stdout + first.stderr
-    assert digest == hashlib.sha256(canonical).hexdigest()
-    assert target.read_bytes() == canonical
-    assert not tuple(target.parent.glob(".*.stage-*"))
-    assert collision.stdout == ""
-    assert collision.stderr == ""
-
-    second = subprocess.run(
-        command,
-        check=False,
-        capture_output=True,
-        text=True,
-        timeout=20,
-    )
-    assert second.returncode == 2
-    assert second.stdout == ""
-    assert second.stderr == ""
-    assert target.read_bytes() == canonical
 
 
 def test_source_cli_review_commands_use_only_canonical_local_paths(

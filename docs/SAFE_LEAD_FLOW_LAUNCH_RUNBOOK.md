@@ -128,6 +128,19 @@ review может предшествовать draft не более чем на
 V1 не поддерживает rotation, revocation, перезапись или автоматическую замену
 корневого pin, даже после expiry.
 
+Сначала разместите реальные receipts в fixed
+`activation-candidates\<job_id>\candidate.json` и выполните штатную публикацию
+по [инструкции evidence](RADAR_YANDEX_ACTIVATION_EVIDENCE.md):
+
+```powershell
+.\scripts\run_safe_lead_flow.ps1 source yandex-publish-evidence --job-id $JobId --expected-draft-sha256 $DraftSha256 --expected-scope-sha256 $ScopeSha256 --expected-candidate-sha256 $CandidateSha256 --confirm-local-publication
+```
+
+`EVIDENCE_PUBLISHED_AWAITING_ACTIVATION` означает только локальную проверку и
+публикацию (`authority_verified=false`, `launch_allowed=false`). Возьмите
+`evidence_sha256` из результата; публикатор не создаёт подтверждения за
+owner/reviewer, не проверяет billing через сеть и не запускает активацию.
+
 Только после проверки реального evidence выполните локальную активацию одной
 точной задачи:
 

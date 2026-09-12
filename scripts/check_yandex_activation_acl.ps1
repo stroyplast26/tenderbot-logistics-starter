@@ -236,12 +236,14 @@ function Assert-EvidenceDirectory {
         [string]$SelectedName,
 
         [Parameter(Mandatory = $true)]
-        [string]$CurrentSid
+        [string]$CurrentSid,
+
+        [bool]$RequireSelected = $true
     )
 
     $SelectedFound = $false
     $Entries = @(Get-ChildItem -LiteralPath $LiteralPath -Force -ErrorAction Stop)
-    if ($Entries.Count -eq 0) {
+    if ($RequireSelected -and $Entries.Count -eq 0) {
         throw 'evidence is absent'
     }
     foreach ($Entry in $Entries) {
@@ -257,7 +259,7 @@ function Assert-EvidenceDirectory {
             $SelectedFound = $true
         }
     }
-    if (-not $SelectedFound) {
+    if ($RequireSelected -and -not $SelectedFound) {
         throw 'selected evidence is absent'
     }
 }
@@ -282,7 +284,7 @@ try {
         -not [Guid]::TryParseExact($JobId, 'D', [ref]$ParsedJobId) -or
         $ParsedJobId.ToString('D') -cne $JobId -or
         $EvidenceSha256 -cnotmatch '\A[0-9a-f]{64}\z' -or
-        $Phase -cnotin @('Draft', 'Request', 'Retention', 'Active')
+        $Phase -cnotin @('Evidence', 'Draft', 'Request', 'Retention', 'Active')
     ) {
         throw 'argument value is invalid'
     }
@@ -320,7 +322,11 @@ try {
         throw 'current principal is unavailable'
     }
 
-    foreach ($Directory in @($StateRoot, $RequestsPath, $JobPath, $ClaimsPath, $EvidenceRoot, $EvidenceJobPath)) {
+    $RequiredDirectories = @($StateRoot, $RequestsPath, $JobPath, $ClaimsPath)
+    if ($Phase -cne 'Evidence') {
+        $RequiredDirectories += @($EvidenceRoot, $EvidenceJobPath)
+    }
+    foreach ($Directory in $RequiredDirectories) {
         Assert-PlainPathAndAcl `
             -LiteralPath $Directory `
             -CurrentSid $CurrentSid `
@@ -337,17 +343,79 @@ try {
     if ($RequestStageEntries.Count -ne 0) {
         throw 'request stage residue is forbidden'
     }
-    foreach ($File in @($ConnectionPath, $JournalPath, $DraftPath, $EvidencePath)) {
+    $RequiredFiles = @($ConnectionPath, $JournalPath, $DraftPath)
+    if ($Phase -cne 'Evidence') {
+        $RequiredFiles += $EvidencePath
+    }
+    foreach ($File in $RequiredFiles) {
         Assert-PlainPathAndAcl `
             -LiteralPath $File `
             -CurrentSid $CurrentSid `
             -Container $false `
             -RootAcl $false
     }
-    Assert-EvidenceDirectory `
-        -LiteralPath $EvidenceJobPath `
-        -SelectedName $EvidenceName `
-        -CurrentSid $CurrentSid
+    if ($Phase -ceq 'Evidence') {
+        $CandidateRoot = [IO.Path]::GetFullPath(
+            (Join-Path $StateRoot 'activation-candidates')
+        )
+        $CandidateJobPath = [IO.Path]::GetFullPath((Join-Path $CandidateRoot $JobId))
+        $CandidatePath = [IO.Path]::GetFullPath((Join-Path $CandidateJobPath 'candidate.json'))
+        foreach ($Directory in @($CandidateRoot, $CandidateJobPath)) {
+            Assert-PlainPathAndAcl `
+                -LiteralPath $Directory `
+                -CurrentSid $CurrentSid `
+                -Container $true `
+                -RootAcl $false
+        }
+        Assert-PlainPathAndAcl `
+            -LiteralPath $CandidatePath `
+            -CurrentSid $CurrentSid `
+            -Container $false `
+            -RootAcl $false
+        Assert-ExactDirectoryNames `
+            -LiteralPath $CandidateJobPath `
+            -ExpectedNames @('candidate.json')
+
+        # Enumerate the parent: a dangling reparse entry is not an absent destination.
+        $EvidenceRootEntries = @(
+            Get-ChildItem -LiteralPath $StateRoot -Force -ErrorAction Stop |
+                Where-Object { $_.Name -ieq 'activation-evidence' }
+        )
+        if ($EvidenceRootEntries.Count -gt 0) {
+            if ($EvidenceRootEntries.Count -ne 1 -or $EvidenceRootEntries[0].Name -cne 'activation-evidence') {
+                throw 'evidence root layout mismatch'
+            }
+            Assert-PlainPathAndAcl `
+                -LiteralPath $EvidenceRoot `
+                -CurrentSid $CurrentSid `
+                -Container $true `
+                -RootAcl $false
+            $EvidenceJobEntries = @(
+                Get-ChildItem -LiteralPath $EvidenceRoot -Force -ErrorAction Stop |
+                    Where-Object { $_.Name -ieq $JobId }
+            )
+            if ($EvidenceJobEntries.Count -gt 0) {
+                if ($EvidenceJobEntries.Count -ne 1 -or $EvidenceJobEntries[0].Name -cne $JobId) {
+                    throw 'evidence job layout mismatch'
+                }
+                Assert-PlainPathAndAcl `
+                    -LiteralPath $EvidenceJobPath `
+                    -CurrentSid $CurrentSid `
+                    -Container $true `
+                    -RootAcl $false
+                Assert-EvidenceDirectory `
+                    -LiteralPath $EvidenceJobPath `
+                    -SelectedName $EvidenceName `
+                    -CurrentSid $CurrentSid `
+                    -RequireSelected $false
+            }
+        }
+    } else {
+        Assert-EvidenceDirectory `
+            -LiteralPath $EvidenceJobPath `
+            -SelectedName $EvidenceName `
+            -CurrentSid $CurrentSid
+    }
 
     $ExpectedJobNames = @('dispatch-claims', 'request.sqlite', 'request.draft.json')
     if ($Phase -cin @('Request', 'Retention', 'Active')) {

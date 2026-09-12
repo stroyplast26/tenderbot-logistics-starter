@@ -72,6 +72,12 @@ def _synthetic_phase(tmp_path: Path, phase: str) -> dict[str, Path]:
     (job / "request.draft.json").write_bytes(b"synthetic-draft")
     evidence = evidence_job / f"{SHA256}.json"
     evidence.write_bytes(b"synthetic-evidence")
+    candidate_root = state_root / "activation-candidates"
+    candidate_job = candidate_root / JOB_ID
+    candidate = candidate_job / "candidate.json"
+    if phase == "Evidence":
+        candidate_job.mkdir(parents=True)
+        candidate.write_bytes(b"synthetic-unread-candidate")
     if phase in {"Request", "Retention", "Active"}:
         (job / "request.json").write_bytes(b"synthetic-request")
     if phase in {"Retention", "Active"}:
@@ -89,11 +95,18 @@ def _synthetic_phase(tmp_path: Path, phase: str) -> dict[str, Path]:
         encoding="utf-8",
     )
     return {
+        "candidate": candidate,
+        "candidate_job": candidate_job,
+        "candidate_root": candidate_root,
         "claims": claims,
+        "connection": state_root / "connection.json",
+        "draft": job / "request.draft.json",
         "evidence": evidence,
         "evidence_job": evidence_job,
+        "evidence_root": evidence_job.parent,
         "helper": synthetic_helper,
         "job": job,
+        "journal": job / "request.sqlite",
         "requests": requests,
         "state_root": state_root,
         "tmp": tmp_path,
@@ -307,3 +320,182 @@ def test_activation_acl_helper_rejects_unsafe_layout_acl_and_reparse(
     assert checked.stdout.strip() == "YANDEX_ACTIVATION_ACL_REJECTED"
     assert checked.stderr == ""
     assert str(tmp_path) not in checked.stdout
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows ACL helper contract")
+@pytest.mark.parametrize(
+    "destination", ("absent-root", "absent-job", "empty-job", "other-evidence", "selected")
+)
+def test_evidence_phase_accepts_only_optional_destination_layouts(
+    tmp_path: Path, destination: str
+) -> None:
+    fixture = _synthetic_phase(tmp_path, "Evidence")
+    if destination != "selected":
+        fixture["evidence"].unlink()
+    if destination in {"absent-root", "absent-job"}:
+        fixture["evidence_job"].rmdir()
+    if destination == "absent-root":
+        fixture["evidence_root"].rmdir()
+    if destination == "other-evidence":
+        (fixture["evidence_job"] / f"{'1' * 64}.json").write_bytes(b"other-evidence")
+
+    checked = _run_synthetic_helper(fixture, "Evidence")
+
+    assert checked.returncode == 0, checked.stdout + checked.stderr
+    assert checked.stdout.strip() == "YANDEX_ACTIVATION_ACL_READY"
+    assert checked.stderr == ""
+    assert fixture["candidate"].read_bytes() == b"synthetic-unread-candidate"
+    assert not (fixture["state_root"] / "request-activation.json").exists()
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows ACL helper contract")
+@pytest.mark.parametrize("phase", ("Draft", "Request", "Retention", "Active"))
+@pytest.mark.parametrize("destination", ("absent-root", "empty-job", "other-evidence"))
+def test_existing_phases_still_require_the_selected_evidence(
+    tmp_path: Path, phase: str, destination: str
+) -> None:
+    fixture = _synthetic_phase(tmp_path, phase)
+    fixture["evidence"].unlink()
+    if destination == "absent-root":
+        fixture["evidence_job"].rmdir()
+        fixture["evidence_root"].rmdir()
+    if destination == "other-evidence":
+        (fixture["evidence_job"] / f"{'1' * 64}.json").write_bytes(b"other-evidence")
+
+    checked = _run_synthetic_helper(fixture, phase)
+
+    assert checked.returncode == 2
+    assert checked.stdout.strip() == "YANDEX_ACTIVATION_ACL_REJECTED"
+    assert checked.stderr == ""
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows ACL helper contract")
+@pytest.mark.parametrize(
+    "mutation",
+    (
+        "missing-candidate", "missing-inbox", "missing-candidate-root",
+        "candidate-directory", "inbox-file", "candidate-root-file",
+        "extra-inbox-entry", "inbox-stage", "active-root", "active-job",
+        "nonempty-claims", "job-stage", "preparing-residue", "activating-residue",
+        "root-stage", "invalid-evidence-name", "uppercase-evidence-name",
+        "evidence-stage", "evidence-root-file", "evidence-job-file",
+    ),
+)
+def test_evidence_phase_rejects_unsafe_inbox_destination_and_job_layouts(
+    tmp_path: Path, mutation: str
+) -> None:
+    fixture = _synthetic_phase(tmp_path, "Evidence")
+    if mutation in {
+        "missing-candidate", "missing-inbox", "missing-candidate-root",
+        "candidate-directory", "inbox-file", "candidate-root-file",
+    }:
+        fixture["candidate"].unlink()
+        if mutation in {"missing-inbox", "inbox-file", "missing-candidate-root", "candidate-root-file"}:
+            fixture["candidate_job"].rmdir()
+        if mutation in {"missing-candidate-root", "candidate-root-file"}:
+            fixture["candidate_root"].rmdir()
+        if mutation == "candidate-directory":
+            fixture["candidate"].mkdir()
+        if mutation == "inbox-file":
+            fixture["candidate_job"].write_bytes(b"not-directory")
+        if mutation == "candidate-root-file":
+            fixture["candidate_root"].write_bytes(b"not-directory")
+    elif mutation in {"extra-inbox-entry", "inbox-stage"}:
+        name = "extra.json" if mutation == "extra-inbox-entry" else ".candidate.json.stage-x"
+        (fixture["candidate_job"] / name).write_bytes(b"untrusted")
+    elif mutation == "active-root":
+        (fixture["state_root"] / "request-activation.json").write_bytes(b"pin")
+    elif mutation == "active-job":
+        (fixture["job"] / "request.json").write_bytes(b"active")
+    elif mutation == "nonempty-claims":
+        (fixture["claims"] / "claim.json").write_bytes(b"claim")
+    elif mutation == "job-stage":
+        (fixture["job"] / ".request.json.stage-x").write_bytes(b"stage")
+    elif mutation in {"preparing-residue", "activating-residue"}:
+        prefix = "preparing" if mutation == "preparing-residue" else "activating"
+        (fixture["requests"] / f".{prefix}-{JOB_ID}-x").mkdir()
+    elif mutation == "root-stage":
+        (fixture["state_root"] / ".request-activation.json.stage-x").write_bytes(b"stage")
+    elif mutation in {"invalid-evidence-name", "uppercase-evidence-name", "evidence-stage"}:
+        names = {
+            "invalid-evidence-name": "untrusted.json",
+            "uppercase-evidence-name": f"{'A' * 64}.json",
+            "evidence-stage": ".evidence.json.stage-x",
+        }
+        (fixture["evidence_job"] / names[mutation]).write_bytes(b"untrusted")
+    elif mutation in {"evidence-root-file", "evidence-job-file"}:
+        fixture["evidence"].unlink()
+        fixture["evidence_job"].rmdir()
+        target = fixture["evidence_job"]
+        if mutation == "evidence-root-file":
+            target = fixture["evidence_root"]
+            target.rmdir()
+        target.write_bytes(b"not-directory")
+    else:  # pragma: no cover - fixed parameter list
+        raise AssertionError("unknown synthetic mutation")
+
+    checked = _run_synthetic_helper(fixture, "Evidence")
+
+    assert checked.returncode == 2
+    assert checked.stdout.strip() == "YANDEX_ACTIVATION_ACL_REJECTED"
+    assert checked.stderr == ""
+    assert str(tmp_path) not in checked.stdout
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows ACL helper contract")
+@pytest.mark.parametrize(
+    "key",
+    (
+        "state_root", "requests", "job", "claims", "connection", "journal", "draft",
+        "candidate_root", "candidate_job", "candidate", "evidence_root", "evidence_job",
+        "evidence",
+    ),
+)
+def test_evidence_phase_rejects_wrong_acl_on_every_fixed_path(
+    tmp_path: Path, key: str
+) -> None:
+    fixture = _synthetic_phase(tmp_path, "Evidence")
+    changed = subprocess.run(
+        [str(Path(os.environ["SystemRoot"]) / "System32" / "icacls.exe"),
+         str(fixture[key]), "/grant", "*S-1-5-32-544:R"],
+        check=False, capture_output=True, text=True, timeout=20,
+    )
+    assert changed.returncode == 0, changed.stdout + changed.stderr
+
+    checked = _run_synthetic_helper(fixture, "Evidence")
+
+    assert checked.returncode == 2
+    assert checked.stdout.strip() == "YANDEX_ACTIVATION_ACL_REJECTED"
+    assert checked.stderr == ""
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows ACL helper contract")
+@pytest.mark.parametrize(
+    "key", ("candidate_root", "candidate_job", "candidate", "evidence_root", "evidence_job", "evidence")
+)
+@pytest.mark.parametrize("dangling", (False, True))
+def test_evidence_phase_rejects_reparse_inbox_and_destination(
+    tmp_path: Path, key: str, dangling: bool
+) -> None:
+    fixture = _synthetic_phase(tmp_path, "Evidence")
+    target = tmp_path / "junction-target"
+    target.mkdir()
+    original = fixture[key]
+    preserved = tmp_path / "preserved-fixture"
+    assert original.resolve().is_relative_to(fixture["state_root"].resolve())
+    assert preserved.resolve().is_relative_to(tmp_path.resolve())
+    original.rename(preserved)
+    created = subprocess.run(
+        [str(Path(os.environ["SystemRoot"]) / "System32" / "cmd.exe"), "/d", "/c",
+         "mklink", "/J", str(original), str(target)],
+        check=False, capture_output=True, text=True, timeout=20,
+    )
+    assert created.returncode == 0, created.stdout + created.stderr
+    if dangling:
+        target.rmdir()
+
+    checked = _run_synthetic_helper(fixture, "Evidence")
+
+    assert checked.returncode == 2
+    assert checked.stdout.strip() == "YANDEX_ACTIVATION_ACL_REJECTED"
+    assert checked.stderr == ""
