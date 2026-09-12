@@ -494,6 +494,18 @@ def _load_published(
     return draft, draft_sha256
 
 
+def _reject_active_replay(final_directory: Path) -> None:
+    for name in ("request.json", "retention-activation.json"):
+        try:
+            (final_directory / name).lstat()
+        except FileNotFoundError:
+            continue
+        except OSError:
+            _fail("YANDEX_JOB_PREPARATION_CONFLICT")
+        else:
+            _fail("YANDEX_JOB_PREPARATION_CONFLICT")
+
+
 def _prepare_core(
     query_text: str,
     region_label: str,
@@ -533,6 +545,7 @@ def _prepare_core(
         _fail("YANDEX_JOB_PREPARATION_CONFLICT")
     else:
         _check_acl("Job", job_id=job_id)
+        _reject_active_replay(final_directory)
         draft, draft_sha256 = _load_published(
             final_directory,
             job_id=job_id,
@@ -543,6 +556,7 @@ def _prepare_core(
             connection_sha256=connection_sha256,
             code_sha256=code_sha256,
         )
+        _reject_active_replay(final_directory)
         return _result(draft, draft_sha256=draft_sha256, replayed=True)
 
     stage = requests_root / (
@@ -661,6 +675,7 @@ def _prepare_core(
             stage_identity = None
             child_identities.clear()
             _check_acl("Job", job_id=job_id)
+            _reject_active_replay(final_directory)
             replay, replay_sha256 = _load_published(
                 final_directory,
                 job_id=job_id,
@@ -671,6 +686,7 @@ def _prepare_core(
                 connection_sha256=connection_sha256,
                 code_sha256=code_sha256,
             )
+            _reject_active_replay(final_directory)
             return _result(
                 replay,
                 draft_sha256=replay_sha256,

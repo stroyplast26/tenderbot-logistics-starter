@@ -30,6 +30,7 @@ _STATE_ROOT = common._trusted_profile() / ".codex/local_state/TenderBot/yandex-s
 _LAUNCHER_FILES = (
     "requirements-dev-win-py311.lock.txt",
     "scripts/bootstrap_python_runtime.ps1",
+    "scripts/check_yandex_activation_acl.ps1",
     "scripts/check_yandex_state_acl.ps1",
     "scripts/read_yandex_credential.ps1",
     "scripts/run_safe_lead_flow.ps1",
@@ -129,10 +130,17 @@ def _read_connection(now: str) -> tuple[dict, str]:
     return connection, digest
 
 
-def _verify_request(job_path: str | Path, now: str) -> _ManualData:
-    current = common._utc(now)
-    connection, connection_sha = _read_connection(now)
-    pin, pin_sha = common._read(_STATE_ROOT / "request-activation.json")
+def _verify_request_against_pin(
+    job_path: str | Path,
+    now: str,
+    pin: dict,
+    pin_sha: str,
+    *,
+    current,
+    connection_pair: tuple[dict, str],
+) -> _ManualData:
+    connection, connection_sha = connection_pair
+    pin_sha = common._sha(pin_sha)
     common._object(pin, {"version", "status", "job_path", "job_sha256", "connection_sha256",
                          "policy_sha256", "activated_at_utc", "expires_at_utc"})
     if pin["version"] != "radar-yandex-manual-activation-v1" or pin["status"] != "ACTIVE":
@@ -224,6 +232,35 @@ def _verify_request(job_path: str | Path, now: str) -> _ManualData:
     if not activated <= current < expiry:
         common._fail("REQUEST_EXPIRED")
     return _ManualData(bound, connection_sha, connection)
+
+
+def _verify_request_with_pin(job_path: str | Path, now: str, pin: dict, pin_sha: str) -> _ManualData:
+    """Validate a supplied activation pin using fresh authority state, without issuing a grant."""
+
+    current = common._utc(now)
+    connection = _read_connection(now)
+    return _verify_request_against_pin(
+        job_path,
+        now,
+        pin,
+        pin_sha,
+        current=current,
+        connection_pair=connection,
+    )
+
+
+def _verify_request(job_path: str | Path, now: str) -> _ManualData:
+    current = common._utc(now)
+    connection = _read_connection(now)
+    pin, pin_sha = common._read(_STATE_ROOT / "request-activation.json")
+    return _verify_request_against_pin(
+        job_path,
+        now,
+        pin,
+        pin_sha,
+        current=current,
+        connection_pair=connection,
+    )
 
 
 def _verified_data(job_path: str | Path, now: str) -> _ManualData:

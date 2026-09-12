@@ -15,11 +15,12 @@
 источникам. До второго платного источника нужен общий spend-ledger; пока предел
 30 000 ₽ контролируется владельцем по журналам источников и детализации биллинга.
 
-`plan`, `status`, `check`, `yandex-prepare`, `yandex-status`, `yandex-purge`,
-`review-list`, `review-decide` и `review-close` всегда локальны.
-`yandex-prepare` создаёт только неактивный draft, а `yandex-purge` удаляет только
-просроченный raw response после отдельного явного подтверждения. В рамках этого
-поддерживаемого safe flow обращение к провайдеру
+`plan`, `status`, `check`, `yandex-prepare`, `yandex-activate`, `yandex-status`,
+`yandex-purge`, `review-list`, `review-decide` и `review-close` всегда локальны.
+`yandex-prepare` создаёт только неактивный draft, `yandex-activate` локально
+публикует exact request и его pins, а `yandex-purge` удаляет только просроченный
+raw response после отдельного явного подтверждения. Ни одна из этих команд не
+читает credential и не делает HTTP. В рамках поддерживаемого safe flow обращение к провайдеру
 разрешено только через `source run-one` с отдельным явным подтверждением; после
 него всё равно повторно срабатывает нативная authority-проверка Yandex или
 TenderPlan. Без неё запрос не отправляется. В репозитории остаётся отдельный
@@ -56,8 +57,8 @@ powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\scripts\bootst
 
 Launcher удаляет ambient `YANDEX_SEARCH_API_KEY` до bootstrap и child process.
 После успешного bootstrap он кратковременно выставляет известный несекретный
-маркер только для `source run-one` и локального mutating
-`source yandex-prepare`; Python entry проверяет его до изменения state, а
+маркер только для `source run-one` и локальных mutating
+`source yandex-prepare` и `source yandex-activate`; Python entry проверяет его до изменения state, а
 accounted runner — до broker и provider. Это защита от случайного прямого
 вызова и ошибки bootstrap-пути, а не криптографическая capability и не защита
 от злонамеренного процесса с правами того же пользователя ОС.
@@ -97,19 +98,65 @@ live-authority. Она создаёт только `request.draft.json`, пус�
 
 Успешный JSON не повторяет query, region, folder ID или локальные пути и явно
 содержит отключённые external read, CRM, contact, outbox, campaign и schedule.
-Даже exit code `0` означает только успешную локальную подготовку. Реальный
-запуск возможен лишь после code freeze, отдельного owner instruction на exact
-scope, независимого `ACCEPT`, свежей проверки billing/API/credential и будущего
-audited activator, которого эта команда не реализует. Для сверки точного draft
-результат содержит только безопасные `job_id`, `draft_sha256`, `policy_sha256`,
-`scope_sha256`, `expires_at_utc`, `created`, `replayed`, явные
+Даже exit code `0` означает только успешную локальную подготовку. Для сверки
+точного draft результат содержит только безопасные `job_id`, `draft_sha256`,
+`policy_sha256`, `scope_sha256`, `expires_at_utc`, `created`, `replayed`, явные
 `authority_verified=false` и `launch_allowed=false`, а также список незакрытых
 gates.
+
+После code freeze нужны три реальные привязки: указание владельца на exact
+scope, независимый `ACCEPT` exact кода и свежая проверка billing/API/credential.
+Полная схема без необъявленных ключей, правила времени и ролей, проверенная
+канонизация UTF-8, no-replace публикация и read-only ACL admission находятся в
+[точной инструкции evidence](RADAR_YANDEX_ACTIVATION_EVIDENCE.md). Файл версии
+`radar-yandex-manual-activation-evidence-v1` находится только по
+content-addressed пути, вычисленному от Windows OS profile через
+`[Environment]::GetFolderPath('UserProfile')`, а не через ambient
+`%USERPROFILE%`:
+
+```text
+[OS profile]\.codex\local_state\TenderBot\yandex-search\activation-evidence\<job_id>\<evidence_sha256>.json
+```
+
+Верхний уровень содержит ровно `version`, `job_id`, `draft_sha256`,
+`scope_sha256`, `owner_receipt`, `independent_acceptance` и `readiness`.
+Вложенные exact-ключи и неизменяемые константы перечислены в инструкции;
+`code_sha256` целиком копируется из exact draft. Reviewer должен отличаться от
+владельца и авторов реализации. Owner/readiness не могут быть старше draft,
+review может предшествовать draft не более чем на 24 часа; все три времени не
+могут быть позже активации. Activator evidence не создаёт и не исправляет.
+V1 не поддерживает rotation, revocation, перезапись или автоматическую замену
+корневого pin, даже после expiry.
+
+Только после проверки реального evidence выполните локальную активацию одной
+точной задачи:
+
+```powershell
+$JobId = "JOB_ID_FROM_PREPARE"
+$DraftSha256 = "DRAFT_SHA256_FROM_PREPARE"
+$ScopeSha256 = "SCOPE_SHA256_FROM_PREPARE"
+$EvidenceSha256 = "SHA256_OF_CANONICAL_EVIDENCE"
+.\scripts\run_safe_lead_flow.ps1 source yandex-activate --job-id $JobId --expected-draft-sha256 $DraftSha256 --expected-scope-sha256 $ScopeSha256 --evidence-sha256 $EvidenceSha256 --confirm-final-activation
+```
+
+Launcher принимает после `yandex-activate` ровно девять токенов в показанном
+порядке; UUID и SHA должны быть строчными. Команда повторно проверяет draft,
+scope, code, connection, evidence, времена, ACL и пустой journal, затем публикует
+`request.json`, per-job `retention-activation.json` и только последним шагом
+корневой `request-activation.json`. Она не читает credential, не делает provider
+read, не тратит деньги и не включает CRM/contact/outbox/campaign/schedule.
+Успех — `ACTIVATED_AWAITING_EXPLICIT_RUN_ONE` с `authority_verified=true`, но
+`launch_allowed=false`: платный read всё ещё требует отдельную команду раздела 3.
+Исходный шестичасовой срок draft не продлевается; после истечения нужно создать
+новый draft и новый exact evidence. Точный повтор активации идемпотентен, иной
+job, hash или evidence завершается fail-closed без замены опубликованных файлов.
 
 Локальная проверка конкретного источника:
 
 ```powershell
-.\scripts\run_safe_lead_flow.ps1 source check --source YANDEX --yandex-job "C:\ABSOLUTE\approved-yandex-job.json" --folder-id "FOLDER_ID"
+$ProfileRoot = [Environment]::GetFolderPath('UserProfile')
+$YandexJob = Join-Path $ProfileRoot ".codex\local_state\TenderBot\yandex-search\requests\$JobId\request.json"
+.\scripts\run_safe_lead_flow.ps1 source check --source YANDEX --yandex-job "$YandexJob" --folder-id "FOLDER_ID"
 .\scripts\run_safe_lead_flow.ps1 source check --source TENDERPLAN --query "алюминиевые конструкции"
 .\scripts\run_safe_lead_flow.ps1 source check --source SABY
 .\scripts\run_safe_lead_flow.ps1 source check --source DOMRF
@@ -168,11 +215,13 @@ UUID-формате. Команда сама вычисляет путь
 пользователя; произвольный job path или SQLite-файл передать нельзя.
 Затем она проверяет exact job, journal и его физическую identity, а также
 сохранённую retention-привязку именно этого job. Основное место для неё —
-`requests/<UUID>/retention-activation.json`. Если per-job копии ещё нет,
-допустима точно совпадающая корневая `request-activation.json`, а после
-замены active pin — её архив `request-activation.<archive>.json`. Во всех
-случаях exact hashes и срок должны совпасть с job; просроченная привязка не
-продлевается и используется только для обязательной privacy-очистки.
+`requests/<UUID>/retention-activation.json`. Для задач нового activator эта
+копия обязательна и имеет приоритет: если файл существует, но повреждён или не
+совпадает, fallback запрещён. Корневая `request-activation.json` или её архив
+`request-activation.<archive>.json` допустимы только для старых задач при
+физическом отсутствии per-job копии. Во всех случаях exact hashes и срок должны
+совпасть с job; просроченная привязка не продлевается и используется только для
+обязательной privacy-очистки.
 
 `yandex-status` показывает `retained_responses`, `purge_due_count`,
 `next_purge_at_utc` и состояние `RAW_RETENTION_PENDING`, `RAW_PURGE_DUE` или
@@ -275,16 +324,17 @@ exact job. Они не имеют 24-часового срока задания 
 создавал шестичасовое окно, но сейчас он не поддерживается и не используется;
 это не меняет обязательное 24-часовое raw-retention.
 
-Code hash задания охватывает всю цепочку до сети: launcher, controller,
-Source Lab bridge, нативные Yandex authority/accounting/transport и фиксированный
-DPAPI broker. Нельзя принять только transport, а затем заменить broker, launcher
-или controller. Любое изменение одного из этих файлов отзывает старые job,
-activation и acceptance; требуется новый exact-комплект.
+Code hash задания охватывает всю цепочку до сети: launcher, preparer, activator,
+activation ACL helper, controller, Source Lab bridge, нативные Yandex
+authority/accounting/transport и фиксированный DPAPI broker. Нельзя принять
+только transport, а затем заменить broker, launcher, activator или controller.
+Любое изменение одного из этих файлов отзывает старые job, activation и
+acceptance; требуется новый exact-комплект.
 
 Yandex:
 
 ```powershell
-.\scripts\run_safe_lead_flow.ps1 source run-one --source YANDEX --yandex-job "C:\ABSOLUTE\approved-yandex-job.json" --folder-id "FOLDER_ID" --confirm-one-authorized-read
+.\scripts\run_safe_lead_flow.ps1 source run-one --source YANDEX --yandex-job "$YandexJob" --folder-id "FOLDER_ID" --confirm-one-authorized-read
 ```
 
 TenderPlan:
@@ -466,10 +516,10 @@ Gold signing, promotion, CRM write, outbox, email/телефонный outreach 
 Пока эти пункты не закрыты, корректный статус — безопасный ручной первый срез,
 а не production lead flow.
 
-Репозиторий намеренно не создаёт owner/reviewer/billing evidence.
-`source yandex-prepare` закрывает только первую, неактивную фазу и оставляет
-scope в `PREPARED_NOT_ACTIVATED`; production-команды выпуска `request.json` и
-activation пока нет. Нельзя копировать для второй фазы synthetic test helper
-или старый внешний installer: нужен отдельный audited activator, который после
-code freeze принимает реальные свежие evidence artifacts и только последним
-шагом устанавливает exact pin.
+Репозиторий намеренно не создаёт реальные owner/reviewer/billing evidence.
+`source yandex-prepare` закрывает только неактивную фазу, а существующий
+`source yandex-activate` принимает уже подготовленный реальный evidence и
+локально выпускает `request.json` и exact pins. Он не подменяет owner, reviewer
+или проверку кабинета и не выполняет provider read. Нельзя использовать для
+evidence synthetic test helper или старый внешний installer; до настоящего
+evidence и отдельного `source run-one` задача остаётся безопасно не запущенной.
