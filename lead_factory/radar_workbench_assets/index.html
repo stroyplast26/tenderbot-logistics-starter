@@ -6,6 +6,7 @@
   <title>Объекты · TenderBot</title>
   <link rel="stylesheet" href="/workspace.css">
   <script src="/workspace.js" defer></script>
+  <script src="/tenderplan-review.js" defer></script>
 </head>
 <body>
   <header class="topbar"><a class="brand" href="/">T<span>·</span>B <small>TenderBot</small></a><span class="mode">Рабочее место менеджера</span><span id="actor" class="actor"></span></header>
@@ -14,6 +15,17 @@
     <div class="page-heading"><div><p class="eyebrow">ОБЪЕКТНЫЕ ПРОДАЖИ</p><h1>От объекта к следующему шагу</h1><p class="subheading">Проверьте сведения, назначьте работу и сохраните результат.</p></div><button id="refresh" class="secondary">Обновить досье</button></div>
     <div class="notice">Локальное рабочее место. Звонки выполняет менеджер; сведения об общении и запросах он фиксирует здесь. Отправка КП и синхронизация с CRM ещё не подключены.</div>
     <p id="message" role="status" aria-live="polite"></p>
+    <section id="tenderplan-panel" class="card" hidden aria-labelledby="tenderplan-heading">
+      <div class="section-heading"><div><p class="eyebrow">ПРОВЕРКА ИСТОЧНИКА</p><h2 id="tenderplan-heading">Карточки Tenderplan</h2></div><button id="tenderplan-toggle" class="secondary" aria-expanded="false" aria-controls="tenderplan-content">Открыть очередь</button></div>
+      <p class="muted">Проверьте сведения закупки, затем свяжите её с подтверждённым объектом и пакетом работ.</p>
+      <div id="tenderplan-content" hidden>
+        <p id="tenderplan-message" role="status" aria-live="polite"></p>
+        <div class="tenderplan-layout">
+          <aside aria-label="Сохранённые карточки Tenderplan"><div id="tenderplan-list" class="object-list"></div><nav class="pagination" aria-label="Страницы карточек Tenderplan"><button id="tenderplan-prev" class="secondary" disabled>← Назад</button><span id="tenderplan-page"></span><button id="tenderplan-next" class="secondary" disabled>Далее →</button></nav></aside>
+          <div id="tenderplan-detail" aria-live="polite"><p class="muted">Выберите карточку для просмотра.</p></div>
+        </div>
+      </div>
+    </section>
     <div class="layout">
       <aside class="queue card" aria-label="Очередь объектов">
         <div class="queue-heading"><h2>Объекты</h2><span id="count" class="badge">0</span></div>

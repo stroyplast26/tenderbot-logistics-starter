@@ -107,6 +107,10 @@ def _parser() -> argparse.ArgumentParser:
     radar_server.add_argument("--actor", required=True, help="fixed local operator id, e.g. manager-1")
     radar_server.add_argument("--port", type=int, default=8766)
     radar_server.add_argument("--demo", action="store_true", help="seed a NEW synthetic database")
+    radar_server.add_argument(
+        "--tenderplan-review-store",
+        help="optional existing native encrypted queue for local read-only review",
+    )
     radar_import = sub.add_parser("import-radar", help="import public facts with an approved passport")
     radar_import.add_argument("--workspace-db", required=True)
     radar_import.add_argument("--actor", required=True)
@@ -232,7 +236,10 @@ def _radar_command(args: argparse.Namespace) -> int:
             raise ValueError("port must be between 1 and 65535")
         if args.demo:
             store = seed_demo_workspace(database)
-        server = create_radar_workbench_server(store, actor=args.actor, port=args.port)
+        server = create_radar_workbench_server(
+            store, actor=args.actor, port=args.port,
+            tenderplan_review_store=args.tenderplan_review_store,
+        )
     except (OSError, ValueError, RadarError) as exc:
         _parser().error(str(exc))
     try:
