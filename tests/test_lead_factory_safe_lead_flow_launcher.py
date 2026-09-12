@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
+import hashlib
 import json
 import os
 from pathlib import Path
 import shutil
 import subprocess
+import tempfile
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -1121,6 +1124,159 @@ def test_runbooks_document_local_activation_before_separate_provider_read() -> N
         assert "ACTIVATED_AWAITING_EXPLICIT_RUN_ONE" in text
         assert "launch_allowed=false" in text
         assert "run-one" in text
+
+
+def test_runbooks_publish_exact_evidence_without_rotation_or_ambient_profile() -> None:
+    evidence_name = "RADAR_YANDEX_ACTIVATION_EVIDENCE.md"
+    for runbook in (
+        ROOT / "docs" / "SAFE_LEAD_FLOW_LAUNCH_RUNBOOK.md",
+        ROOT / "docs" / "RADAR_YANDEX_PERMANENT_CONNECTION.md",
+    ):
+        text = runbook.read_text(encoding="utf-8")
+        assert evidence_name in text
+        assert "[Environment]::GetFolderPath('UserProfile')" in text
+        assert "requests\\$JobId\\request.json" in text
+        assert "rotation" in text
+
+    evidence = (ROOT / "docs" / evidence_name).read_text(encoding="utf-8")
+    for exact_key in (
+        '"owner_receipt"',
+        '"source_thread_id"',
+        '"independent_acceptance"',
+        '"implementation_author_ids"',
+        '"readiness"',
+        '"folder_id_sha256"',
+        '"connection_sha256"',
+    ):
+        assert exact_key in evidence
+    for constant in (
+        "CAPTURED_OWNER_INSTRUCTION",
+        "INDEPENDENT_CODE_ACCEPTANCE",
+        "BILLING_API_READINESS",
+        "CONFIGURATION_VERIFIED",
+        "YANDEX_ACTIVATION_ACL_READY",
+        "ACTIVATED_AWAITING_EXPLICIT_RUN_ONE",
+    ):
+        assert constant in evidence
+    assert "sort_keys=True" in evidence
+    assert "os.O_EXCL" in evidence
+    assert "os.rename(stage, target)" in evidence
+    assert "requests\\$JobId\\request.json" in evidence
+    assert "V1 не поддерживает rotation" in evidence
+
+
+def test_documented_evidence_publisher_is_canonical_and_no_replace(
+    tmp_path: Path,
+    request: pytest.FixtureRequest,
+) -> None:
+    documentation = (
+        ROOT / "docs" / "RADAR_YANDEX_ACTIVATION_EVIDENCE.md"
+    ).read_text(encoding="utf-8")
+    publisher = documentation.split("$Publisher = @'\n", 1)[1].split("\n'@", 1)[0]
+    job_id = "00000000-0000-0000-0000-000000000000"
+    draft_sha256 = "0" * 64
+    scope_sha256 = "1" * 64
+    value = {
+        "version": "radar-yandex-manual-activation-evidence-v1",
+        "job_id": job_id,
+        "draft_sha256": draft_sha256,
+        "scope_sha256": scope_sha256,
+        "owner_receipt": {
+            "kind": "CAPTURED_OWNER_INSTRUCTION",
+            "owner_id": "owner",
+            "source_thread_id": "owner-thread",
+            "instruction_sha256": "2" * 64,
+            "captured_at_utc": "2026-09-12T10:00:00Z",
+            "scope_sha256": scope_sha256,
+        },
+        "independent_acceptance": {
+            "kind": "INDEPENDENT_CODE_ACCEPTANCE",
+            "reviewer_id": "reviewer",
+            "reviewed_at_utc": "2026-09-12T10:00:00Z",
+            "verdict": "ACCEPT",
+            "code_sha256": {"synthetic.py": "3" * 64},
+            "evidence_sha256": "4" * 64,
+            "implementation_author_ids": ["implementer"],
+        },
+        "readiness": {
+            "kind": "BILLING_API_READINESS",
+            "observed_at_utc": "2026-09-12T10:00:00Z",
+            "billing_status": "ACTIVE",
+            "search_api_status": "CONFIGURATION_VERIFIED",
+            "credential_status": "AVAILABLE",
+            "folder_id_sha256": "5" * 64,
+            "connection_sha256": "6" * 64,
+            "evidence_sha256": "7" * 64,
+        },
+    }
+    candidate = tmp_path / "evidence.candidate.json"
+    candidate.write_text(json.dumps(value, ensure_ascii=False, indent=2), encoding="utf-8")
+    profile = Path(tempfile.mkdtemp(prefix="e"))
+    request.addfinalizer(lambda: shutil.rmtree(profile, ignore_errors=True))
+    command = [
+        str(VENV_PYTHON),
+        "-I",
+        "-c",
+        publisher,
+        str(candidate),
+        str(profile),
+        job_id,
+        draft_sha256,
+        scope_sha256,
+    ]
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        futures = [
+            pool.submit(
+                subprocess.run,
+                command,
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=20,
+            )
+            for _ in range(2)
+        ]
+        attempts = [future.result(timeout=30) for future in futures]
+    assert sorted(attempt.returncode for attempt in attempts) == [0, 2]
+    first = next(attempt for attempt in attempts if attempt.returncode == 0)
+    collision = next(attempt for attempt in attempts if attempt.returncode == 2)
+
+    canonical = json.dumps(
+        value,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    digest = first.stdout.strip()
+    target = (
+        profile
+        / ".codex"
+        / "local_state"
+        / "TenderBot"
+        / "yandex-search"
+        / "activation-evidence"
+        / job_id
+        / f"{digest}.json"
+    )
+    assert first.returncode == 0, first.stdout + first.stderr
+    assert digest == hashlib.sha256(canonical).hexdigest()
+    assert target.read_bytes() == canonical
+    assert not tuple(target.parent.glob(".*.stage-*"))
+    assert collision.stdout == ""
+    assert collision.stderr == ""
+
+    second = subprocess.run(
+        command,
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=20,
+    )
+    assert second.returncode == 2
+    assert second.stdout == ""
+    assert second.stderr == ""
+    assert target.read_bytes() == canonical
 
 
 def test_source_cli_review_commands_use_only_canonical_local_paths(

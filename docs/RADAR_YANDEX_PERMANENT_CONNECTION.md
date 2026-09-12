@@ -94,26 +94,36 @@ draft; изменённый replay отклоняется без перезап�
 `launch_allowed=false`, а также список ещё не закрытых gates.
 
 После подготовки всё ещё требуются code freeze, exact owner instruction,
-независимый reviewer `ACCEPT` и свежая проверка billing/API/credential. Эти три
-реальные привязки оформляются вне activator в каноническом UTF-8 JSON версии
-`radar-yandex-manual-activation-evidence-v1` по единственному пути:
+независимый reviewer `ACCEPT` и свежая проверка billing/API/credential. Полная
+схема всех top-level и nested keys, неизменяемые константы, правила времени и
+ролей, проверенная canonical UTF-8/no-replace публикация и ACL admission описаны
+в [точной инструкции evidence](RADAR_YANDEX_ACTIVATION_EVIDENCE.md). Файл версии
+`radar-yandex-manual-activation-evidence-v1` публикуется по единственному пути,
+где OS profile получен через `[Environment]::GetFolderPath('UserProfile')`, а не
+через ambient `%USERPROFILE%`:
 
 ```text
-%USERPROFILE%\.codex\local_state\TenderBot\yandex-search\activation-evidence\<job_id>\<evidence_sha256>.json
+[OS profile]\.codex\local_state\TenderBot\yandex-search\activation-evidence\<job_id>\<evidence_sha256>.json
 ```
 
-Evidence обязан связать exact `job_id`, `draft_sha256`, `scope_sha256`, code,
-connection и folder; содержать owner receipt, независимый `ACCEPT` и readiness
-с активным billing, проверенной Search API configuration и доступным credential.
-Reviewer не может быть владельцем или автором реализации. Owner/readiness
-фиксируются не раньше draft, review допускается не более чем за 24 часа до него,
-и все времена должны быть не позже активации. Activator не создаёт и не
-исправляет этот файл.
+Evidence содержит ровно семь top-level ключей: `version`, `job_id`,
+`draft_sha256`, `scope_sha256`, `owner_receipt`, `independent_acceptance`,
+`readiness`; exact `code_sha256` переносится целиком из draft. Он связывает
+job, scope, code, connection и folder; reviewer не может быть владельцем или
+автором реализации. Owner/readiness фиксируются не раньше draft, review
+допускается не более чем за 24 часа до него, и все времена должны быть не позже
+активации. Activator этот файл не создаёт и не исправляет. V1 не поддерживает
+rotation, revocation, перезапись или автоматическую замену корневого pin, даже
+после expiry.
 
 Активировать точный draft локально, без чтения ключа и без HTTP:
 
 ```powershell
-.\scripts\run_safe_lead_flow.ps1 source yandex-activate --job-id "JOB_ID_FROM_PREPARE" --expected-draft-sha256 "DRAFT_SHA256_FROM_PREPARE" --expected-scope-sha256 "SCOPE_SHA256_FROM_PREPARE" --evidence-sha256 "SHA256_OF_CANONICAL_EVIDENCE" --confirm-final-activation
+$JobId = "JOB_ID_FROM_PREPARE"
+$DraftSha256 = "DRAFT_SHA256_FROM_PREPARE"
+$ScopeSha256 = "SCOPE_SHA256_FROM_PREPARE"
+$EvidenceSha256 = "SHA256_OF_CANONICAL_EVIDENCE"
+.\scripts\run_safe_lead_flow.ps1 source yandex-activate --job-id $JobId --expected-draft-sha256 $DraftSha256 --expected-scope-sha256 $ScopeSha256 --evidence-sha256 $EvidenceSha256 --confirm-final-activation
 ```
 
 Команда принимает ровно показанный порядок и строчный UUID/SHA, повторно
@@ -128,7 +138,9 @@ draft не продлевается; после его истечения нуж
 точного принятого checkout через общий launcher:
 
 ```powershell
-.\scripts\run_safe_lead_flow.ps1 source check --source YANDEX --yandex-job "C:\ABSOLUTE\approved-yandex-job.json" --folder-id "FOLDER_ID"
+$ProfileRoot = [Environment]::GetFolderPath('UserProfile')
+$YandexJob = Join-Path $ProfileRoot ".codex\local_state\TenderBot\yandex-search\requests\$JobId\request.json"
+.\scripts\run_safe_lead_flow.ps1 source check --source YANDEX --yandex-job "$YandexJob" --folder-id "FOLDER_ID"
 ```
 
 Успешная проверка возвращает `authority_verified=true` и
@@ -141,7 +153,7 @@ draft не продлевается; после его истечения нуж
 launcher:
 
 ```powershell
-.\scripts\run_safe_lead_flow.ps1 source run-one --source YANDEX --yandex-job "C:\ABSOLUTE\approved-yandex-job.json" --folder-id "FOLDER_ID" --confirm-one-authorized-read
+.\scripts\run_safe_lead_flow.ps1 source run-one --source YANDEX --yandex-job "$YandexJob" --folder-id "FOLDER_ID" --confirm-one-authorized-read
 ```
 
 Не запускайте `radar_yandex_connection` напрямую и не используйте внешний или

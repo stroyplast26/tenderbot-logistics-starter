@@ -106,28 +106,37 @@ gates.
 
 После code freeze нужны три реальные привязки: указание владельца на exact
 scope, независимый `ACCEPT` exact кода и свежая проверка billing/API/credential.
-Они оформляются вне activator как канонический UTF-8 JSON версии
-`radar-yandex-manual-activation-evidence-v1`. Файл должен находиться только по
-фиксированному content-addressed пути:
+Полная схема без необъявленных ключей, правила времени и ролей, проверенная
+канонизация UTF-8, no-replace публикация и read-only ACL admission находятся в
+[точной инструкции evidence](RADAR_YANDEX_ACTIVATION_EVIDENCE.md). Файл версии
+`radar-yandex-manual-activation-evidence-v1` находится только по
+content-addressed пути, вычисленному от Windows OS profile через
+`[Environment]::GetFolderPath('UserProfile')`, а не через ambient
+`%USERPROFILE%`:
 
 ```text
-%USERPROFILE%\.codex\local_state\TenderBot\yandex-search\activation-evidence\<job_id>\<evidence_sha256>.json
+[OS profile]\.codex\local_state\TenderBot\yandex-search\activation-evidence\<job_id>\<evidence_sha256>.json
 ```
 
-Верхний уровень связывает `job_id`, `draft_sha256` и `scope_sha256`; внутри
-обязательны `owner_receipt`, `independent_acceptance` и `readiness`. Reviewer
-должен отличаться от владельца и авторов реализации. Owner/readiness не могут
-быть старше draft, review может предшествовать draft не более чем на 24 часа;
-все три времени не могут быть позже активации. `ACCEPT`, exact code hashes,
-активный billing, проверенная конфигурация Search API, доступный credential,
-folder hash и connection hash должны совпасть. Activator этот evidence не
-создаёт и не исправляет.
+Верхний уровень содержит ровно `version`, `job_id`, `draft_sha256`,
+`scope_sha256`, `owner_receipt`, `independent_acceptance` и `readiness`.
+Вложенные exact-ключи и неизменяемые константы перечислены в инструкции;
+`code_sha256` целиком копируется из exact draft. Reviewer должен отличаться от
+владельца и авторов реализации. Owner/readiness не могут быть старше draft,
+review может предшествовать draft не более чем на 24 часа; все три времени не
+могут быть позже активации. Activator evidence не создаёт и не исправляет.
+V1 не поддерживает rotation, revocation, перезапись или автоматическую замену
+корневого pin, даже после expiry.
 
 Только после проверки реального evidence выполните локальную активацию одной
 точной задачи:
 
 ```powershell
-.\scripts\run_safe_lead_flow.ps1 source yandex-activate --job-id "JOB_ID_FROM_PREPARE" --expected-draft-sha256 "DRAFT_SHA256_FROM_PREPARE" --expected-scope-sha256 "SCOPE_SHA256_FROM_PREPARE" --evidence-sha256 "SHA256_OF_CANONICAL_EVIDENCE" --confirm-final-activation
+$JobId = "JOB_ID_FROM_PREPARE"
+$DraftSha256 = "DRAFT_SHA256_FROM_PREPARE"
+$ScopeSha256 = "SCOPE_SHA256_FROM_PREPARE"
+$EvidenceSha256 = "SHA256_OF_CANONICAL_EVIDENCE"
+.\scripts\run_safe_lead_flow.ps1 source yandex-activate --job-id $JobId --expected-draft-sha256 $DraftSha256 --expected-scope-sha256 $ScopeSha256 --evidence-sha256 $EvidenceSha256 --confirm-final-activation
 ```
 
 Launcher принимает после `yandex-activate` ровно девять токенов в показанном
@@ -145,7 +154,9 @@ job, hash или evidence завершается fail-closed без замены
 Локальная проверка конкретного источника:
 
 ```powershell
-.\scripts\run_safe_lead_flow.ps1 source check --source YANDEX --yandex-job "C:\ABSOLUTE\approved-yandex-job.json" --folder-id "FOLDER_ID"
+$ProfileRoot = [Environment]::GetFolderPath('UserProfile')
+$YandexJob = Join-Path $ProfileRoot ".codex\local_state\TenderBot\yandex-search\requests\$JobId\request.json"
+.\scripts\run_safe_lead_flow.ps1 source check --source YANDEX --yandex-job "$YandexJob" --folder-id "FOLDER_ID"
 .\scripts\run_safe_lead_flow.ps1 source check --source TENDERPLAN --query "алюминиевые конструкции"
 .\scripts\run_safe_lead_flow.ps1 source check --source SABY
 .\scripts\run_safe_lead_flow.ps1 source check --source DOMRF
@@ -323,7 +334,7 @@ acceptance; требуется новый exact-комплект.
 Yandex:
 
 ```powershell
-.\scripts\run_safe_lead_flow.ps1 source run-one --source YANDEX --yandex-job "C:\ABSOLUTE\approved-yandex-job.json" --folder-id "FOLDER_ID" --confirm-one-authorized-read
+.\scripts\run_safe_lead_flow.ps1 source run-one --source YANDEX --yandex-job "$YandexJob" --folder-id "FOLDER_ID" --confirm-one-authorized-read
 ```
 
 TenderPlan:

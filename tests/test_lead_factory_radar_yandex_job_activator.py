@@ -9,6 +9,7 @@ import hashlib
 import json
 from pathlib import Path
 import tempfile
+from threading import Barrier
 from unittest.mock import patch
 
 import pytest
@@ -378,6 +379,109 @@ def test_request_partial_is_inert_and_exact_retry_completes() -> None:
         assert recovered["created"] is True
 
 
+def test_request_stage_fsync_failure_cleans_before_stable_request_and_retries() -> None:
+    with prepared_job() as fixture:
+        with (
+            patch.object(
+                preparer.os,
+                "fsync",
+                side_effect=OSError("PRIVATE-STAGE-FSYNC-FAILURE"),
+            ),
+            pytest.raises(
+                activator.YandexJobActivationError,
+                match="^YANDEX_JOB_ACTIVATION_REJECTED$",
+            ),
+        ):
+            _activate(fixture)
+
+        job_directory = fixture["job_directory"]
+        assert not (job_directory / "request.json").exists()
+        assert not (job_directory / "retention-activation.json").exists()
+        assert not (fixture["root"] / "request-activation.json").exists()
+        assert not tuple(job_directory.glob(".request.json.stage-*"))
+        assert _activate(fixture)["created"] is True
+
+
+def test_request_stage_readback_mismatch_cleans_stage_and_retries() -> None:
+    with prepared_job() as fixture:
+        original_read = common._read
+
+        def mismatch_request_stage_read(path: Path):
+            if Path(path).name.startswith(".request.json.stage-"):
+                return {}, "0" * 64
+            return original_read(path)
+
+        with (
+            patch.object(common, "_read", side_effect=mismatch_request_stage_read),
+            pytest.raises(
+                activator.YandexJobActivationError,
+                match="^YANDEX_JOB_ACTIVATION_RECONCILIATION_REQUIRED$",
+            ),
+        ):
+            _activate(fixture)
+
+        job_directory = fixture["job_directory"]
+        assert not (job_directory / "request.json").exists()
+        assert not (job_directory / "retention-activation.json").exists()
+        assert not (fixture["root"] / "request-activation.json").exists()
+        assert not tuple(job_directory.glob(".request.json.stage-*"))
+        assert _activate(fixture)["created"] is True
+
+
+def test_request_stage_rename_failure_cleans_stage_and_requires_reconciliation() -> None:
+    with prepared_job() as fixture:
+        original_rename = activator.os.rename
+
+        def fail_request_stage_rename(source: Path, destination: Path) -> None:
+            if Path(destination).name == "request.json":
+                raise OSError("PRIVATE-STAGE-RENAME-FAILURE")
+            original_rename(source, destination)
+
+        with (
+            patch.object(activator.os, "rename", side_effect=fail_request_stage_rename),
+            pytest.raises(
+                activator.YandexJobActivationError,
+                match="^YANDEX_JOB_ACTIVATION_RECONCILIATION_REQUIRED$",
+            ),
+        ):
+            _activate(fixture)
+
+        job_directory = fixture["job_directory"]
+        assert not (job_directory / "request.json").exists()
+        assert not (job_directory / "retention-activation.json").exists()
+        assert not (fixture["root"] / "request-activation.json").exists()
+        assert not tuple(job_directory.glob(".request.json.stage-*"))
+        assert _activate(fixture)["created"] is True
+
+
+def test_request_stage_cleanup_failure_preserves_stage_for_reconciliation() -> None:
+    with prepared_job() as fixture:
+        original_read = common._read
+
+        def mismatch_request_stage_read(path: Path):
+            if Path(path).name.startswith(".request.json.stage-"):
+                return {}, "0" * 64
+            return original_read(path)
+
+        with (
+            patch.object(common, "_read", side_effect=mismatch_request_stage_read),
+            patch.object(activator, "_cleanup_file_stage", return_value=False) as cleanup,
+            pytest.raises(
+                activator.YandexJobActivationError,
+                match="^YANDEX_JOB_ACTIVATION_RECONCILIATION_REQUIRED$",
+            ),
+        ):
+            _activate(fixture)
+
+        job_directory = fixture["job_directory"]
+        stages = tuple(job_directory.glob(".request.json.stage-*"))
+        assert len(stages) == 1
+        cleanup.assert_called_once()
+        assert not (job_directory / "request.json").exists()
+        assert not (job_directory / "retention-activation.json").exists()
+        assert not (fixture["root"] / "request-activation.json").exists()
+
+
 def test_retention_partial_is_inert_and_exact_retry_reuses_pin() -> None:
     with prepared_job() as fixture:
         with patch.object(
@@ -468,6 +572,83 @@ def test_two_identical_concurrent_activations_converge_without_overwrite() -> No
         assert (
             fixture["job_directory"] / "retention-activation.json"
         ).read_bytes() == (fixture["root"] / "request-activation.json").read_bytes()
+
+
+def test_two_different_concurrent_evidence_bundles_never_overwrite() -> None:
+    with prepared_job() as fixture:
+        changed_evidence = copy.deepcopy(fixture["evidence"])
+        changed_evidence["owner_receipt"]["instruction_sha256"] = common._digest(
+            "different concurrent owner instruction"
+        )
+        changed_sha256 = _write_evidence(fixture["root"], changed_evidence)
+        first_fixture = dict(fixture)
+        second_fixture = {**fixture, "evidence_sha256": changed_sha256}
+        expected_requests = {
+            common._canonical(
+                activator._request_from_draft(fixture["draft"], fixture["evidence"])
+            ): first_fixture,
+            common._canonical(
+                activator._request_from_draft(fixture["draft"], changed_evidence)
+            ): second_fixture,
+        }
+        request_barrier = Barrier(2)
+        original_rename = activator.os.rename
+
+        def rename_concurrently(source: Path, destination: Path) -> None:
+            if Path(destination).name == "request.json":
+                request_barrier.wait(timeout=10)
+            original_rename(source, destination)
+
+        with (
+            patch.object(
+                activator.os,
+                "rename",
+                side_effect=rename_concurrently,
+            ),
+            ThreadPoolExecutor(max_workers=2) as pool,
+        ):
+            futures = (
+                pool.submit(_activate, first_fixture),
+                pool.submit(_activate, second_fixture),
+            )
+            successes: list[dict[str, object]] = []
+            failures: list[str] = []
+            for future in futures:
+                try:
+                    successes.append(future.result(timeout=30))
+                except activator.YandexJobActivationError as error:
+                    failures.append(error.code)
+
+        assert len(successes) == 1
+        assert failures == ["YANDEX_JOB_ACTIVATION_CONFLICT"]
+        request_path = fixture["job_directory"] / "request.json"
+        request_payload = request_path.read_bytes()
+        assert request_payload in expected_requests
+        retention_payload = (
+            fixture["job_directory"] / "retention-activation.json"
+        ).read_bytes()
+        root_payload = (fixture["root"] / "request-activation.json").read_bytes()
+        assert retention_payload == root_payload
+        root_pin = json.loads(root_payload)
+        assert root_pin["job_sha256"] == hashlib.sha256(request_payload).hexdigest()
+        assert not tuple(fixture["job_directory"].glob(".request.json.stage-*"))
+
+        winning_fixture = expected_requests[request_payload]
+        losing_fixture = (
+            second_fixture if winning_fixture is first_fixture else first_fixture
+        )
+        request_before = request_path.read_bytes()
+        root_before = (fixture["root"] / "request-activation.json").read_bytes()
+        replay = _activate(winning_fixture)
+        assert replay["created"] is False
+        assert replay["replayed"] is True
+        with pytest.raises(
+            activator.YandexJobActivationError,
+            match="^YANDEX_JOB_ACTIVATION_CONFLICT$",
+        ):
+            _activate(losing_fixture)
+        assert request_path.read_bytes() == request_before
+        assert (fixture["root"] / "request-activation.json").read_bytes() == root_before
 
 
 def test_public_failure_discards_private_traceback_locals() -> None:
