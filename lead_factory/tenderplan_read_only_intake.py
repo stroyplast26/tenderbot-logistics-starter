@@ -15,6 +15,7 @@ from datetime import datetime, timedelta, timezone
 import hashlib
 import json
 from pathlib import Path
+import re
 import secrets
 from typing import Final
 
@@ -346,12 +347,14 @@ def run_tenderplan_read_only_intake(
     transport: TenderPlanReadOnlyTransport | None = None,
     clock: Callable[[], datetime] | None = None,
     require_existing_store: bool = False,
+    run_id: str | None = None,
 ) -> TenderPlanReadOnlyIntakeResult:
     """Perform exactly one explicit read and queue only encrypted cards."""
 
     if (
         confirmation != TENDERPLAN_READ_ONLY_CONFIRMATION
         or type(require_existing_store) is not bool
+        or (run_id is not None and (type(run_id) is not str or re.fullmatch(r"tpri_[0-9a-f]{32}", run_id) is None))
     ):
         raise TenderPlanReadOnlyIntakeValidationError
     # Query validation and hashing are deliberately delegated to the strict
@@ -366,7 +369,7 @@ def run_tenderplan_read_only_intake(
     expires_at_utc = _utc(expires)
     reference, target_sha256 = _verified_registration_safe(registration_path)
     auth_reference_id_sha256 = _sha256(reference.encode("ascii", "strict"))
-    run_id = f"tpri_{secrets.token_hex(16)}"
+    run_id = run_id if run_id is not None else f"tpri_{secrets.token_hex(16)}"
     nonce_sha256 = _sha256(secrets.token_bytes(32))
     try:
         query_policy_sha256 = tenderplan_read_only_query_policy_sha256(

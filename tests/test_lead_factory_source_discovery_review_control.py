@@ -884,7 +884,7 @@ def test_legacy_ready_batch_without_bridge_link_remains_blocked(
         )
 
     status = source_discovery_status(state_path=state_path)
-    assert status["version"] == "source-discovery-control-v4"
+    assert status["version"] == "source-discovery-control-v5"
     assert status["control"]["gate"] == "BLOCKED_BACKPRESSURE"  # type: ignore[index]
     assert status["control"]["open_review_batches"] == 1  # type: ignore[index]
     with patch.object(control, "run_manual_yandex_search_accounted") as runner:

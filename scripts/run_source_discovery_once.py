@@ -16,10 +16,12 @@ if str(ROOT) not in sys.path:
 
 from lead_factory.source_discovery_control import (  # noqa: E402
     SOURCE_DISCOVERY_LOCAL_CLOSE_CONFIRMATION,
+    SOURCE_DISCOVERY_PREPARE_CONFIRMATION,
     SOURCE_DISCOVERY_ONE_SHOT_CONFIRMATION,
     SOURCE_DISCOVERY_STATE_PATH,
     SourceDiscoveryControlError,
     close_source_discovery_review,
+    prepare_source_discovery_tenderplan_bindings,
     run_source_discovery_once,
     source_discovery_plan,
     source_discovery_status,
@@ -177,6 +179,8 @@ def _parser() -> argparse.ArgumentParser:
 
     status = commands.add_parser("status", help="read durable local status")
     status.add_argument("--wip-limit", type=int, default=1)
+    prepare = commands.add_parser("prepare-tenderplan-bindings", help="explicitly prepare local controller receipt storage; no provider access")
+    prepare.add_argument("--confirm-local-prepare", action="store_true")
 
     yandex_status = commands.add_parser(
         "yandex-status",
@@ -341,6 +345,11 @@ def main(argv: list[str] | None = None) -> int:
                 state_path=SOURCE_DISCOVERY_STATE_PATH,
                 wip_limit=arguments.wip_limit,
             )
+        elif arguments.command == "prepare-tenderplan-bindings":
+            result = prepare_source_discovery_tenderplan_bindings(
+                state_path=SOURCE_DISCOVERY_STATE_PATH,
+                confirmation=SOURCE_DISCOVERY_PREPARE_CONFIRMATION if arguments.confirm_local_prepare else None,
+            )
         elif arguments.command == "check":
             result = verify_source_discovery_authority(
                 arguments.source,
@@ -487,7 +496,7 @@ def main(argv: list[str] | None = None) -> int:
                         not in (
                             _LOCAL_REVIEW_COMMANDS
                             | _LOCAL_YANDEX_COMMANDS
-                            | {"check", "plan", "status"}
+                            | {"check", "plan", "status", "prepare-tenderplan-bindings"}
                         )
                     ),
                 },

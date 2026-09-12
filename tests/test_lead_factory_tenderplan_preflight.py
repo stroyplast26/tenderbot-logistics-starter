@@ -109,6 +109,9 @@ def _claim(queue: Path, intent: dict[str, object]) -> None:
 
 @pytest.fixture
 def prepared_state(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[Path, Path]:
+    control.prepare_source_discovery_tenderplan_bindings(
+        state_path=tmp_path / "control.sqlite3", confirmation=control.SOURCE_DISCOVERY_PREPARE_CONFIRMATION,
+    )
     registration = tmp_path / "registration.json"
     queue = tmp_path / "queue.sqlite3"
     _registration(registration)
@@ -139,7 +142,7 @@ def test_existing_native_uncertain_blocks_before_controller_reservation(
     assert result["state"] == "BLOCKED_TENDERPLAN_UNCERTAIN"
     assert result["native_runner_call_count"] == 0
     assert result["external_requests_this_run"] == 0
-    assert not state_path.exists()
+    assert result["control"]["attempt_count"] == 0
     assert queue.read_bytes() == before
     provider.assert_not_called()
 
@@ -209,7 +212,7 @@ def test_missing_or_invalid_registration_is_local_block(
         )
     assert result["state"] == "BLOCKED_TENDERPLAN_REGISTRATION"
     assert result["native_runner_call_count"] == 0
-    assert not (tmp_path / "control.sqlite3").exists()
+    assert result["control"]["attempt_count"] == 0
     assert queue.read_bytes() == before
     assert "DO_NOT_ECHO" not in json.dumps(result)
     assert str(tmp_path) not in json.dumps(result)
@@ -263,7 +266,7 @@ def test_unusable_store_blocks_without_bootstrap_or_controller_reservation(
         )
     assert checked["state"] == result["state"] == "BLOCKED_TENDERPLAN_STORE_RECONCILIATION"
     assert result["native_runner_call_count"] == 0
-    assert not (tmp_path / "control.sqlite3").exists()
+    assert result["control"]["attempt_count"] == 0
     assert (queue.read_bytes() if queue.exists() else None) == before
     reserve.assert_not_called()
 
@@ -286,7 +289,7 @@ def test_noncanonical_queue_and_moved_binding_both_fail_closed(
     )
     assert result["state"] == "BLOCKED_TENDERPLAN_STORE_RECONCILIATION"
     assert moved.read_bytes() == before
-    assert not (tmp_path / "control.sqlite3").exists()
+    assert result["control"]["attempt_count"] == 0
 
 
 def test_cli_check_uses_explicit_native_paths(
@@ -310,7 +313,7 @@ def test_cli_check_uses_explicit_native_paths(
         assert result["authority_verified"] is False
         assert code == (2 if expected.startswith("BLOCKED_") else 0)
         assert str(tmp_path) not in output.out + output.err
-    assert not (tmp_path / "control.sqlite3").exists()
+    assert result["control"]["attempt_count"] == 0
 
 
 @pytest.mark.parametrize("race", ["uncertain", "missing", "empty", "replaced"])

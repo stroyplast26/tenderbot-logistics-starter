@@ -765,14 +765,33 @@ def test_yandex_transport_failure_reports_one_only_with_coherent_journal(
     assert secret not in serialized
 
 
-def test_tenderplan_delegates_exactly_once_without_storing_query(tmp_path: Path) -> None:
+def test_tenderplan_delegates_exactly_once_without_storing_query(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    import lead_factory.tenderplan_read_only_intake as intake
+    from tests.test_lead_factory_tenderplan_read_only_intake import NOW, _registration, _success_transport
+
     state_path = tmp_path / "control.sqlite3"
+    control.prepare_source_discovery_tenderplan_bindings(
+        state_path=state_path, confirmation=control.SOURCE_DISCOVERY_PREPARE_CONFIRMATION,
+    )
     secret_query = "TENDER QUERY MUST NEVER APPEAR"
     calls: list[tuple[object, object]] = []
+    registration = tmp_path / "registration.json"
+    queue = tmp_path / "queue.sqlite3"
+    _registration(registration)
+    intake.TenderPlanReadOnlyStore(queue, clock=lambda: NOW)
+    fake_type = _success_transport(queue, returned_count=1)
+    original_post = fake_type.post_registered_search
+
+    def synthetic_post(self, query, reference, **values):
+        assert query == secret_query
+        return original_post(self, "окна", reference, **values)
+
+    monkeypatch.setattr(fake_type, "post_registered_search", synthetic_post)
+    monkeypatch.setattr(intake, "TenderPlanReadOnlyTransport", fake_type)
 
     def fake_runner(query: object, **options: object) -> TenderPlanReadOnlyIntakeResult:
         calls.append((query, options))
-        return _tenderplan_result()
+        return intake.run_tenderplan_read_only_intake(query, **options, transport=fake_type(), clock=lambda: NOW)
 
     with patch(
         "lead_factory.source_discovery_control.run_tenderplan_read_only_intake",
@@ -860,6 +879,9 @@ def test_reservation_block_reason_survives_late_ready_snapshot_and_cli_exits_two
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     state_path = tmp_path / "control.sqlite3"
+    control.prepare_source_discovery_tenderplan_bindings(
+        state_path=state_path, confirmation=control.SOURCE_DISCOVERY_PREPARE_CONFIRMATION,
+    )
     entered = Event()
     release = Event()
     finished = Event()
