@@ -8,7 +8,7 @@
 
 ## 1. Единственная схема v1
 
-Подготовьте вне trusted state файл `evidence.candidate.json` ровно следующей
+Подготовьте файл `candidate.json` с реальными подтверждениями ровно следующей
 структуры. Лишние и отсутствующие ключи запрещены. Все SHA-256 — 64 строчных
 шестнадцатеричных символа, все времена — UTC вида `YYYY-MM-DDTHH:MM:SSZ`.
 
@@ -67,134 +67,69 @@
 ссылаться на реально сохранённые неизменяемые доказательства, а не на текстовые
 заглушки.
 
-## 2. Канонизация и no-replace публикация
+## 2. Проверка и публикация штатной командой
 
-Сначала задайте четыре значения из результата `yandex-prepare` и абсолютный
-путь к заполненному candidate. Trusted profile получают только через Windows
-OS API, а не через `%USERPROFILE%` или другой ambient environment.
+Только после code freeze и подготовки exact draft оператор собирает реальные
+подтверждения по схеме выше. Сохраните готовый JSON как обычный UTF-8 файл
+`candidate.json` в фиксированном inbox:
+
+```text
+[OS profile]\.codex\local_state\TenderBot\yandex-search\activation-candidates\<job_id>\candidate.json
+```
+
+Inbox содержит только `candidate.json`; его каталоги и файл наследуют защищённые
+ACL корневого state. Символические ссылки, junction, hardlink, лишние файлы и
+неверные права запрещены. Candidate может быть форматированным JSON, но не
+содержать BOM, повторяющиеся ключи, NaN/Infinity или более 131072 байт. Не
+помещайте туда credential, query, region или folder ID. Хеши receipts относятся
+к реально сохранённым доказательствам; заполненный шаблон сам по себе их не
+заменяет. Если реальных подтверждений нет, остановитесь до публикации.
+
+Задайте значения из `yandex-prepare` и вычислите SHA-256 точных байтов готового
+candidate. Произвольный input path команда не принимает:
 
 ```powershell
 $JobId = "JOB_ID_FROM_PREPARE"
 $DraftSha256 = "DRAFT_SHA256_FROM_PREPARE"
 $ScopeSha256 = "SCOPE_SHA256_FROM_PREPARE"
-$Candidate = "C:\ABSOLUTE\evidence.candidate.json"
 $ProfileRoot = [Environment]::GetFolderPath('UserProfile')
+$StateRoot = Join-Path $ProfileRoot ".codex\local_state\TenderBot\yandex-search"
+$Candidate = Join-Path $StateRoot "activation-candidates\$JobId\candidate.json"
+$CandidateSha256 = (Get-FileHash -LiteralPath $Candidate -Algorithm SHA256).Hash.ToLowerInvariant()
+.\scripts\run_safe_lead_flow.ps1 source yandex-publish-evidence --job-id $JobId --expected-draft-sha256 $DraftSha256 --expected-scope-sha256 $ScopeSha256 --expected-candidate-sha256 $CandidateSha256 --confirm-local-publication
 ```
 
-Следующий блок проверяет exact ключи верхнего и вложенных объектов,
-канонизирует JSON как UTF-8 без BOM с сортировкой ключей и без пробелов,
-вычисляет content hash и публикует файл через собственный stage и Windows
-no-replace rename. При любой ошибке digest не возвращается и продолжать нельзя.
+Launcher принимает ровно девять токенов после `yandex-publish-evidence` в
+указанном порядке. Команда сначала проверяет ACL fixed inbox, затем exact raw
+hash, размер/тип/identity файла, строгий JSON, роли, времена, полный code map,
+connection, scope и свежесть draft. Только после успешной проверки она создаёт
+фиксированные каталоги назначения и публикует канонические UTF-8 байты:
 
-```powershell
-$Publisher = @'
-import hashlib, json, os, pathlib, secrets, stat, sys, uuid
-
-TOP = {"version", "job_id", "draft_sha256", "scope_sha256", "owner_receipt", "independent_acceptance", "readiness"}
-OWNER = {"kind", "owner_id", "source_thread_id", "instruction_sha256", "captured_at_utc", "scope_sha256"}
-REVIEW = {"kind", "reviewer_id", "reviewed_at_utc", "verdict", "code_sha256", "evidence_sha256", "implementation_author_ids"}
-READY = {"kind", "observed_at_utc", "billing_status", "search_api_status", "credential_status", "folder_id_sha256", "connection_sha256", "evidence_sha256"}
-
-def exact_object(value, keys):
-    if type(value) is not dict or set(value) != keys:
-        raise ValueError()
-
-def main():
-    source = pathlib.Path(sys.argv[1]).resolve(strict=True)
-    profile = pathlib.Path(sys.argv[2]).resolve(strict=True)
-    job_id, draft_sha256, scope_sha256 = sys.argv[3:6]
-    if str(uuid.UUID(job_id)) != job_id:
-        raise ValueError()
-    for digest in (draft_sha256, scope_sha256):
-        if len(digest) != 64 or any(c not in "0123456789abcdef" for c in digest):
-            raise ValueError()
-    value = json.loads(source.read_bytes())
-    exact_object(value, TOP)
-    exact_object(value["owner_receipt"], OWNER)
-    exact_object(value["independent_acceptance"], REVIEW)
-    exact_object(value["readiness"], READY)
-    if (value["version"] != "radar-yandex-manual-activation-evidence-v1"
-            or value["job_id"] != job_id
-            or value["draft_sha256"] != draft_sha256
-            or value["scope_sha256"] != scope_sha256):
-        raise ValueError()
-    payload = json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
-    digest = hashlib.sha256(payload).hexdigest()
-    directory = profile / ".codex" / "local_state" / "TenderBot" / "yandex-search" / "activation-evidence" / job_id
-    directory.mkdir(parents=True, exist_ok=True)
-    if directory.resolve(strict=True) != directory.absolute():
-        raise ValueError()
-    target = directory / (digest + ".json")
-    if target.exists():
-        raise FileExistsError()
-    stage = directory / ("." + digest + ".json.stage-" + str(os.getpid()) + "-" + secrets.token_hex(8))
-    descriptor = -1
-    identity = None
-    try:
-        descriptor = os.open(stage, os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_BINARY", 0), 0o600)
-        opened = os.fstat(descriptor)
-        identity = (opened.st_dev, opened.st_ino, opened.st_mode)
-        view = memoryview(payload)
-        while view:
-            written = os.write(descriptor, view)
-            if written <= 0:
-                raise OSError()
-            view = view[written:]
-        os.fsync(descriptor)
-        os.close(descriptor)
-        descriptor = -1
-        if stage.read_bytes() != payload:
-            raise OSError()
-        os.rename(stage, target)
-        if target.read_bytes() != payload:
-            raise OSError()
-    except BaseException:
-        if descriptor >= 0:
-            try:
-                os.close(descriptor)
-            except OSError:
-                pass
-        try:
-            current = os.lstat(stage)
-            current_identity = (current.st_dev, current.st_ino, current.st_mode)
-            if current_identity == identity and stat.S_ISREG(current.st_mode) and not stat.S_ISLNK(current.st_mode):
-                os.unlink(stage)
-        except OSError:
-            pass
-        raise
-    print(digest)
-
-try:
-    main()
-except BaseException:
-    raise SystemExit(2)
-'@
-$EvidenceOutput = & .\.venv\Scripts\python.exe -I -c $Publisher $Candidate $ProfileRoot $JobId $DraftSha256 $ScopeSha256
-$PublishExitCode = $LASTEXITCODE
-$EvidenceSha256 = (@($EvidenceOutput) -join '').Trim()
-if ($PublishExitCode -ne 0 -or $EvidenceSha256 -notmatch '\A[0-9a-f]{64}\z') {
-    throw "YANDEX_EVIDENCE_PUBLICATION_FAILED"
-}
+```text
+[OS profile]\.codex\local_state\TenderBot\yandex-search\activation-evidence\<job_id>\<evidence_sha256>.json
 ```
 
-Нельзя использовать `Set-Content`, копирование поверх существующего файла или
-повторную публикацию по тому же имени. После публикации выполните реальный
-read-only ACL admission. Единственный допустимый stdout — marker READY:
+Публикация использует exclusive stage, fsync, Windows no-replace rename и
+повторную проверку. Совпадающие байты дают exact replay; существующие отличные
+байты никогда не перезаписываются. Candidate не меняется. После публикации
+helper обязан вернуть `YANDEX_ACTIVATION_ACL_READY` для прежней фазы `Draft`.
+Новая фаза `Evidence` допускает отсутствие назначения только до публикации и
+требует готовый защищённый inbox; требования четырёх фаз активации сохранены.
 
-```powershell
-$AclHelper = ".\scripts\check_yandex_activation_acl.ps1"
-$AclOutput = & "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $AclHelper -JobId $JobId -EvidenceSha256 $EvidenceSha256 -Phase Draft
-$AclExitCode = $LASTEXITCODE
-$AclResult = (@($AclOutput) -join '').Trim()
-if ($AclExitCode -ne 0 -or $AclResult -ne "YANDEX_ACTIVATION_ACL_READY") {
-    throw "YANDEX_ACTIVATION_ACL_REJECTED"
-}
-```
+Успех — `EVIDENCE_PUBLISHED_AWAITING_ACTIVATION`, `authority_verified=false`,
+`launch_allowed=false`, `evidence_sha256` и нулевые внешние эффекты. Это проверка
+согласованности предоставленных данных. Команда не создаёт согласие владельца,
+независимый ACCEPT или readiness, не выдаёт grant, не устанавливает request/pin,
+не читает credential и не вызывает provider, CRM, почту или расписание. Проверка
+пустого journal может брать SQLite locks, но не резервирует запрос и не
+изменяет accounting.
 
-ACL-проверка подтверждает protected root ACL, наследование только от текущего
-Windows SID и `SYSTEM`, обычные файлы/каталоги, отсутствие reparse points,
-stage residue, посторонних job-файлов и непустых claims. Сам `yandex-activate`
-повторяет эту проверку перед каждым переходом фазы.
+Сохраните `evidence_sha256` из успешного JSON в `$EvidenceSha256`. Если получен
+`YANDEX_EVIDENCE_PUBLICATION_RECONCILIATION_REQUIRED`, стабильный файл может
+уже существовать: сохраните его и разберите причину. Команда не удаляет
+опубликованный evidence. При временном конфликте параллельных команд допустим
+только повтор с теми же exact inputs после устранения причины; автоматической
+активации или продолжения после ошибки нет.
 
 ## 3. Активация и фактический job path
 

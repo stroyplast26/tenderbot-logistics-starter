@@ -116,7 +116,20 @@ job, scope, code, connection и folder; reviewer не может быть вла
 rotation, revocation, перезапись или автоматическую замену корневого pin, даже
 после expiry.
 
-Активировать точный draft локально, без чтения ключа и без HTTP:
+Сначала разместите реальные receipts в fixed
+`activation-candidates\<job_id>\candidate.json` и выполните штатную публикацию
+по [инструкции evidence](RADAR_YANDEX_ACTIVATION_EVIDENCE.md):
+
+```powershell
+.\scripts\run_safe_lead_flow.ps1 source yandex-publish-evidence --job-id $JobId --expected-draft-sha256 $DraftSha256 --expected-scope-sha256 $ScopeSha256 --expected-candidate-sha256 $CandidateSha256 --confirm-local-publication
+```
+
+`EVIDENCE_PUBLISHED_AWAITING_ACTIVATION` означает только локальную проверку и
+публикацию (`authority_verified=false`, `launch_allowed=false`). Возьмите
+`evidence_sha256` из результата; публикатор не создаёт подтверждения за
+owner/reviewer, не проверяет billing через сеть и не запускает активацию.
+
+После успешной публикации активируйте exact draft локально, без чтения ключа и HTTP:
 
 ```powershell
 $JobId = "JOB_ID_FROM_PREPARE"

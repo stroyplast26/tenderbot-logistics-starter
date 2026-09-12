@@ -52,6 +52,11 @@ from lead_factory.radar_yandex_job_activator import (  # noqa: E402
     YandexJobActivationError,
     activate_prepared_yandex_job,
 )
+from lead_factory.radar_yandex_evidence_publisher import (  # noqa: E402
+    YANDEX_EVIDENCE_PUBLICATION_CONFIRMATION,
+    YandexEvidencePublicationError,
+    publish_yandex_activation_evidence,
+)
 from lead_factory.source_review_queue import (  # noqa: E402
     ReviewQueueResolutionResult,
 )
@@ -73,7 +78,10 @@ _EVIDENCE_URI = re.compile(
 )
 _LOCAL_REVIEW_COMMANDS = frozenset({"review-list", "review-decide", "review-close"})
 _LOCAL_YANDEX_COMMANDS = frozenset(
-    {"yandex-activate", "yandex-prepare", "yandex-status", "yandex-purge"}
+    {
+        "yandex-activate", "yandex-prepare", "yandex-publish-evidence",
+        "yandex-status", "yandex-purge",
+    }
 )
 
 
@@ -227,6 +235,19 @@ def _parser() -> argparse.ArgumentParser:
         action="store_true",
     )
 
+    yandex_publish = commands.add_parser(
+        "yandex-publish-evidence",
+        help="validate and publish supplied local Yandex evidence without activation",
+    )
+    yandex_publish.add_argument("--job-id", required=True, type=_job_id)
+    for option in (
+        "--expected-draft-sha256",
+        "--expected-scope-sha256",
+        "--expected-candidate-sha256",
+    ):
+        yandex_publish.add_argument(option, required=True, type=_sha256)
+    yandex_publish.add_argument("--confirm-local-publication", action="store_true")
+
     for name in ("check", "run-one"):
         command = commands.add_parser(name)
         command.add_argument(
@@ -297,7 +318,9 @@ def _emit(value: dict[str, object], *, error: bool = False) -> None:
 
 def main(argv: list[str] | None = None) -> int:
     arguments = _parser().parse_args(argv)
-    if arguments.command in {"run-one", "yandex-activate", "yandex-prepare"} and (
+    if arguments.command in {
+        "run-one", "yandex-activate", "yandex-prepare", "yandex-publish-evidence",
+    } and (
         os.environ.get(SAFE_LEAD_FLOW_LAUNCH_MARKER_NAME)
         != SAFE_LEAD_FLOW_LAUNCH_MARKER_VALUE
     ):
@@ -358,6 +381,18 @@ def main(argv: list[str] | None = None) -> int:
                 confirmation=(
                     YANDEX_JOB_ACTIVATION_CONFIRMATION
                     if arguments.confirm_final_activation
+                    else None
+                ),
+            )
+        elif arguments.command == "yandex-publish-evidence":
+            result = publish_yandex_activation_evidence(
+                arguments.job_id,
+                arguments.expected_draft_sha256,
+                arguments.expected_scope_sha256,
+                arguments.expected_candidate_sha256,
+                confirmation=(
+                    YANDEX_EVIDENCE_PUBLICATION_CONFIRMATION
+                    if arguments.confirm_local_publication
                     else None
                 ),
             )
@@ -430,6 +465,7 @@ def main(argv: list[str] | None = None) -> int:
             raise SourceDiscoveryControlError("SOURCE_DISCOVERY_COMMAND_NOT_ALLOWED")
     except (
         SourceDiscoveryControlError,
+        YandexEvidencePublicationError,
         YandexJobActivationError,
         YandexJobPreparationError,
         YandexJournalMaintenanceError,
