@@ -16,6 +16,7 @@ import pytest
 from lead_factory import radar_yandex_connection_authority as authority
 from lead_factory import radar_yandex_job_activator as activator
 from lead_factory import radar_yandex_job_preparer as preparer
+from lead_factory import radar_yandex_maintenance as maintenance
 from lead_factory import radar_yandex_pilot_authority as common
 from lead_factory.radar_yandex_journal import YandexPilotJournal
 
@@ -193,6 +194,96 @@ def test_exact_activation_is_local_root_last_and_exactly_replayable() -> None:
         assert second["replayed"] is True
         assert second["activation_sha256"] == first["activation_sha256"]
         assert second["request_sha256"] == first["request_sha256"]
+
+
+def test_active_job_cannot_replay_as_inactive_preparation() -> None:
+    with prepared_job() as fixture:
+        _activate(fixture)
+        root = fixture["root"]
+        before = {
+            path.relative_to(root): (
+                path.read_bytes(),
+                path.stat().st_ino,
+                path.stat().st_mtime_ns,
+            )
+            for path in root.rglob("*")
+            if path.is_file()
+        }
+
+        with (
+            patch.object(preparer, "_check_acl"),
+            patch.object(
+                preparer,
+                "_load_published",
+                side_effect=AssertionError("active replay reached draft load"),
+            ) as load,
+            patch.object(
+                preparer,
+                "_write_new",
+                side_effect=AssertionError("active replay attempted a write"),
+            ) as write,
+            pytest.raises(preparer.YandexJobPreparationError) as denied,
+        ):
+            preparer.prepare_inactive_yandex_job(
+                QUERY,
+                REGION,
+                IDEMPOTENCY_KEY,
+                confirmation=preparer.YANDEX_INACTIVE_PREPARATION_CONFIRMATION,
+            )
+
+        assert denied.value.code == "YANDEX_JOB_PREPARATION_CONFLICT"
+        load.assert_not_called()
+        write.assert_not_called()
+        after = {
+            path.relative_to(root): (
+                path.read_bytes(),
+                path.stat().st_ino,
+                path.stat().st_mtime_ns,
+            )
+            for path in root.rglob("*")
+            if path.is_file()
+        }
+        assert after == before
+
+
+def test_activator_retention_pin_supports_maintenance_without_root_pin() -> None:
+    with prepared_job() as fixture:
+        activated = _activate(fixture)
+        root = fixture["root"]
+        root_pin_path = root / "request-activation.json"
+        root_pin_path.unlink()
+        (root / "connection.json").unlink()
+
+        with patch.object(maintenance, "_now_utc", return_value=NOW):
+            report = maintenance.yandex_journal_status(
+                fixture["prepared"]["job_id"]
+            )
+        assert report["operation"] == "YANDEX_JOURNAL_STATUS_LOCAL"
+        assert report["state"] == "NO_RAW_RESPONSE_RETAINED"
+        assert report["retention_activation_sha256"] == activated["activation_sha256"]
+        assert report["journal"]["attempts_reserved"] == 0
+
+
+def test_corrupt_activator_retention_pin_never_falls_back_to_valid_root() -> None:
+    with prepared_job() as fixture:
+        _activate(fixture)
+        root = fixture["root"]
+        job_directory = fixture["job_directory"]
+        root_pin_path = root / "request-activation.json"
+        root_pin = root_pin_path.read_bytes()
+
+        retention_path = job_directory / "retention-activation.json"
+        retention = json.loads(retention_path.read_bytes())
+        retention["job_sha256"] = "0" * 64
+        retention_path.write_bytes(common._canonical(retention))
+        with (
+            patch.object(maintenance, "_now_utc", return_value=NOW),
+            pytest.raises(maintenance.YandexJournalMaintenanceError) as denied,
+        ):
+            maintenance.yandex_journal_status(fixture["prepared"]["job_id"])
+
+        assert denied.value.code == "YANDEX_JOURNAL_MAINTENANCE_REJECTED"
+        assert root_pin_path.read_bytes() == root_pin
 
 
 @pytest.mark.parametrize(
