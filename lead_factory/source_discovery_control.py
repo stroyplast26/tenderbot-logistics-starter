@@ -46,6 +46,7 @@ from lead_factory.tenderplan_read_only_intake import (
     TENDERPLAN_READ_ONLY_CONFIRMATION,
     TENDERPLAN_READ_ONLY_DEFAULT_QUERY,
     TenderPlanReadOnlyIntakeResult,
+    check_tenderplan_read_only_intake,
     run_tenderplan_read_only_intake,
 )
 
@@ -1084,6 +1085,8 @@ def check_source_discovery(
     yandex_job_path: str | Path | None = None,
     folder_id: str | None = None,
     tenderplan_query: str = TENDERPLAN_READ_ONLY_DEFAULT_QUERY,
+    tenderplan_registration_path: str | Path | None = None,
+    tenderplan_store_path: str | Path | None = None,
 ) -> dict[str, object]:
     """Check local configuration and backpressure only; never calls a provider."""
 
@@ -1103,6 +1106,12 @@ def check_source_discovery(
         type(tenderplan_query) is not str or not tenderplan_query.strip()
     ):
         state = "BLOCKED_CONFIGURATION"
+    elif selected is SourceDiscoverySource.TENDERPLAN:
+        native = check_tenderplan_read_only_intake(
+            registration_path=tenderplan_registration_path,
+            store_path=tenderplan_store_path,
+        )
+        state = str(native["state"])
     else:
         state = "READY_FOR_SEPARATE_AUTHORITY_CHECK"
     return {
@@ -1192,6 +1201,8 @@ def _verify_source_discovery_authority_core(
     yandex_job_path: str | Path | None,
     folder_id: str | None,
     tenderplan_query: str,
+    tenderplan_registration_path: str | Path | None,
+    tenderplan_store_path: str | Path | None,
 ) -> dict[str, object]:
     report = check_source_discovery(
         source,
@@ -1200,6 +1211,8 @@ def _verify_source_discovery_authority_core(
         yandex_job_path=yandex_job_path,
         folder_id=folder_id,
         tenderplan_query=tenderplan_query,
+        tenderplan_registration_path=tenderplan_registration_path,
+        tenderplan_store_path=tenderplan_store_path,
     )
     selected = _source(source)
     if (
@@ -1245,6 +1258,8 @@ def verify_source_discovery_authority(
     yandex_job_path: str | Path | None = None,
     folder_id: str | None = None,
     tenderplan_query: str = TENDERPLAN_READ_ONLY_DEFAULT_QUERY,
+    tenderplan_registration_path: str | Path | None = None,
+    tenderplan_store_path: str | Path | None = None,
 ) -> dict[str, object]:
     """Run the supported local authority check without credentials or provider I/O."""
 
@@ -1256,6 +1271,8 @@ def verify_source_discovery_authority(
             yandex_job_path=yandex_job_path,
             folder_id=folder_id,
             tenderplan_query=tenderplan_query,
+            tenderplan_registration_path=tenderplan_registration_path,
+            tenderplan_store_path=tenderplan_store_path,
         )
     except SourceDiscoveryControlError as error:
         failure_code = _known_control_failure_code(
@@ -1265,6 +1282,7 @@ def verify_source_discovery_authority(
     except BaseException:
         failure_code = "YANDEX_AUTHORITY_CHECK_REJECTED"
     del source, state_path, wip_limit, yandex_job_path, folder_id, tenderplan_query
+    del tenderplan_registration_path, tenderplan_store_path
     _raise_detached_control_failure(failure_code)
 
 
@@ -1857,6 +1875,8 @@ def _run_source_discovery_once_core(
         yandex_job_path=yandex_job_path,
         folder_id=folder_id,
         tenderplan_query=tenderplan_query,
+        tenderplan_registration_path=tenderplan_registration_path,
+        tenderplan_store_path=tenderplan_store_path,
     )
     if check["state"] != "READY_FOR_SEPARATE_AUTHORITY_CHECK":
         return _blocked_run_report(selected, str(check["state"]), path=path, wip_limit=limit)
@@ -1961,6 +1981,7 @@ def _run_source_discovery_once_core(
         else:
             tenderplan_options: dict[str, object] = {
                 "confirmation": TENDERPLAN_READ_ONLY_CONFIRMATION,
+                "require_existing_store": True,
             }
             if tenderplan_registration_path is not None:
                 tenderplan_options["registration_path"] = tenderplan_registration_path

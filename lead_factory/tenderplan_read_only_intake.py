@@ -51,8 +51,10 @@ from lead_factory.tenderplan_read_only_store import (
     TenderPlanReadOnlyRunState,
     TenderPlanReadOnlyStore,
     TenderPlanReadOnlyStoreError,
+    _existing_store,
     seal_tenderplan_read_only_intent,
     seal_tenderplan_read_only_receipt,
+    validate_tenderplan_read_only_store,
 )
 from lead_factory.tenderplan_read_only_transport import (
     TENDERPLAN_READ_ONLY_MAX_RECORDS,
@@ -229,6 +231,68 @@ def _verified_registration_safe(path: str | Path) -> tuple[str, str]:
     return reference, target_sha256
 
 
+def check_tenderplan_read_only_intake(
+    *,
+    registration_path: str | Path | None = None,
+    store_path: str | Path | None = None,
+) -> dict[str, object]:
+    """Inspect existing local readiness without credentials, writes, or repair.
+
+    A ready result is only a snapshot, never authority or a reservation.  The
+    native runner must retain its transactional checks for any later race.
+    """
+
+    report: dict[str, object] = {
+        "authority_verified": False,
+        "automatic_schedule_eligible": False,
+        "contact_count": 0,
+        "live_release_eligible": False,
+        "operation": "CHECK_TENDERPLAN_LOCAL_ONLY",
+        "request_count": 0,
+        "spend_minor": 0,
+        "state": "BLOCKED_TENDERPLAN_REGISTRATION",
+        "write_count": 0,
+    }
+    try:
+        _verified_registration_safe(
+            TENDERPLAN_OWNER_CANARY_REGISTRATION_PATH
+            if registration_path is None else registration_path
+        )
+    except (TenderPlanReadOnlyIntakeRegistrationError, OSError, TypeError, ValueError):
+        return report
+
+    report["state"] = "BLOCKED_TENDERPLAN_STORE_LOCATION"
+    try:
+        path = Path(TENDERPLAN_READ_ONLY_QUEUE_PATH if store_path is None else store_path)
+        if path.resolve(strict=False) != Path(TENDERPLAN_READ_ONLY_QUEUE_PATH).resolve(
+            strict=False
+        ):
+            return report
+    except (OSError, RuntimeError, TypeError, ValueError):
+        return report
+
+    report["state"] = "BLOCKED_TENDERPLAN_STORE_RECONCILIATION"
+    try:
+        # The validator opens an existing path with mode=ro/query_only and
+        # verifies schema, path binding and complete chains.  Never construct
+        # TenderPlanReadOnlyStore here: its constructor can create a queue.
+        validated = validate_tenderplan_read_only_store(path)
+    except TenderPlanReadOnlyStoreError:
+        return report
+    states = validated["states"]
+    report["states"] = states
+    if states[TenderPlanReadOnlyRunState.UNCERTAIN.value]:
+        report["state"] = "BLOCKED_TENDERPLAN_UNCERTAIN"
+    elif (
+        states[TenderPlanReadOnlyRunState.INTENT.value]
+        or states[TenderPlanReadOnlyRunState.DISPATCH_CLAIMED.value]
+    ):
+        report["state"] = "BLOCKED_TENDERPLAN_IN_FLIGHT"
+    else:
+        report["state"] = "READY_FOR_SEPARATE_AUTHORITY_CHECK"
+    return report
+
+
 def _terminal_or_reconciliation(
     store: TenderPlanReadOnlyStore,
     run_id: str,
@@ -281,10 +345,14 @@ def run_tenderplan_read_only_intake(
     store_path: str | Path = TENDERPLAN_READ_ONLY_QUEUE_PATH,
     transport: TenderPlanReadOnlyTransport | None = None,
     clock: Callable[[], datetime] | None = None,
+    require_existing_store: bool = False,
 ) -> TenderPlanReadOnlyIntakeResult:
     """Perform exactly one explicit read and queue only encrypted cards."""
 
-    if confirmation != TENDERPLAN_READ_ONLY_CONFIRMATION:
+    if (
+        confirmation != TENDERPLAN_READ_ONLY_CONFIRMATION
+        or type(require_existing_store) is not bool
+    ):
         raise TenderPlanReadOnlyIntakeValidationError
     # Query validation and hashing are deliberately delegated to the strict
     # transport helper.  No query text enters the intent or queue.
@@ -339,7 +407,13 @@ def run_tenderplan_read_only_intake(
         }
     )
     try:
-        store = TenderPlanReadOnlyStore(store_path, clock=now_clock)
+        # A controller has already inspected this ledger.  Losing it after
+        # that check must fail closed, never bootstrap a replacement history.
+        store = (
+            _existing_store(store_path, clock=now_clock)
+            if require_existing_store
+            else TenderPlanReadOnlyStore(store_path, clock=now_clock)
+        )
         reservation = store.reserve_intent(intent)
     except TenderPlanReadOnlyStoreError:
         raise TenderPlanReadOnlyIntakeReconciliationRequired from None
@@ -619,6 +693,7 @@ __all__ = [
     "TenderPlanReadOnlyIntakeRegistrationError",
     "TenderPlanReadOnlyIntakeResult",
     "TenderPlanReadOnlyIntakeValidationError",
+    "check_tenderplan_read_only_intake",
     "decide_tenderplan_review_item",
     "decision_receipt_to_mapping",
     "list_tenderplan_review_items",

@@ -184,8 +184,28 @@ activation, code hashes, owner/reviewer/readiness receipts и journal. Она н
 
 Для Saby, DOM.RF и Kontur ожидаемое состояние сейчас —
 `BLOCKED_OFFLINE_CONTRACT`, а exit code — `2`. TenderPlan/Yandex `check`
-не вызывает provider read. Для TenderPlan `check` пока показывает только
-готовность перейти к его отдельной нативной authority-проверке.
+не вызывает provider read.
+
+Для TenderPlan `check` проверяет существующую регистрацию и нативную очередь
+без чтения credential, создания SQLite-файла или записи в журнал. Можно передать
+`--tenderplan-registration` и `--tenderplan-store`; путь очереди должен совпадать
+с каноническим путём текущего native intake и сохранённой привязкой хранилища.
+Отсутствующая или повреждённая регистрация даёт `BLOCKED_TENDERPLAN_REGISTRATION`,
+чужой путь — `BLOCKED_TENDERPLAN_STORE_LOCATION`, отсутствующая или некорректная
+очередь — `BLOCKED_TENDERPLAN_STORE_RECONCILIATION`. Незавершённые native-попытки
+дают `BLOCKED_TENDERPLAN_UNCERTAIN` либо `BLOCKED_TENDERPLAN_IN_FLIGHT`;
+истечение срока INTENT само по себе не снимает блокировку. Общий STOP/WIP
+проверяется первым и может скрывать эти более узкие причины.
+
+Успех TenderPlan означает только `READY_FOR_SEPARATE_AUTHORITY_CHECK` при
+`authority_verified=false`: доступность credential/API и разрешение внешнего
+вызова ещё не доказаны. `run-one` выполняет ту же проверку до общего reserve и
+затем требует уже существующую native queue. Если очередь исчезла или стала
+некорректной между проверкой и native run, новая история не создаётся; сбой
+после общего reserve сохраняет `UNCERTAIN` и требует сверки. Не использовать
+`run-one` как диагностическую команду и не восстанавливать очередь во время
+работы команды. Прежний standalone native runner сохраняет отдельную процедуру
+первичной подготовки; она не является способом обойти этот запрет.
 
 Портфель первого этапа разделён следующим образом:
 
