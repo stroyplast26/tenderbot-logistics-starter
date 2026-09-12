@@ -245,7 +245,7 @@ function Assert-EvidenceDirectory {
         throw 'evidence is absent'
     }
     foreach ($Entry in $Entries) {
-        if ($Entry.Name -cnotmatch '^[0-9a-f]{64}\.json$') {
+        if ($Entry.Name -cnotmatch '\A[0-9a-f]{64}\.json\z') {
             throw 'evidence layout mismatch'
         }
         Assert-PlainPathAndAcl `
@@ -281,7 +281,7 @@ try {
         [string]::IsNullOrEmpty($JobId) -or
         -not [Guid]::TryParseExact($JobId, 'D', [ref]$ParsedJobId) -or
         $ParsedJobId.ToString('D') -cne $JobId -or
-        $EvidenceSha256 -cnotmatch '^[0-9a-f]{64}$' -or
+        $EvidenceSha256 -cnotmatch '\A[0-9a-f]{64}\z' -or
         $Phase -cnotin @('Draft', 'Request', 'Retention', 'Active')
     ) {
         throw 'argument value is invalid'
@@ -326,6 +326,16 @@ try {
             -CurrentSid $CurrentSid `
             -Container $true `
             -RootAcl ($Directory -ceq $StateRoot)
+    }
+    $RequestStageEntries = @(
+        Get-ChildItem -LiteralPath $RequestsPath -Force -ErrorAction Stop |
+            Where-Object {
+                $_.Name -ilike ".preparing-$JobId-*" -or
+                $_.Name -ilike ".activating-$JobId-*"
+            }
+    )
+    if ($RequestStageEntries.Count -ne 0) {
+        throw 'request stage residue is forbidden'
     }
     foreach ($File in @($ConnectionPath, $JournalPath, $DraftPath, $EvidencePath)) {
         Assert-PlainPathAndAcl `

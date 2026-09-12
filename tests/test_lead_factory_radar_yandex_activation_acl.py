@@ -24,6 +24,9 @@ def test_activation_acl_helper_has_a_read_only_fixed_path_contract() -> None:
     assert "'retention-activation.json'" in source
     assert "YANDEX_ACTIVATION_ACL_READY" in source
     assert "YANDEX_ACTIVATION_ACL_REJECTED" in source
+    assert "\\A[0-9a-f]{64}\\z" in source
+    assert '".preparing-$JobId-*"' in source
+    assert '".activating-$JobId-*"' in source
     for forbidden in (
         "ConvertFrom-Json",
         "Get-Content",
@@ -71,6 +74,7 @@ def test_activation_acl_helper_parses_and_rejects_before_state_access() -> None:
         ("-JobId", "PRIVATE-JOB-SENTINEL", "-EvidenceSha256", SHA256, "-Phase", "Draft"),
         ("-JobId", JOB_ID, "-EvidenceSha256", "A" * 64, "-Phase", "Draft"),
         ("-JobId", JOB_ID, "-EvidenceSha256", "0" * 63, "-Phase", "Draft"),
+        ("-JobId", JOB_ID, "-EvidenceSha256", SHA256 + "\n", "-Phase", "Draft"),
         ("-JobId", JOB_ID, "-EvidenceSha256", SHA256, "-Phase", "draft"),
         ("-Phase", "Draft", "-JobId", JOB_ID, "-EvidenceSha256", SHA256),
     )
