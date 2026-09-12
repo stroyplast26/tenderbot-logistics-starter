@@ -349,6 +349,8 @@ def main(argv: list[str] | None = None) -> int:
                 yandex_job_path=arguments.yandex_job,
                 folder_id=arguments.folder_id,
                 tenderplan_query=arguments.query,
+                tenderplan_registration_path=arguments.tenderplan_registration,
+                tenderplan_store_path=arguments.tenderplan_store,
             )
         elif arguments.command == "yandex-status":
             result = yandex_journal_status(arguments.job_id)

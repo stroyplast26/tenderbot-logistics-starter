@@ -1950,6 +1950,16 @@ def validate_tenderplan_read_only_store(path: str | Path) -> dict[str, object]:
 
     store = _existing_store(path)
     with store._transaction(write=False) as connection:  # noqa: SLF001
+        states = {state.value: 0 for state in TenderPlanReadOnlyRunState}
+        for row in connection.execute(
+            """SELECT e.state, COUNT(*) AS state_count
+               FROM tenderplan_read_only_events e
+               WHERE e.sequence=(
+                   SELECT MAX(x.sequence) FROM tenderplan_read_only_events x
+                   WHERE x.run_id=e.run_id
+               ) GROUP BY e.state"""
+        ):
+            states[str(row["state"])] = int(row["state_count"])
         return {
             "automatic_schedule_eligible": False,
             "card_count": int(
@@ -1979,6 +1989,7 @@ def validate_tenderplan_read_only_store(path: str | Path) -> dict[str, object]:
                 TENDERPLAN_READ_ONLY_STORE_SCHEMA_FINGERPRINT_SHA256
             ),
             "spend_minor": 0,
+            "states": states,
             "store_identity_sha256": store.store_identity_sha256,
             "write_count": 0,
         }

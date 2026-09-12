@@ -777,6 +777,9 @@ def test_tenderplan_delegates_exactly_once_without_storing_query(tmp_path: Path)
     with patch(
         "lead_factory.source_discovery_control.run_tenderplan_read_only_intake",
         side_effect=fake_runner,
+    ), patch(
+        "lead_factory.source_discovery_control.check_tenderplan_read_only_intake",
+        return_value={"state": "READY_FOR_SEPARATE_AUTHORITY_CHECK"},
     ):
         report = run_source_discovery_once(
             "TENDERPLAN",
@@ -789,6 +792,7 @@ def test_tenderplan_delegates_exactly_once_without_storing_query(tmp_path: Path)
     assert len(calls) == 1
     assert calls[0][0] == secret_query
     assert calls[0][1]["confirmation"] == TENDERPLAN_READ_ONLY_CONFIRMATION
+    assert calls[0][1]["require_existing_store"] is True
     assert calls[0][1]["registration_path"] == tmp_path / "registration.json"
     assert calls[0][1]["store_path"] == tmp_path / "queue.sqlite3"
     assert report["state"] == "READY_FOR_REVIEW"
