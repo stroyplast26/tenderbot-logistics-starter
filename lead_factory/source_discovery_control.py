@@ -63,6 +63,11 @@ from lead_factory.tenderplan_read_only_transport import (
     tenderplan_read_only_query_policy_sha256,
     tenderplan_read_only_request_sha256,
 )
+from lead_factory.tenderplan_profile_request import (
+    PreparedTenderPlanSearch,
+    TenderPlanProfileRequestError,
+    validate_prepared_tenderplan_search,
+)
 
 
 SOURCE_DISCOVERY_CONTROL_VERSION: Final = "source-discovery-control-v5"
@@ -554,6 +559,7 @@ def _expected_tenderplan_run_id(attempt_id: str) -> str:
 def _verified_tenderplan_binding(
     attempt_id: str, result: TenderPlanReadOnlyIntakeResult, query: str, store_path: str | Path,
     registration_path: str | Path,
+    *, profile_request: PreparedTenderPlanSearch | None = None,
 ) -> dict[str, object]:
     """Verify a causal receipt using metadata only, never decrypt or bootstrap."""
     try:
@@ -561,7 +567,10 @@ def _verified_tenderplan_binding(
             raise ValueError
         # A frozen dataclass can still be replaced or forged at a boundary.
         result.__post_init__()
-        policy = tenderplan_read_only_query_policy_sha256(query, maximum_records=TENDERPLAN_READ_ONLY_MAX_RECORDS)
+        policy = tenderplan_read_only_query_policy_sha256(
+            query, maximum_records=TENDERPLAN_READ_ONLY_MAX_RECORDS,
+            profile_request=profile_request,
+        )
         account_registration = _verified_account_registration(store_path)
         auth_reference, credential_target_sha256 = (
             account_registration[:2] if account_registration is not None
@@ -583,6 +592,7 @@ def _verified_tenderplan_binding(
                 query_policy_sha256=policy, expires_at_utc=intent["expires_at_utc"],
                 maximum_response_bytes=TENDERPLAN_READ_ONLY_MAX_RESPONSE_BYTES,
                 maximum_records=TENDERPLAN_READ_ONLY_MAX_RECORDS,
+                profile_request=profile_request,
             )
             if (
                 ready.run_id != result.run_id or ready.receipt_record_sha256 != result.receipt_record_sha256
@@ -1505,6 +1515,7 @@ def check_source_discovery(
     tenderplan_query: str = TENDERPLAN_READ_ONLY_DEFAULT_QUERY,
     tenderplan_registration_path: str | Path | None = None,
     tenderplan_store_path: str | Path | None = None,
+    tenderplan_profile_request: PreparedTenderPlanSearch | None = None,
 ) -> dict[str, object]:
     """Check local configuration and backpressure only; never calls a provider."""
 
@@ -1512,6 +1523,16 @@ def check_source_discovery(
     path = _state_path(state_path)
     limit = _wip_limit(wip_limit)
     control = _snapshot(path, limit)
+    profile_valid = True
+    if tenderplan_profile_request is not None:
+        try:
+            if selected is not SourceDiscoverySource.TENDERPLAN:
+                raise TenderPlanProfileRequestError
+            tenderplan_read_only_query_policy_sha256(
+                tenderplan_query, profile_request=tenderplan_profile_request
+            )
+        except (TenderPlanProfileRequestError, ValueError, RuntimeError):
+            profile_valid = False
     if selected in _OFFLINE_CONTRACT_SOURCES:
         state = "BLOCKED_OFFLINE_CONTRACT"
     elif control["gate"] != "READY":
@@ -1520,7 +1541,9 @@ def check_source_discovery(
         yandex_job_path is None or type(folder_id) is not str or not folder_id.strip()
     ):
         state = "BLOCKED_CONFIGURATION"
-    elif selected is SourceDiscoverySource.TENDERPLAN and (
+    elif not profile_valid:
+        state = "BLOCKED_CONFIGURATION"
+    elif selected is SourceDiscoverySource.TENDERPLAN and tenderplan_profile_request is None and (
         type(tenderplan_query) is not str or not tenderplan_query.strip()
     ):
         state = "BLOCKED_CONFIGURATION"
@@ -1623,6 +1646,7 @@ def _verify_source_discovery_authority_core(
     tenderplan_query: str,
     tenderplan_registration_path: str | Path | None,
     tenderplan_store_path: str | Path | None,
+    tenderplan_profile_request: PreparedTenderPlanSearch | None = None,
 ) -> dict[str, object]:
     report = check_source_discovery(
         source,
@@ -1633,6 +1657,7 @@ def _verify_source_discovery_authority_core(
         tenderplan_query=tenderplan_query,
         tenderplan_registration_path=tenderplan_registration_path,
         tenderplan_store_path=tenderplan_store_path,
+        tenderplan_profile_request=tenderplan_profile_request,
     )
     selected = _source(source)
     if (
@@ -1680,6 +1705,7 @@ def verify_source_discovery_authority(
     tenderplan_query: str = TENDERPLAN_READ_ONLY_DEFAULT_QUERY,
     tenderplan_registration_path: str | Path | None = None,
     tenderplan_store_path: str | Path | None = None,
+    tenderplan_profile_request: PreparedTenderPlanSearch | None = None,
 ) -> dict[str, object]:
     """Run the supported local authority check without credentials or provider I/O."""
 
@@ -1693,6 +1719,7 @@ def verify_source_discovery_authority(
             tenderplan_query=tenderplan_query,
             tenderplan_registration_path=tenderplan_registration_path,
             tenderplan_store_path=tenderplan_store_path,
+            tenderplan_profile_request=tenderplan_profile_request,
         )
     except SourceDiscoveryControlError as error:
         failure_code = _known_control_failure_code(
@@ -1702,7 +1729,7 @@ def verify_source_discovery_authority(
     except BaseException:
         failure_code = "YANDEX_AUTHORITY_CHECK_REJECTED"
     del source, state_path, wip_limit, yandex_job_path, folder_id, tenderplan_query
-    del tenderplan_registration_path, tenderplan_store_path
+    del tenderplan_registration_path, tenderplan_store_path, tenderplan_profile_request
     _raise_detached_control_failure(failure_code)
 
 
@@ -2577,6 +2604,7 @@ def _run_source_discovery_once_core(
     tenderplan_query: str = TENDERPLAN_READ_ONLY_DEFAULT_QUERY,
     tenderplan_registration_path: str | Path | None = None,
     tenderplan_store_path: str | Path | None = None,
+    tenderplan_profile_request: PreparedTenderPlanSearch | None = None,
 ) -> dict[str, object]:
     """Delegate once to one already-authorized source-native one-shot runner."""
 
@@ -2585,6 +2613,19 @@ def _run_source_discovery_once_core(
     limit = _wip_limit(wip_limit)
     if selected in _OFFLINE_CONTRACT_SOURCES:
         return _blocked_run_report(selected, "BLOCKED_OFFLINE_CONTRACT", path=path, wip_limit=limit)
+    prepared = None
+    if tenderplan_profile_request is not None:
+        try:
+            if selected is not SourceDiscoverySource.TENDERPLAN:
+                raise TenderPlanProfileRequestError
+            prepared = validate_prepared_tenderplan_search(tenderplan_profile_request)
+            tenderplan_read_only_query_policy_sha256(
+                tenderplan_query, profile_request=prepared
+            )
+        except (TenderPlanProfileRequestError, ValueError, RuntimeError):
+            return _blocked_run_report(
+                selected, "BLOCKED_CONFIGURATION", path=path, wip_limit=limit
+            )
     check = check_source_discovery(
         selected,
         state_path=path,
@@ -2594,6 +2635,7 @@ def _run_source_discovery_once_core(
         tenderplan_query=tenderplan_query,
         tenderplan_registration_path=tenderplan_registration_path,
         tenderplan_store_path=tenderplan_store_path,
+        tenderplan_profile_request=prepared,
     )
     if check["state"] != "READY_FOR_SEPARATE_AUTHORITY_CHECK":
         return _blocked_run_report(selected, str(check["state"]), path=path, wip_limit=limit)
@@ -2705,6 +2747,8 @@ def _run_source_discovery_once_core(
                 tenderplan_options["registration_path"] = tenderplan_registration_path
             if tenderplan_store_path is not None:
                 tenderplan_options["store_path"] = tenderplan_store_path
+            profile_options = {"profile_request": prepared} if prepared is not None else {}
+            tenderplan_options.update(profile_options)
             native_runner_call_count = 1
             external_requests_this_run = None
             journal_report = _accounting_marker("NOT_EXPOSED_FOR_SOURCE")
@@ -2719,6 +2763,7 @@ def _run_source_discovery_once_core(
                 attempt_id, result, tenderplan_query,
                 tenderplan_store_path if tenderplan_store_path is not None else TENDERPLAN_READ_ONLY_QUEUE_PATH,
                 tenderplan_registration_path if tenderplan_registration_path is not None else TENDERPLAN_OWNER_CANARY_REGISTRATION_PATH,
+                **profile_options,
             )
             _finish(path, attempt_id, "READY_FOR_REVIEW" if review_count else "COMPLETE_NO_RESULTS",
                     review_count, tenderplan_binding=binding)
@@ -2806,6 +2851,7 @@ def run_source_discovery_once(
     tenderplan_query: str = TENDERPLAN_READ_ONLY_DEFAULT_QUERY,
     tenderplan_registration_path: str | Path | None = None,
     tenderplan_store_path: str | Path | None = None,
+    tenderplan_profile_request: PreparedTenderPlanSearch | None = None,
 ) -> dict[str, object]:
     """Run one source behind a detached, sanitized public failure boundary."""
 
@@ -2820,6 +2866,7 @@ def run_source_discovery_once(
             tenderplan_query=tenderplan_query,
             tenderplan_registration_path=tenderplan_registration_path,
             tenderplan_store_path=tenderplan_store_path,
+            tenderplan_profile_request=tenderplan_profile_request,
         )
     except YandexSourceLabBridgeError as error:
         failure_family = "YANDEX"
@@ -2847,6 +2894,7 @@ def run_source_discovery_once(
         tenderplan_query,
         tenderplan_registration_path,
         tenderplan_store_path,
+        tenderplan_profile_request,
     )
     if failure_family == "YANDEX":
         _raise_detached_yandex_control_failure(failure_code)

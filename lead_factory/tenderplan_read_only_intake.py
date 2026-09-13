@@ -23,6 +23,11 @@ from lead_factory.tenderplan_account_connection import (
     TenderPlanAccountConnectionError,
     validate_tenderplan_account_connection,
 )
+from lead_factory.tenderplan_profile_request import (
+    PreparedTenderPlanSearch,
+    TenderPlanProfileRequestError,
+    validate_prepared_tenderplan_search,
+)
 
 from lead_factory.tenderplan_isolated_transport import (
     TenderPlanIsolatedTransportError,
@@ -384,6 +389,7 @@ def run_tenderplan_read_only_intake(
     clock: Callable[[], datetime] | None = None,
     require_existing_store: bool = False,
     run_id: str | None = None,
+    profile_request: PreparedTenderPlanSearch | None = None,
 ) -> TenderPlanReadOnlyIntakeResult:
     """Perform exactly one explicit read and queue only encrypted cards."""
 
@@ -393,8 +399,19 @@ def run_tenderplan_read_only_intake(
         or (run_id is not None and (type(run_id) is not str or re.fullmatch(r"tpri_[0-9a-f]{32}", run_id) is None))
     ):
         raise TenderPlanReadOnlyIntakeValidationError
-    # Query validation and hashing are deliberately delegated to the strict
-    # transport helper.  No query text enters the intent or queue.
+    # Freeze admitted criteria before account lookup, queue creation or reserve.
+    # The existing durable digests bind the body without storing private words.
+    try:
+        prepared = (
+            validate_prepared_tenderplan_search(profile_request)
+            if profile_request is not None else None
+        )
+        query_policy_sha256 = tenderplan_read_only_query_policy_sha256(
+            query, maximum_records=TENDERPLAN_READ_ONLY_MAX_RECORDS,
+            profile_request=prepared,
+        )
+    except (TenderPlanProfileRequestError, TenderPlanIsolatedTransportError):
+        raise TenderPlanReadOnlyIntakeValidationError from None
     now_clock = clock or (lambda: datetime.now(timezone.utc))
     requested = _now(now_clock)
     try:
@@ -412,10 +429,6 @@ def run_tenderplan_read_only_intake(
     run_id = run_id if run_id is not None else f"tpri_{secrets.token_hex(16)}"
     nonce_sha256 = _sha256(secrets.token_bytes(32))
     try:
-        query_policy_sha256 = tenderplan_read_only_query_policy_sha256(
-            query,
-            maximum_records=TENDERPLAN_READ_ONLY_MAX_RECORDS,
-        )
         request_sha256 = tenderplan_read_only_request_sha256(
             run_id=run_id,
             auth_reference_id_sha256=auth_reference_id_sha256,
@@ -425,6 +438,7 @@ def run_tenderplan_read_only_intake(
             expires_at_utc=expires_at_utc,
             maximum_response_bytes=TENDERPLAN_READ_ONLY_MAX_RESPONSE_BYTES,
             maximum_records=TENDERPLAN_READ_ONLY_MAX_RECORDS,
+            profile_request=prepared,
         )
     except TenderPlanIsolatedTransportError:
         raise TenderPlanReadOnlyIntakeValidationError from None
@@ -500,6 +514,7 @@ def run_tenderplan_read_only_intake(
             )
             raise TenderPlanReadOnlyIntakeValidationError from None
     try:
+        profile_options = {"profile_request": prepared} if prepared is not None else {}
         batch = boundary.post_registered_search(
             query,
             reference,
@@ -512,6 +527,7 @@ def run_tenderplan_read_only_intake(
             expires_at_utc=expires_at_utc,
             maximum_response_bytes=TENDERPLAN_READ_ONLY_MAX_RESPONSE_BYTES,
             maximum_records=TENDERPLAN_READ_ONLY_MAX_RECORDS,
+            **profile_options,
         )
     except TenderPlanReadOnlyDiagnosticUncertain as error:
         _record_uncertain_diagnostic_best_effort(

@@ -262,7 +262,10 @@ def _parser() -> argparse.ArgumentParser:
         command.add_argument("--wip-limit", type=int, default=1)
         command.add_argument("--yandex-job")
         command.add_argument("--folder-id")
-        command.add_argument("--query", default=TENDERPLAN_READ_ONLY_DEFAULT_QUERY)
+        selection = command.add_mutually_exclusive_group()
+        selection.add_argument("--query")
+        selection.add_argument("--tenderplan-profile-binding")
+        command.add_argument("--expected-tenderplan-profile-sha256", type=_sha256)
         command.add_argument("--tenderplan-registration")
         command.add_argument("--tenderplan-store")
         if name == "run-one":
@@ -338,6 +341,28 @@ def main(argv: list[str] | None = None) -> int:
         )
         return 2
     try:
+        profile_options = {}
+        if arguments.command in {"check", "run-one"}:
+            from lead_factory.tenderplan_profile_request import (
+                TenderPlanProfileRequestError,
+                load_tenderplan_profile_request,
+            )
+
+            binding = arguments.tenderplan_profile_binding
+            pin = arguments.expected_tenderplan_profile_sha256
+            if (binding is None) != (pin is None) or (
+                binding is not None and arguments.source != "TENDERPLAN"
+            ):
+                raise SourceDiscoveryControlError("TENDERPLAN_PROFILE_REQUEST_INVALID")
+            if binding is not None:
+                try:
+                    prepared = load_tenderplan_profile_request(binding, expected_sha256=pin)
+                except TenderPlanProfileRequestError:
+                    raise SourceDiscoveryControlError("TENDERPLAN_PROFILE_REQUEST_INVALID") from None
+                profile_options["tenderplan_profile_request"] = prepared
+                query = ""
+            else:
+                query = arguments.query if arguments.query is not None else TENDERPLAN_READ_ONLY_DEFAULT_QUERY
         if arguments.command == "plan":
             result = source_discovery_plan()
         elif arguments.command == "status":
@@ -357,9 +382,10 @@ def main(argv: list[str] | None = None) -> int:
                 wip_limit=arguments.wip_limit,
                 yandex_job_path=arguments.yandex_job,
                 folder_id=arguments.folder_id,
-                tenderplan_query=arguments.query,
+                tenderplan_query=query,
                 tenderplan_registration_path=arguments.tenderplan_registration,
                 tenderplan_store_path=arguments.tenderplan_store,
+                **profile_options,
             )
         elif arguments.command == "yandex-status":
             result = yandex_journal_status(arguments.job_id)
@@ -419,9 +445,10 @@ def main(argv: list[str] | None = None) -> int:
                 wip_limit=arguments.wip_limit,
                 yandex_job_path=arguments.yandex_job,
                 folder_id=arguments.folder_id,
-                tenderplan_query=arguments.query,
+                tenderplan_query=query,
                 tenderplan_registration_path=arguments.tenderplan_registration,
                 tenderplan_store_path=arguments.tenderplan_store,
+                **profile_options,
             )
         elif arguments.command == "review-list":
             items = list_yandex_review_batch(

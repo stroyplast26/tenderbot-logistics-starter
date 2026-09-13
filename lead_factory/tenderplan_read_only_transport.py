@@ -58,6 +58,12 @@ from lead_factory.tenderplan_isolated_transport import (  # noqa: E402
 from lead_factory.tenderplan_account_connection import (  # noqa: E402
     validate_tenderplan_account_connection,
 )
+from lead_factory.tenderplan_profile_request import (  # noqa: E402
+    PreparedTenderPlanSearch,
+    TenderPlanProfileRequestError,
+    prepare_tenderplan_profile_request,
+    validate_prepared_tenderplan_search,
+)
 from lead_factory.tenderplan_read_only_crypto import (  # noqa: E402
     EncryptedTenderPlanCardV1,
     TenderPlanReadOnlyCryptoError,
@@ -84,6 +90,9 @@ from lead_factory.tenderplan_windows_credential import (  # noqa: E402
 
 
 TENDERPLAN_READ_ONLY_WORKER_PROTOCOL_V1: Final = "tenderplan-read-only-worker-v1"
+TENDERPLAN_READ_ONLY_PROFILE_WORKER_PROTOCOL_V1: Final = (
+    "tenderplan-profile-read-only-worker-v1"
+)
 TENDERPLAN_READ_ONLY_QUERY_POLICY_PROTOCOL_V1: Final = (
     "tenderplan-read-only-query-policy-v1"
 )
@@ -348,9 +357,29 @@ def tenderplan_read_only_query_policy_sha256(
     query: str,
     *,
     maximum_records: int = TENDERPLAN_READ_ONLY_MAX_RECORDS,
+    profile_request: PreparedTenderPlanSearch | None = None,
 ) -> str:
     """Hash the exact private query without returning its text."""
 
+    if profile_request is not None:
+        try:
+            prepared = validate_prepared_tenderplan_search(profile_request)
+        except TenderPlanProfileRequestError:
+            raise TenderPlanIsolatedValidationError(
+                "TenderPlan profile request is invalid"
+            ) from None
+        if type(query) is not str or query != "":
+            raise TenderPlanIsolatedValidationError(
+                "TenderPlan profile query must be empty"
+            )
+        return _sha256_json({
+            "body_sha256": _sha256_bytes(prepared.body_bytes),
+            "profile_binding_sha256": prepared.binding_sha256,
+            "maximum_projected_records": _maximum_records(maximum_records),
+            "page": 0,
+            "protocol": "tenderplan-profile-query-policy-v1",
+            "set": "actual",
+        })
     query_value = _query(query)
     maximum = _maximum_records(maximum_records)
     return _sha256_json(
@@ -374,13 +403,22 @@ def tenderplan_read_only_request_sha256(
     expires_at_utc: str,
     maximum_response_bytes: int = TENDERPLAN_READ_ONLY_MAX_RESPONSE_BYTES,
     maximum_records: int = TENDERPLAN_READ_ONLY_MAX_RECORDS,
+    profile_request: PreparedTenderPlanSearch | None = None,
 ) -> str:
     """Seal request metadata that is durably stored before the worker starts."""
 
+    body = b"{}"
+    if profile_request is not None:
+        try:
+            body = validate_prepared_tenderplan_search(profile_request).body_bytes
+        except TenderPlanProfileRequestError:
+            raise TenderPlanIsolatedValidationError(
+                "TenderPlan profile request is invalid"
+            ) from None
     return _sha256_json(
         {
             "auth_reference_id_sha256": _digest(auth_reference_id_sha256),
-            "body_sha256": _sha256_bytes(b"{}"),
+            "body_sha256": _sha256_bytes(body),
             "credential_target_sha256": _digest(credential_target_sha256),
             "expires_at_utc": _expiry(expires_at_utc),
             "host": TENDERPLAN_ISOLATED_HOST,
@@ -671,8 +709,9 @@ def _request_mapping(
     expires_at_utc: str,
     maximum_response_bytes: int,
     maximum_records: int,
+    profile_request: PreparedTenderPlanSearch | None = None,
 ) -> dict[str, object]:
-    return {
+    result = {
         "auth_reference_id": auth_reference_id,
         "credential_target_sha256": credential_target_sha256,
         "expires_at_utc": expires_at_utc,
@@ -686,6 +725,19 @@ def _request_mapping(
         "request_sha256": request_sha256,
         "run_id": run_id,
     }
+    if profile_request is not None:
+        # Validation also forbids combining a text query with profile criteria.
+        tenderplan_read_only_query_policy_sha256(
+            query, maximum_records=maximum_records, profile_request=profile_request
+        )
+        prepared = validate_prepared_tenderplan_search(profile_request)
+        result.pop("query")
+        result.update({
+            "protocol": TENDERPLAN_READ_ONLY_PROFILE_WORKER_PROTOCOL_V1,
+            "profile_binding": prepared.binding_bytes.decode("ascii"),
+            "expected_profile_binding_sha256": prepared.binding_sha256,
+        })
+    return result
 
 
 def _validate_request(value: dict[str, object]) -> dict[str, object]:
@@ -703,14 +755,35 @@ def _validate_request(value: dict[str, object]) -> dict[str, object]:
         "request_sha256",
         "run_id",
     }
+    typed = value.get("protocol") == TENDERPLAN_READ_ONLY_PROFILE_WORKER_PROTOCOL_V1
+    if typed:
+        expected.remove("query")
+        expected.update({"profile_binding", "expected_profile_binding_sha256"})
     if (
         set(value) != expected
-        or value.get("protocol") != TENDERPLAN_READ_ONLY_WORKER_PROTOCOL_V1
+        or value.get("protocol") not in {
+            TENDERPLAN_READ_ONLY_WORKER_PROTOCOL_V1,
+            TENDERPLAN_READ_ONLY_PROFILE_WORKER_PROTOCOL_V1,
+        }
     ):
         raise TenderPlanIsolatedValidationError(
             "TenderPlan read-only worker request is invalid"
         )
-    query_value = _query(value["query"])
+    prepared = None
+    if typed:
+        try:
+            raw_binding = value["profile_binding"]
+            if type(raw_binding) is not str:
+                raise TenderPlanProfileRequestError
+            prepared = prepare_tenderplan_profile_request(
+                raw_binding.encode("ascii", "strict"),
+                expected_sha256=value["expected_profile_binding_sha256"],
+            )
+        except (TenderPlanProfileRequestError, UnicodeError):
+            raise TenderPlanIsolatedValidationError(
+                "TenderPlan profile request is invalid"
+            ) from None
+    query_value = "" if typed else _query(value["query"])
     reference = _auth_reference(value["auth_reference_id"])
     run = _run_id(value["run_id"])
     nonce = _digest(value["nonce_sha256"])
@@ -725,6 +798,7 @@ def _validate_request(value: dict[str, object]) -> dict[str, object]:
     expected_policy = tenderplan_read_only_query_policy_sha256(
         query_value,
         maximum_records=maximum_cards,
+        profile_request=prepared,
     )
     expected_target = _credential_target_sha256(reference)
     expected_request = tenderplan_read_only_request_sha256(
@@ -736,6 +810,7 @@ def _validate_request(value: dict[str, object]) -> dict[str, object]:
         expires_at_utc=expiry,
         maximum_response_bytes=maximum_bytes,
         maximum_records=maximum_cards,
+        profile_request=prepared,
     )
     if (
         policy != expected_policy
@@ -745,7 +820,7 @@ def _validate_request(value: dict[str, object]) -> dict[str, object]:
         raise TenderPlanIsolatedAuthorizationError(
             "TenderPlan read-only worker binding differs"
         )
-    return {
+    result = {
         "auth_reference_id": reference,
         "auth_reference_id_sha256": auth_digest,
         "credential_target_sha256": target,
@@ -759,6 +834,9 @@ def _validate_request(value: dict[str, object]) -> dict[str, object]:
         "request_sha256": request,
         "run_id": run,
     }
+    if prepared is not None:
+        result["profile_request"] = prepared
+    return result
 
 
 def _execute_worker(request: dict[str, object]) -> TenderPlanReadOnlyEncryptedBatch:
@@ -803,10 +881,15 @@ def _execute_worker(request: dict[str, object]) -> TenderPlanReadOnlyEncryptedBa
     except BaseException:
         raise _WorkerDiagnosticFailure("credential_unavailable") from None
     try:
+        profile_options = (
+            {"profile_request": values["profile_request"]}
+            if "profile_request" in values else {}
+        )
         response = _perform_worker_post(
             str(values["query"]),
             bearer,
             int(values["maximum_response_bytes"]),
+            **profile_options,
         )
     except BaseException:
         # Provider entry may already have occurred.  This deliberately says
@@ -1137,8 +1220,19 @@ class TenderPlanReadOnlyTransport:
         total_timeout_seconds: int = TENDERPLAN_READ_ONLY_TOTAL_TIMEOUT_SECONDS,
         maximum_response_bytes: int = TENDERPLAN_READ_ONLY_MAX_RESPONSE_BYTES,
         maximum_records: int = TENDERPLAN_READ_ONLY_MAX_RECORDS,
+        profile_request: PreparedTenderPlanSearch | None = None,
     ) -> TenderPlanReadOnlyEncryptedBatch:
-        query_value = _query(query)
+        # Freeze and validate the profile before consuming the one-use transport.
+        try:
+            prepared = (
+                validate_prepared_tenderplan_search(profile_request)
+                if profile_request is not None else None
+            )
+        except TenderPlanProfileRequestError:
+            raise TenderPlanIsolatedValidationError(
+                "TenderPlan profile request is invalid"
+            ) from None
+        query_value = query if prepared is not None else _query(query)
         reference = _auth_reference(auth_reference_id)
         run = _run_id(run_id)
         nonce = _digest(nonce_sha256)
@@ -1159,6 +1253,7 @@ class TenderPlanReadOnlyTransport:
         expected_policy = tenderplan_read_only_query_policy_sha256(
             query_value,
             maximum_records=maximum_cards,
+            profile_request=prepared,
         )
         auth_digest = _sha256_bytes(reference.encode("ascii", "strict"))
         expected_target = _credential_target_sha256(reference)
@@ -1171,6 +1266,7 @@ class TenderPlanReadOnlyTransport:
             expires_at_utc=expiry,
             maximum_response_bytes=maximum_bytes,
             maximum_records=maximum_cards,
+            profile_request=prepared,
         )
         if (
             policy != expected_policy
@@ -1202,6 +1298,7 @@ class TenderPlanReadOnlyTransport:
             expires_at_utc=expiry,
             maximum_response_bytes=maximum_bytes,
             maximum_records=maximum_cards,
+            profile_request=prepared,
         )
         encoded = _canonical_bytes(worker_request)
         if len(encoded) > _MAX_WORKER_INPUT_BYTES:

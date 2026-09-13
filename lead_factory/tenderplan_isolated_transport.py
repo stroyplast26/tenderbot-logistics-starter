@@ -1837,8 +1837,30 @@ def _perform_worker_post(
     query: str,
     bearer_token: str,
     maximum_response_bytes: int,
+    *,
+    profile_request: object = None,
 ) -> TenderPlanIsolatedResponse:
-    url = f"{TENDERPLAN_ISOLATED_URL}?{urlencode({'set': 'actual', 'page': 0, 'q': query})}"
+    parameters = {"set": "actual", "page": 0, "q": query}
+    body = b"{}"
+    if profile_request is not None:
+        from lead_factory.tenderplan_profile_request import (
+            TenderPlanProfileRequestError,
+            validate_prepared_tenderplan_search,
+        )
+
+        try:
+            prepared = validate_prepared_tenderplan_search(profile_request)
+        except TenderPlanProfileRequestError:
+            raise TenderPlanIsolatedValidationError(
+                "TenderPlan profile request is invalid"
+            ) from None
+        if type(query) is not str or query != "":
+            raise TenderPlanIsolatedValidationError(
+                "TenderPlan profile query must be empty"
+            )
+        parameters.pop("q")
+        body = prepared.body_bytes
+    url = f"{TENDERPLAN_ISOLATED_URL}?{urlencode(parameters)}"
     headers = {
         "Accept": "application/json",
         "Accept-Encoding": "identity",
@@ -1859,7 +1881,7 @@ def _perform_worker_post(
         response = session.post(
             url,
             headers=headers,
-            data=b"{}",
+            data=body,
             timeout=(_CONNECT_TIMEOUT_SECONDS, _READ_TIMEOUT_SECONDS),
             allow_redirects=False,
             stream=True,
