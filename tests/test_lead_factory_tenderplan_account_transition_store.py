@@ -435,6 +435,28 @@ def test_expected_transition_pin_rejects_v1_or_different_record_before_insert(tm
     ).created
 
 
+def test_complete_exact_account_pin_bundle_is_accepted_atomically(tmp_path):
+    path, arguments, _ = make_transition_fixture(tmp_path, moved=False)
+    prepared = prepare_tenderplan_account_transition(path, **arguments, apply=True)
+    account = arguments["active_connection"]
+    store = TenderPlanReadOnlyStore(path, clock=lambda: NOW)
+
+    receipt = store.reserve_intent(
+        _new_intent(NEW_RUN, account),
+        expected_account_transition_sha256=prepared["account_transition"][
+            "record_sha256"
+        ],
+        expected_connection_profile_sha256=account["profile_sha256"],
+        expected_connection_profile_record_sha256=account[
+            "profile_record_sha256"
+        ],
+        expected_credential_target_sha256=account["credential_target_sha256"],
+    )
+
+    assert receipt.created is True
+    assert validate_tenderplan_read_only_store(path)["operation_count"] == 2
+
+
 def test_pinned_v2_object_rejects_same_path_v1_replacement(tmp_path):
     path, arguments, _ = make_transition_fixture(tmp_path, moved=False)
     original_v1 = path.read_bytes()

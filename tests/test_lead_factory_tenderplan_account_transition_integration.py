@@ -90,6 +90,88 @@ def test_changed_profile_stops_before_any_new_intent(transition, monkeypatch):
     provider.assert_not_called()
 
 
+@pytest.mark.parametrize(
+    "changed_pin",
+    (
+        "expected_account_transition_sha256",
+        "expected_connection_profile_sha256",
+        "expected_connection_profile_record_sha256",
+        "expected_credential_target_sha256",
+    ),
+)
+def test_exact_account_pins_reject_tamper_before_queue_insert_or_transport(
+    transition,
+    monkeypatch: pytest.MonkeyPatch,
+    changed_pin: str,
+) -> None:
+    queue, kwargs, _, _, result = transition
+    active = kwargs["active_connection"]
+    pins = {
+        "expected_account_transition_sha256": result["account_transition"][
+            "record_sha256"
+        ],
+        "expected_connection_profile_sha256": active["profile_sha256"],
+        "expected_connection_profile_record_sha256": active[
+            "profile_record_sha256"
+        ],
+        "expected_credential_target_sha256": active[
+            "credential_target_sha256"
+        ],
+    }
+    pins[changed_pin] = "0" * 64
+    before = queue.read_bytes()
+    before_count = validate_tenderplan_read_only_store(queue)["operation_count"]
+    provider = Mock(side_effect=AssertionError("transport reached after stale pin"))
+    monkeypatch.setattr(
+        intake.TenderPlanReadOnlyTransport, "post_registered_search", provider
+    )
+
+    with pytest.raises(intake.TenderPlanReadOnlyIntakeReconciliationRequired):
+        intake.run_tenderplan_read_only_intake(
+            "окна",
+            confirmation=intake.TENDERPLAN_READ_ONLY_CONFIRMATION,
+            store_path=queue,
+            require_existing_store=True,
+            **pins,
+        )
+
+    assert queue.read_bytes() == before
+    assert (
+        validate_tenderplan_read_only_store(queue)["operation_count"]
+        == before_count
+    )
+    provider.assert_not_called()
+
+
+def test_exact_account_pins_are_all_or_none_before_queue_insert_or_transport(
+    transition,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    queue, kwargs, _, _, result = transition
+    before = queue.read_bytes()
+    provider = Mock(side_effect=AssertionError("transport reached after partial pins"))
+    monkeypatch.setattr(
+        intake.TenderPlanReadOnlyTransport, "post_registered_search", provider
+    )
+
+    with pytest.raises(intake.TenderPlanReadOnlyIntakeReconciliationRequired):
+        intake.run_tenderplan_read_only_intake(
+            "окна",
+            confirmation=intake.TENDERPLAN_READ_ONLY_CONFIRMATION,
+            store_path=queue,
+            require_existing_store=True,
+            expected_account_transition_sha256=result["account_transition"][
+                "record_sha256"
+            ],
+            expected_connection_profile_sha256=kwargs["active_connection"][
+                "profile_sha256"
+            ],
+        )
+
+    assert queue.read_bytes() == before
+    provider.assert_not_called()
+
+
 def test_account_transition_does_not_close_common_yandex_wip(transition, tmp_path, monkeypatch):
     queue, _, _, _, _ = transition
     common = tmp_path / "controller.sqlite3"

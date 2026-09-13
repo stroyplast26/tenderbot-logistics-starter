@@ -5,10 +5,14 @@ from dataclasses import replace
 import hashlib
 import json
 import os
+from pathlib import Path
+import subprocess
+import sys
 
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 import pytest
 
+from lead_factory import tenderplan_read_only_crypto as crypto
 from lead_factory.tenderplan_read_only_crypto import (
     EncryptedTenderPlanCardV1,
     TenderPlanReadOnlyCryptoError,
@@ -485,3 +489,43 @@ def test_windows_dpapi_production_default_round_trip() -> None:
         )
         == card
     )
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows CNG is Windows-only")
+def test_windows_cng_gcm_ciphertext_is_aesgcm_envelope_compatible(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    key = bytes(range(32))
+    nonce = bytes(range(12))
+    plaintext = b'{"title":"sealed-worker-cng"}'
+    aad = b'{"protocol":"tenderplan-read-only-card-v1"}'
+
+    monkeypatch.setattr(crypto, "_SEALED_WORKER", True)
+    monkeypatch.setattr(crypto, "AESGCM", None)
+    sealed = crypto._aes_gcm_encrypt(key, nonce, plaintext, aad)
+
+    assert sealed == AESGCM(key).encrypt(nonce, plaintext, aad)
+    assert AESGCM(key).decrypt(nonce, sealed, aad) == plaintext
+
+
+def test_sealed_worker_crypto_import_has_no_third_party_dependency() -> None:
+    project_root = Path(__file__).resolve().parents[1]
+    script = (
+        "import sys\n"
+        f"sys.path.insert(0, {str(project_root)!r})\n"
+        "sys._tenderplan_sealed_worker = True\n"
+        "import lead_factory.tenderplan_read_only_crypto as crypto\n"
+        "assert crypto.AESGCM is None\n"
+        "assert not any(name == 'cryptography' or "
+        "name.startswith('cryptography.') for name in sys.modules)\n"
+    )
+
+    completed = subprocess.run(
+        [sys.executable, "-I", "-B", "-S", "-c", script],
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
+
+    assert completed.returncode == 0, completed.stderr

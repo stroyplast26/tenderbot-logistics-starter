@@ -1614,9 +1614,22 @@ class TenderPlanReadOnlyStore:
         intent_mapping: Mapping[str, object],
         *,
         expected_account_transition_sha256: str | None = None,
+        expected_connection_profile_sha256: str | None = None,
+        expected_connection_profile_record_sha256: str | None = None,
+        expected_credential_target_sha256: str | None = None,
     ) -> TenderPlanReadOnlyOperationReceipt:
-        if expected_account_transition_sha256 is not None:
-            _hex64(expected_account_transition_sha256)
+        exact_account_pins = (
+            expected_account_transition_sha256,
+            expected_connection_profile_sha256,
+            expected_connection_profile_record_sha256,
+            expected_credential_target_sha256,
+        )
+        exact_account_binding_required = any(
+            value is not None for value in exact_account_pins[1:]
+        )
+        for value in exact_account_pins:
+            if value is not None:
+                _hex64(value)
         intent = _normalize_intent(intent_mapping)
         now = self._now()
         if not (
@@ -1632,11 +1645,31 @@ class TenderPlanReadOnlyStore:
         intent_json = _canonical_json(intent)
         run_id = str(intent["run_id"])
         with self._transaction(write=True) as connection:
+            # The long-standing transition-only pin remains supported.  Once
+            # any exact active-account field is requested, the complete bundle
+            # is required and checked under the same writer fence.
+            if exact_account_binding_required and any(
+                value is None for value in exact_account_pins
+            ):
+                raise TenderPlanReadOnlyStoreValidationError
             if expected_account_transition_sha256 is not None and (
                 self._account_transition is None
                 or self._account_transition["record_sha256"] != expected_account_transition_sha256
             ):
                 raise TenderPlanReadOnlyStoreReconciliationRequired
+            if exact_account_binding_required:
+                if self._account_transition is None:
+                    raise TenderPlanReadOnlyStoreReconciliationRequired
+                active = self._account_transition["active_connection"]
+                if (
+                    active["profile_sha256"]
+                    != expected_connection_profile_sha256
+                    or active["profile_record_sha256"]
+                    != expected_connection_profile_record_sha256
+                    or active["credential_target_sha256"]
+                    != expected_credential_target_sha256
+                ):
+                    raise TenderPlanReadOnlyStoreReconciliationRequired
             _require_active_account(self._account_transition, intent)
             frozen_run = (
                 str(self._account_transition["legacy_run_id"])

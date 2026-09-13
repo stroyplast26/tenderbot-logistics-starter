@@ -60,6 +60,7 @@ from lead_factory.tenderplan_read_only_store import TENDERPLAN_READ_ONLY_QUEUE_P
 from lead_factory.tenderplan_read_only_transport import (
     TENDERPLAN_READ_ONLY_MAX_RECORDS,
     TENDERPLAN_READ_ONLY_MAX_RESPONSE_BYTES,
+    TenderPlanSealedWorker,
     tenderplan_read_only_query_policy_sha256,
     tenderplan_read_only_request_sha256,
 )
@@ -731,6 +732,13 @@ def _open_for_write(
             probe = _open_read_only(path)
             try:
                 version = _control_schema_version(probe)
+                journal_mode = str(
+                    probe.execute("PRAGMA journal_mode").fetchone()[0]
+                ).lower()
+                if journal_mode != "delete":
+                    raise SourceDiscoveryControlError(
+                        "CONTROL_STATE_INTEGRITY_FAILED"
+                    )
                 if require_tenderplan and version not in {5, 6}:
                     raise SourceDiscoveryControlError("CONTROL_SCHEMA_PREPARATION_REQUIRED")
             finally:
@@ -744,15 +752,19 @@ def _open_for_write(
         )
         connection.row_factory = sqlite3.Row
         connection.execute("PRAGMA foreign_keys=ON")
-        if prepare_tenderplan:
-            # Preparation must not rewrite an unexpected concurrently created
-            # database merely to discover that its schema cannot be prepared.
-            if str(connection.execute("PRAGMA journal_mode").fetchone()[0]).lower() != "delete":
-                raise SourceDiscoveryControlError("CONTROL_STATE_INTEGRITY_FAILED")
-        else:
+        if not (prepare_tenderplan or require_tenderplan):
             connection.execute("PRAGMA journal_mode=DELETE")
         connection.execute("PRAGMA synchronous=FULL")
         connection.execute("BEGIN IMMEDIATE")
+        # Exact Tenderplan admission and explicit schema preparation inspect
+        # the existing journal mode without rewriting it.  Repeat under the
+        # writer fence to close the race after the read-only probe above.
+        if (
+            (prepare_tenderplan or require_tenderplan)
+            and str(connection.execute("PRAGMA journal_mode").fetchone()[0]).lower()
+            != "delete"
+        ):
+            raise SourceDiscoveryControlError("CONTROL_STATE_INTEGRITY_FAILED")
         if require_existing and connection.execute(
             "SELECT 1 FROM sqlite_master WHERE type='table' AND name='source_discovery_attempts'"
         ).fetchone() is None:
@@ -1397,9 +1409,17 @@ def _validate_closed_yandex_batches(
             connection.close()
 
 
-def _snapshot(path: Path, wip_limit: int) -> dict[str, object]:
-    rows = _rows(path)
-    _validate_closed_yandex_batches(path, rows)
+def _snapshot(
+    path: Path,
+    wip_limit: int,
+    *,
+    _connection: sqlite3.Connection | None = None,
+    _lab_connection: sqlite3.Connection | None = None,
+) -> dict[str, object]:
+    rows = _rows(path, _connection=_connection)
+    _validate_closed_yandex_batches(
+        path, rows, _lab_connection=_lab_connection
+    )
     state_counts = {
         state: sum(str(row["state"]) == state for row in rows) for state in sorted(_ATTEMPT_STATES)
     }
@@ -1758,7 +1778,22 @@ def _reserve(
     path: Path,
     source: SourceDiscoverySource,
     wip_limit: int,
+    *,
+    expected_controller_file_sha256: str | None = None,
+    expected_controller_snapshot_sha256: str | None = None,
 ) -> tuple[str | None, str | None]:
+    controller_pins = (
+        expected_controller_file_sha256,
+        expected_controller_snapshot_sha256,
+    )
+    if any(value is None for value in controller_pins) != all(
+        value is None for value in controller_pins
+    ) or any(
+        value is not None
+        and (type(value) is not str or _SHA256.fullmatch(value) is None)
+        for value in controller_pins
+    ):
+        raise SourceDiscoveryControlError("CONTROL_STATE_INTEGRITY_FAILED")
     connection = _open_for_write(path, require_tenderplan=source is SourceDiscoverySource.TENDERPLAN)
     lab_connection: sqlite3.Connection | None = None
     try:
@@ -1770,6 +1805,27 @@ def _reserve(
             if deferred_attempts:
                 lab_connection = _open_existing_local_fence(_source_lab_path(control_path=path))
             _validate_closed_yandex_batches(path, validated_rows, _lab_connection=lab_connection)
+        if expected_controller_file_sha256 is not None:
+            try:
+                controller_file_sha256 = hashlib.sha256(path.read_bytes()).hexdigest()
+            except OSError:
+                raise SourceDiscoveryControlError("CONTROL_STATE_UNAVAILABLE") from None
+            controller_snapshot_sha256 = _digest(
+                _snapshot(
+                    path,
+                    wip_limit,
+                    _connection=connection,
+                    _lab_connection=lab_connection,
+                )
+            )
+            if (
+                controller_file_sha256 != expected_controller_file_sha256
+                or controller_snapshot_sha256
+                != expected_controller_snapshot_sha256
+            ):
+                raise SourceDiscoveryControlError(
+                    "CONTROL_RECONCILIATION_REQUIRED"
+                )
         rows = connection.execute(
             """SELECT a.attempt_id,a.state,c.attempt_id AS closed_attempt_id
                FROM source_discovery_attempts a
@@ -1809,6 +1865,12 @@ def _reserve(
             )
         connection.execute("COMMIT")
         return attempt_id, None
+    except SourceDiscoveryControlError:
+        try:
+            connection.execute("ROLLBACK")
+        except sqlite3.Error:
+            pass
+        raise
     except sqlite3.Error:
         try:
             connection.execute("ROLLBACK")
@@ -2605,6 +2667,13 @@ def _run_source_discovery_once_core(
     tenderplan_registration_path: str | Path | None = None,
     tenderplan_store_path: str | Path | None = None,
     tenderplan_profile_request: PreparedTenderPlanSearch | None = None,
+    expected_controller_file_sha256: str | None = None,
+    expected_controller_snapshot_sha256: str | None = None,
+    expected_account_transition_sha256: str | None = None,
+    expected_connection_profile_sha256: str | None = None,
+    expected_connection_profile_record_sha256: str | None = None,
+    expected_credential_target_sha256: str | None = None,
+    tenderplan_sealed_worker: TenderPlanSealedWorker | None = None,
 ) -> dict[str, object]:
     """Delegate once to one already-authorized source-native one-shot runner."""
 
@@ -2651,7 +2720,13 @@ def _run_source_discovery_once_core(
     )
     if lab_path is not None:
         preflight_yandex_source_lab(lab_path)
-    attempt_id, blocked_state = _reserve(path, selected, limit)
+    attempt_id, blocked_state = _reserve(
+        path,
+        selected,
+        limit,
+        expected_controller_file_sha256=expected_controller_file_sha256,
+        expected_controller_snapshot_sha256=expected_controller_snapshot_sha256,
+    )
     if attempt_id is None:
         # The refusal is the outcome observed under BEGIN IMMEDIATE.  The
         # snapshot added to the report below is diagnostic only and may already
@@ -2747,6 +2822,23 @@ def _run_source_discovery_once_core(
                 tenderplan_options["registration_path"] = tenderplan_registration_path
             if tenderplan_store_path is not None:
                 tenderplan_options["store_path"] = tenderplan_store_path
+            tenderplan_options.update(
+                {
+                    "expected_account_transition_sha256": (
+                        expected_account_transition_sha256
+                    ),
+                    "expected_connection_profile_sha256": (
+                        expected_connection_profile_sha256
+                    ),
+                    "expected_connection_profile_record_sha256": (
+                        expected_connection_profile_record_sha256
+                    ),
+                    "expected_credential_target_sha256": (
+                        expected_credential_target_sha256
+                    ),
+                    "tenderplan_sealed_worker": tenderplan_sealed_worker,
+                }
+            )
             profile_options = {"profile_request": prepared} if prepared is not None else {}
             tenderplan_options.update(profile_options)
             native_runner_call_count = 1
@@ -2852,6 +2944,13 @@ def run_source_discovery_once(
     tenderplan_registration_path: str | Path | None = None,
     tenderplan_store_path: str | Path | None = None,
     tenderplan_profile_request: PreparedTenderPlanSearch | None = None,
+    expected_controller_file_sha256: str | None = None,
+    expected_controller_snapshot_sha256: str | None = None,
+    expected_account_transition_sha256: str | None = None,
+    expected_connection_profile_sha256: str | None = None,
+    expected_connection_profile_record_sha256: str | None = None,
+    expected_credential_target_sha256: str | None = None,
+    tenderplan_sealed_worker: TenderPlanSealedWorker | None = None,
 ) -> dict[str, object]:
     """Run one source behind a detached, sanitized public failure boundary."""
 
@@ -2867,6 +2966,15 @@ def run_source_discovery_once(
             tenderplan_registration_path=tenderplan_registration_path,
             tenderplan_store_path=tenderplan_store_path,
             tenderplan_profile_request=tenderplan_profile_request,
+            expected_controller_file_sha256=expected_controller_file_sha256,
+            expected_controller_snapshot_sha256=expected_controller_snapshot_sha256,
+            expected_account_transition_sha256=expected_account_transition_sha256,
+            expected_connection_profile_sha256=expected_connection_profile_sha256,
+            expected_connection_profile_record_sha256=(
+                expected_connection_profile_record_sha256
+            ),
+            expected_credential_target_sha256=expected_credential_target_sha256,
+            tenderplan_sealed_worker=tenderplan_sealed_worker,
         )
     except YandexSourceLabBridgeError as error:
         failure_family = "YANDEX"
@@ -2895,6 +3003,13 @@ def run_source_discovery_once(
         tenderplan_registration_path,
         tenderplan_store_path,
         tenderplan_profile_request,
+        expected_controller_file_sha256,
+        expected_controller_snapshot_sha256,
+        expected_account_transition_sha256,
+        expected_connection_profile_sha256,
+        expected_connection_profile_record_sha256,
+        expected_credential_target_sha256,
+        tenderplan_sealed_worker,
     )
     if failure_family == "YANDEX":
         _raise_detached_yandex_control_failure(failure_code)

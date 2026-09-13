@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import fields, is_dataclass
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -30,6 +31,7 @@ from lead_factory.tenderplan_read_only_intake import (
     TENDERPLAN_READ_ONLY_CONFIRMATION,
     TenderPlanReadOnlyIntakeResult,
 )
+from lead_factory.tenderplan_read_only_transport import TenderPlanSealedWorker
 import scripts.run_source_discovery_once as source_cli
 
 
@@ -780,6 +782,32 @@ def test_tenderplan_delegates_exactly_once_without_storing_query(tmp_path: Path,
     _registration(registration)
     intake.TenderPlanReadOnlyStore(queue, clock=lambda: NOW)
     fake_type = _success_transport(queue, returned_count=1)
+    sealed_worker = TenderPlanSealedWorker(
+        bundle_path=str(tmp_path / "sealed-worker.py"),
+        bundle_sha256="8" * 64,
+        logical_root=str(tmp_path / "runtime"),
+        worker_python_path=str(tmp_path / "sealed-python" / "python.exe"),
+        worker_python_sha256="9" * 64,
+        python_path_configuration_path=str(
+            tmp_path / "sealed-python" / "python311._pth"
+        ),
+        python_path_configuration_sha256="a" * 64,
+        base_runtime_path=str(tmp_path / "sealed-python"),
+        base_runtime_tree_sha256="b" * 64,
+        base_runtime_file_count=1,
+        base_runtime_directory_count=1,
+        base_runtime_directory_sha256="d" * 64,
+        base_runtime_total_bytes=1,
+        queue_path=str(queue),
+        connection_profile_path=str(registration),
+        connection_profile_sha256="c" * 64,
+    )
+    exact_account_pins = {
+        "expected_account_transition_sha256": "4" * 64,
+        "expected_connection_profile_sha256": "5" * 64,
+        "expected_connection_profile_record_sha256": "6" * 64,
+        "expected_credential_target_sha256": "7" * 64,
+    }
     original_post = fake_type.post_registered_search
 
     def synthetic_post(self, query, reference, **values):
@@ -790,8 +818,14 @@ def test_tenderplan_delegates_exactly_once_without_storing_query(tmp_path: Path,
     monkeypatch.setattr(intake, "TenderPlanReadOnlyTransport", fake_type)
 
     def fake_runner(query: object, **options: object) -> TenderPlanReadOnlyIntakeResult:
-        calls.append((query, options))
-        return intake.run_tenderplan_read_only_intake(query, **options, transport=fake_type(), clock=lambda: NOW)
+        calls.append((query, dict(options)))
+        local_options = dict(options)
+        for key in exact_account_pins:
+            local_options.pop(key)
+        local_options.pop("tenderplan_sealed_worker")
+        return intake.run_tenderplan_read_only_intake(
+            query, **local_options, transport=fake_type(), clock=lambda: NOW
+        )
 
     with patch(
         "lead_factory.source_discovery_control.run_tenderplan_read_only_intake",
@@ -807,6 +841,8 @@ def test_tenderplan_delegates_exactly_once_without_storing_query(tmp_path: Path,
             tenderplan_query=secret_query,
             tenderplan_registration_path=tmp_path / "registration.json",
             tenderplan_store_path=tmp_path / "queue.sqlite3",
+            tenderplan_sealed_worker=sealed_worker,
+            **exact_account_pins,
         )
     assert len(calls) == 1
     assert calls[0][0] == secret_query
@@ -814,9 +850,199 @@ def test_tenderplan_delegates_exactly_once_without_storing_query(tmp_path: Path,
     assert calls[0][1]["require_existing_store"] is True
     assert calls[0][1]["registration_path"] == tmp_path / "registration.json"
     assert calls[0][1]["store_path"] == tmp_path / "queue.sqlite3"
+    assert calls[0][1]["tenderplan_sealed_worker"] is sealed_worker
+    assert {
+        key: calls[0][1][key] for key in exact_account_pins
+    } == exact_account_pins
     assert report["state"] == "READY_FOR_REVIEW"
     assert secret_query not in _serialized(report)
     assert secret_query.encode() not in state_path.read_bytes()
+
+
+def test_controller_exact_pins_reject_state_race_before_attempt_or_transport(
+    tmp_path: Path,
+) -> None:
+    state_path = tmp_path / "control.sqlite3"
+    control.prepare_source_discovery_tenderplan_bindings(
+        state_path=state_path,
+        confirmation=control.SOURCE_DISCOVERY_PREPARE_CONFIRMATION,
+    )
+    with patch.object(
+        control,
+        "check_tenderplan_read_only_intake",
+        return_value={"state": "READY_FOR_SEPARATE_AUTHORITY_CHECK"},
+    ):
+        initial = check_source_discovery(
+            "TENDERPLAN", state_path=state_path, wip_limit=1
+        )
+    expected_file_sha256 = hashlib.sha256(state_path.read_bytes()).hexdigest()
+    expected_snapshot_sha256 = control._digest(initial["control"])  # noqa: SLF001
+    original_check = control.check_source_discovery
+
+    def raced_check(*args: object, **kwargs: object) -> dict[str, object]:
+        report = original_check(*args, **kwargs)
+        attempt_id, blocked = control._reserve(  # noqa: SLF001
+            state_path, control.SourceDiscoverySource.YANDEX, 1
+        )
+        assert attempt_id is not None and blocked is None
+        control._record_yandex_binding(  # noqa: SLF001
+            state_path, attempt_id, _binding()
+        )
+        outcome = _accounted_page("race", hits=0)
+        external_requests, journal = control._validated_yandex_accounting(  # noqa: SLF001
+            outcome.external_requests_this_run,
+            outcome.journal,
+            completed=True,
+        )
+        control._record_yandex_accounting(  # noqa: SLF001
+            state_path,
+            attempt_id,
+            external_requests,
+            journal,
+            outcome="COMPLETED",
+        )
+        control._finish(state_path, attempt_id, "COMPLETE_NO_RESULTS", 0)  # noqa: SLF001
+        return report
+
+    with (
+        patch.object(
+            control,
+            "check_tenderplan_read_only_intake",
+            return_value={"state": "READY_FOR_SEPARATE_AUTHORITY_CHECK"},
+        ),
+        patch.object(control, "check_source_discovery", side_effect=raced_check),
+        patch.object(control, "run_tenderplan_read_only_intake") as native,
+        pytest.raises(SourceDiscoveryControlError) as caught,
+    ):
+        run_source_discovery_once(
+            "TENDERPLAN",
+            confirmation=SOURCE_DISCOVERY_ONE_SHOT_CONFIRMATION,
+            state_path=state_path,
+            expected_controller_file_sha256=expected_file_sha256,
+            expected_controller_snapshot_sha256=expected_snapshot_sha256,
+        )
+
+    assert caught.value.code == "CONTROL_RECONCILIATION_REQUIRED"
+    native.assert_not_called()
+    with sqlite3.connect(state_path) as connection:
+        rows = connection.execute(
+            "SELECT source,state FROM source_discovery_attempts ORDER BY sequence"
+        ).fetchall()
+    assert rows == [("YANDEX", "COMPLETE_NO_RESULTS")]
+
+
+@pytest.mark.parametrize("changed_pin", ("file", "snapshot"))
+def test_controller_reservation_checks_each_exact_pin_before_insert(
+    tmp_path: Path,
+    changed_pin: str,
+) -> None:
+    state_path = tmp_path / "control.sqlite3"
+    control.prepare_source_discovery_tenderplan_bindings(
+        state_path=state_path,
+        confirmation=control.SOURCE_DISCOVERY_PREPARE_CONFIRMATION,
+    )
+    file_sha256 = hashlib.sha256(state_path.read_bytes()).hexdigest()
+    snapshot_sha256 = control._digest(  # noqa: SLF001
+        control._snapshot(state_path, 1)  # noqa: SLF001
+    )
+    if changed_pin == "file":
+        file_sha256 = "0" * 64
+    else:
+        snapshot_sha256 = "0" * 64
+
+    with pytest.raises(SourceDiscoveryControlError) as caught:
+        control._reserve(  # noqa: SLF001
+            state_path,
+            control.SourceDiscoverySource.TENDERPLAN,
+            1,
+            expected_controller_file_sha256=file_sha256,
+            expected_controller_snapshot_sha256=snapshot_sha256,
+        )
+
+    assert caught.value.code == "CONTROL_RECONCILIATION_REQUIRED"
+    with sqlite3.connect(state_path) as connection:
+        count = connection.execute(
+            "SELECT COUNT(*) FROM source_discovery_attempts"
+        ).fetchone()[0]
+    assert count == 0
+
+
+def test_controller_reservation_accepts_matching_exact_pins_under_writer_fence(
+    tmp_path: Path,
+) -> None:
+    state_path = tmp_path / "control.sqlite3"
+    control.prepare_source_discovery_tenderplan_bindings(
+        state_path=state_path,
+        confirmation=control.SOURCE_DISCOVERY_PREPARE_CONFIRMATION,
+    )
+    file_sha256 = hashlib.sha256(state_path.read_bytes()).hexdigest()
+    snapshot_sha256 = control._digest(  # noqa: SLF001
+        control._snapshot(state_path, 1)  # noqa: SLF001
+    )
+
+    attempt_id, blocked = control._reserve(  # noqa: SLF001
+        state_path,
+        control.SourceDiscoverySource.TENDERPLAN,
+        1,
+        expected_controller_file_sha256=file_sha256,
+        expected_controller_snapshot_sha256=snapshot_sha256,
+    )
+
+    assert attempt_id is not None
+    assert blocked is None
+    with sqlite3.connect(state_path) as connection:
+        rows = connection.execute(
+            "SELECT attempt_id,source,state FROM source_discovery_attempts"
+        ).fetchall()
+    assert rows == [(attempt_id, "TENDERPLAN", "RUNNING")]
+
+
+def test_controller_exact_pins_reject_wal_without_mutating_state(
+    tmp_path: Path,
+) -> None:
+    state_path = tmp_path / "control.sqlite3"
+    control.prepare_source_discovery_tenderplan_bindings(
+        state_path=state_path,
+        confirmation=control.SOURCE_DISCOVERY_PREPARE_CONFIRMATION,
+    )
+    connection = sqlite3.connect(state_path)
+    try:
+        assert connection.execute("PRAGMA journal_mode=WAL").fetchone()[0] == "wal"
+    finally:
+        connection.close()
+    expected_snapshot_sha256 = control._digest(  # noqa: SLF001
+        control._snapshot(state_path, 1)  # noqa: SLF001
+    )
+    expected_file_sha256 = hashlib.sha256(state_path.read_bytes()).hexdigest()
+    before_files = {
+        item.name: item.read_bytes()
+        for item in tmp_path.iterdir()
+        if item.is_file()
+    }
+
+    with pytest.raises(SourceDiscoveryControlError) as caught:
+        control._reserve(  # noqa: SLF001
+            state_path,
+            control.SourceDiscoverySource.TENDERPLAN,
+            1,
+            expected_controller_file_sha256=expected_file_sha256,
+            expected_controller_snapshot_sha256=expected_snapshot_sha256,
+        )
+
+    assert caught.value.code == "CONTROL_STATE_INTEGRITY_FAILED"
+    assert {
+        item.name: item.read_bytes()
+        for item in tmp_path.iterdir()
+        if item.is_file()
+    } == before_files
+    connection = sqlite3.connect(state_path)
+    try:
+        assert connection.execute("PRAGMA journal_mode").fetchone()[0] == "wal"
+        assert connection.execute(
+            "SELECT COUNT(*) FROM source_discovery_attempts"
+        ).fetchone()[0] == 0
+    finally:
+        connection.close()
 
 
 def test_offline_contract_sources_are_explicitly_blocked_without_state(

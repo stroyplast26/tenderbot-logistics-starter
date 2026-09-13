@@ -43,7 +43,12 @@ from time import monotonic
 from typing import Final
 from urllib.parse import urlencode
 
-import requests
+if not getattr(sys, "_tenderplan_sealed_worker", False):
+    import requests
+else:
+    # The exact credential worker deliberately has no third-party import path.
+    # Its HTTPS implementation lives in ``tenderplan_read_only_transport``.
+    requests = None  # type: ignore[assignment]
 
 
 TENDERPLAN_ISOLATED_METHOD: Final = "POST"
@@ -730,6 +735,8 @@ class _WindowsIsolatedProcessSupervisor:
 
     __slots__ = (
         "_command",
+        "_cwd",
+        "_environment",
         "_last_process_id",
         "_last_returncode",
         "_last_captured_output_bytes",
@@ -742,6 +749,8 @@ class _WindowsIsolatedProcessSupervisor:
         command: tuple[str, ...],
         *,
         maximum_output_bytes: int = _MAX_WORKER_OUTPUT_BYTES,
+        cwd: str | None = None,
+        environment: dict[str, str] | None = None,
     ) -> None:
         if (
             type(command) is not tuple
@@ -755,7 +764,34 @@ class _WindowsIsolatedProcessSupervisor:
             raise TenderPlanIsolatedValidationError(
                 "TenderPlan worker output limit is invalid"
             )
+        if cwd is not None and (
+            type(cwd) is not str
+            or not cwd
+            or not Path(cwd).is_absolute()
+            or _CONTROL.search(cwd) is not None
+        ):
+            raise TenderPlanIsolatedValidationError(
+                "TenderPlan worker directory is invalid"
+            )
+        if environment is not None and (
+            type(environment) is not dict
+            or not environment
+            or any(
+                type(name) is not str
+                or not name
+                or "=" in name
+                or "\x00" in name
+                or type(value) is not str
+                or "\x00" in value
+                for name, value in environment.items()
+            )
+        ):
+            raise TenderPlanIsolatedValidationError(
+                "TenderPlan worker environment is invalid"
+            )
         self._command = command
+        self._cwd = cwd
+        self._environment = dict(environment) if environment is not None else None
         self._maximum_output_bytes = maximum_output_bytes
         self._last_process_id: int | None = None
         self._last_returncode: int | None = None
@@ -778,7 +814,12 @@ class _WindowsIsolatedProcessSupervisor:
                 bufsize=0,
                 close_fds=True,
                 creationflags=creation_flags,
-                env=_minimal_worker_environment(),
+                cwd=self._cwd,
+                env=(
+                    dict(self._environment)
+                    if self._environment is not None
+                    else _minimal_worker_environment()
+                ),
             )
         except (OSError, ValueError):
             raise TenderPlanIsolatedStopped(
@@ -1840,6 +1881,10 @@ def _perform_worker_post(
     *,
     profile_request: object = None,
 ) -> TenderPlanIsolatedResponse:
+    if requests is None:
+        raise TenderPlanIsolatedStopped(
+            "TenderPlan requests transport is unavailable in the sealed worker"
+        )
     parameters = {"set": "actual", "page": 0, "q": query}
     body = b"{}"
     if profile_request is not None:

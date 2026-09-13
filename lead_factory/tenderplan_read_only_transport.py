@@ -22,6 +22,7 @@ import json
 import os
 from pathlib import Path
 import re
+import stat
 import sys
 import threading
 from typing import Final
@@ -31,15 +32,20 @@ from typing import Final
 # from sys.path.  Add only the immutable workspace root derived from __file__;
 # no cwd or environment-controlled import path is used by the worker.
 _ROOT = Path(__file__).resolve().parent.parent
-if str(_ROOT) not in sys.path:
+if (
+    not getattr(sys, "_tenderplan_sealed_worker", False)
+    and str(_ROOT) not in sys.path
+):
     sys.path.insert(0, str(_ROOT))
 
 from lead_factory.tenderplan_isolated_transport import (  # noqa: E402
     TENDERPLAN_ISOLATED_HOST,
     TENDERPLAN_ISOLATED_METHOD,
     TENDERPLAN_ISOLATED_PATH,
+    TENDERPLAN_ISOLATED_USER_AGENT,
     TenderPlanIsolatedAuthorizationError,
     TenderPlanIsolatedQuotaExceeded,
+    TenderPlanIsolatedResponse,
     TenderPlanIsolatedStopped,
     TenderPlanIsolatedTransportError,
     TenderPlanIsolatedUncertain,
@@ -102,8 +108,14 @@ TENDERPLAN_READ_ONLY_MAX_RESPONSE_BYTES: Final = 1_048_576
 TENDERPLAN_READ_ONLY_MAX_RECORDS: Final = 5
 TENDERPLAN_READ_ONLY_MAX_OUTPUT_BYTES: Final = 262_144
 TENDERPLAN_READ_ONLY_TOTAL_TIMEOUT_SECONDS: Final = 30
+TENDERPLAN_SEALED_WORKER_PROTOCOL_V1: Final = "tenderplan-sealed-worker-bundle-v1"
 
 _MAX_WORKER_INPUT_BYTES = 8_192
+_MAX_SEALED_WORKER_BUNDLE_BYTES = 16_777_216
+_MAX_SEALED_RUNTIME_FILES = 100_000
+_MAX_SEALED_RUNTIME_BYTES = 1_073_741_824
+_CLOUD_TAG_MASK = 0xFFFF0FFF
+_CLOUD_TAG_BASE = 0x9000001A
 _MAX_QUERY_CHARS = 256
 _MAX_ENCRYPTED_CARDS = 5
 _CONTROL = re.compile(r"[\x00-\x1f\x7f]")
@@ -112,6 +124,8 @@ _AUTH_REFERENCE = re.compile(r"^authref_[0-9a-f]{32}$")
 _RUN_ID = re.compile(r"^tpri_[0-9a-f]{32}$")
 _UTC = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}Z$")
 _OBVIOUS_PERSONAL_QUERY = re.compile(r"@|://|\d{7,}")
+_SEALED_CONNECTION_PROFILE_PATH: str | None = None
+_SEALED_CONNECTION_PROFILE_SHA256: str | None = None
 _WORKER_ERROR_CODES = frozenset(
     {
         "authorization",
@@ -130,6 +144,28 @@ _WORKER_ERROR_CODES = frozenset(
         "validation",
     }
 )
+
+
+@dataclass(frozen=True)
+class TenderPlanSealedWorker:
+    """Exact in-memory source bundle for the contained credential/HTTP worker."""
+
+    bundle_path: str
+    bundle_sha256: str
+    logical_root: str
+    worker_python_path: str
+    worker_python_sha256: str
+    python_path_configuration_path: str
+    python_path_configuration_sha256: str
+    base_runtime_path: str
+    base_runtime_tree_sha256: str
+    base_runtime_file_count: int
+    base_runtime_directory_count: int
+    base_runtime_directory_sha256: str
+    base_runtime_total_bytes: int
+    queue_path: str
+    connection_profile_path: str
+    connection_profile_sha256: str
 
 
 class _WorkerDiagnosticFailure(TenderPlanIsolatedValidationError):
@@ -839,6 +875,169 @@ def _validate_request(value: dict[str, object]) -> dict[str, object]:
     return result
 
 
+def _perform_sealed_worker_post(
+    query: str,
+    bearer_token: str,
+    maximum_response_bytes: int,
+    *,
+    profile_request: object = None,
+) -> TenderPlanIsolatedResponse:
+    """Perform the exact worker POST with the standard library only."""
+
+    import http.client
+    import ssl
+    from urllib.parse import urlencode
+
+    maximum_bytes = _maximum_response_bytes(maximum_response_bytes)
+    if (
+        type(bearer_token) is not str
+        or not 16 <= len(bearer_token) <= 4_096
+        or re.fullmatch(r"[A-Za-z0-9._~-]+", bearer_token) is None
+    ):
+        raise TenderPlanIsolatedAuthorizationError(
+            "TenderPlan credential material is invalid"
+        )
+    query_value = query if profile_request is not None else _query(query)
+    parameters: dict[str, object] = {
+        "set": "actual",
+        "page": 0,
+        "q": query_value,
+    }
+    body = b"{}"
+    if profile_request is not None:
+        try:
+            prepared = validate_prepared_tenderplan_search(profile_request)
+        except TenderPlanProfileRequestError:
+            raise TenderPlanIsolatedValidationError(
+                "TenderPlan profile request is invalid"
+            ) from None
+        if type(query_value) is not str or query_value != "":
+            raise TenderPlanIsolatedValidationError(
+                "TenderPlan profile query must be empty"
+            )
+        parameters.pop("q")
+        body = prepared.body_bytes
+    target = f"{TENDERPLAN_ISOLATED_PATH}?{urlencode(parameters)}"
+    headers = {
+        "Accept": "application/json",
+        "Accept-Encoding": "identity",
+        "Authorization": f"Bearer {bearer_token}",
+        "Content-Type": "application/json",
+        "User-Agent": TENDERPLAN_ISOLATED_USER_AGENT,
+    }
+    connection: http.client.HTTPSConnection | None = None
+    response: http.client.HTTPResponse | None = None
+    try:
+        context = ssl.create_default_context()
+        if not context.check_hostname or context.verify_mode != ssl.CERT_REQUIRED:
+            raise TenderPlanIsolatedValidationError(
+                "TenderPlan TLS verification is unavailable"
+            )
+        connection = http.client.HTTPSConnection(
+            TENDERPLAN_ISOLATED_HOST,
+            443,
+            timeout=5,
+            context=context,
+        )
+        connection.connect()
+        if connection.sock is None:
+            raise OSError
+        connection.sock.settimeout(10)
+        connection.request(
+            TENDERPLAN_ISOLATED_METHOD,
+            target,
+            body=body,
+            headers=headers,
+        )
+        response = connection.getresponse()
+        raw_headers = response.getheaders()
+        if type(raw_headers) is not list or any(
+            type(item) is not tuple
+            or len(item) != 2
+            or type(item[0]) is not str
+            or type(item[1]) is not str
+            for item in raw_headers
+        ):
+            raise TenderPlanIsolatedValidationError(
+                "TenderPlan response metadata is invalid"
+            )
+
+        def one_header(name: str) -> str:
+            selected = [
+                value for key, value in raw_headers if key.casefold() == name.casefold()
+            ]
+            if len(selected) > 1:
+                raise TenderPlanIsolatedValidationError(
+                    "TenderPlan response metadata is invalid"
+                )
+            return selected[0] if selected else ""
+
+        content_encoding = one_header("Content-Encoding")
+        if content_encoding.casefold().strip() not in {"", "identity"}:
+            raise TenderPlanIsolatedValidationError(
+                "TenderPlan response encoding is invalid"
+            )
+        content_length = one_header("Content-Length")
+        if content_length:
+            if re.fullmatch(r"[0-9]+", content_length) is None:
+                raise TenderPlanIsolatedValidationError(
+                    "TenderPlan response length is invalid"
+                )
+            declared_length = int(content_length, 10)
+            if declared_length > maximum_bytes:
+                raise TenderPlanIsolatedQuotaExceeded(
+                    "TenderPlan response exceeded the isolated byte limit"
+                )
+        status = int(response.status)
+        content_type = one_header("Content-Type")
+        if (
+            not 100 <= status <= 599
+            or len(content_type) > 255
+            or _CONTROL.search(content_type) is not None
+        ):
+            raise TenderPlanIsolatedValidationError(
+                "TenderPlan response metadata is invalid"
+            )
+        chunks: list[bytes] = []
+        total = 0
+        while True:
+            chunk = response.read(min(65_536, maximum_bytes - total + 1))
+            if not chunk:
+                break
+            if type(chunk) is not bytes:
+                raise TenderPlanIsolatedValidationError(
+                    "TenderPlan response body is invalid"
+                )
+            total += len(chunk)
+            if total > maximum_bytes:
+                raise TenderPlanIsolatedQuotaExceeded(
+                    "TenderPlan response exceeded the isolated byte limit"
+                )
+            chunks.append(chunk)
+        if content_length and total != int(content_length, 10):
+            raise TenderPlanIsolatedValidationError(
+                "TenderPlan response length is invalid"
+            )
+        return TenderPlanIsolatedResponse(status, content_type, b"".join(chunks))
+    except TenderPlanIsolatedTransportError:
+        raise
+    except Exception:
+        raise TenderPlanIsolatedUncertain(
+            "TenderPlan isolated request outcome requires reconciliation"
+        ) from None
+    finally:
+        if response is not None:
+            try:
+                response.close()
+            except Exception:
+                pass
+        if connection is not None:
+            try:
+                connection.close()
+            except Exception:
+                pass
+
+
 def _execute_worker(request: dict[str, object]) -> TenderPlanReadOnlyEncryptedBatch:
     try:
         values = _validate_request(request)
@@ -865,8 +1064,32 @@ def _execute_worker(request: dict[str, object]) -> TenderPlanReadOnlyEncryptedBa
     try:
         account = getattr(verified_intent, "account_connection", None)
         if account is None:
+            if getattr(sys, "_tenderplan_sealed_worker", False):
+                raise TenderPlanIsolatedAuthorizationError(
+                    "tenderplan_sealed_account_binding_missing"
+                )
             bearer = _read_registered_bearer(str(values["auth_reference_id"]))
         else:
+            if getattr(sys, "_tenderplan_sealed_worker", False):
+                try:
+                    current_profile_path = str(
+                        Path(str(account["profile_path"])).resolve(strict=True)
+                    )
+                except (OSError, RuntimeError, ValueError):
+                    raise TenderPlanIsolatedAuthorizationError(
+                        "tenderplan_sealed_account_path_invalid"
+                    ) from None
+                if (
+                    _SEALED_CONNECTION_PROFILE_PATH is None
+                    or _SEALED_CONNECTION_PROFILE_SHA256 is None
+                    or os.path.normcase(current_profile_path)
+                    != os.path.normcase(_SEALED_CONNECTION_PROFILE_PATH)
+                    or account["profile_sha256"]
+                    != _SEALED_CONNECTION_PROFILE_SHA256
+                ):
+                    raise TenderPlanIsolatedAuthorizationError(
+                        "tenderplan_sealed_account_binding_differs"
+                    )
             current = validate_tenderplan_account_connection(
                 account["profile_path"], expected_sha256=account["profile_sha256"]
             )
@@ -885,7 +1108,12 @@ def _execute_worker(request: dict[str, object]) -> TenderPlanReadOnlyEncryptedBa
             {"profile_request": values["profile_request"]}
             if "profile_request" in values else {}
         )
-        response = _perform_worker_post(
+        post = (
+            _perform_sealed_worker_post
+            if getattr(sys, "_tenderplan_sealed_worker", False)
+            else _perform_worker_post
+        )
+        response = post(
             str(values["query"]),
             bearer,
             int(values["maximum_response_bytes"]),
@@ -1187,6 +1415,1193 @@ def _decode_worker_response(
     return batch
 
 
+_SEALED_WORKER_BOOTSTRAP = r"""
+import ctypes
+from ctypes import wintypes
+import hashlib
+import http.client
+import importlib.abc
+import importlib.machinery
+import importlib.util
+import io
+import json
+import os
+from pathlib import Path, PurePosixPath
+import re
+import ssl
+import stat
+import sys
+import urllib.parse
+import zipfile
+
+MAX_BUNDLE = 16777216
+MAX_REQUEST = 8192
+MAX_RUNTIME_FILES = 100000
+MAX_RUNTIME_BYTES = 1073741824
+MANIFEST_NAME = "__sealed_manifest__.json"
+PROTOCOL = "tenderplan-sealed-worker-bundle-v1"
+REPARSE_POINT = 0x400
+CLOUD_TAG_MASK = 0xFFFF0FFF
+CLOUD_TAG_BASE = 0x9000001A
+LOAD_LIBRARY_SEARCH_SYSTEM32 = 0x00000800
+
+
+def stop():
+    raise SystemExit(65)
+
+
+def digest(value):
+    if type(value) is not str or re.fullmatch(r"[0-9a-f]{64}", value) is None:
+        stop()
+    return value
+
+
+def positive_integer(value, maximum):
+    if type(value) is not str or re.fullmatch(r"[0-9]+", value) is None:
+        stop()
+    parsed = int(value)
+    if not 1 <= parsed <= maximum:
+        stop()
+    return parsed
+
+
+def exact_path(value, *, directory, allow_cloud=False):
+    try:
+        path = Path(value)
+        if not path.is_absolute():
+            stop()
+        resolved = path.resolve(strict=True)
+        if os.path.normcase(str(path)) != os.path.normcase(str(resolved)):
+            stop()
+        current = Path(resolved.anchor)
+        for part in resolved.parts[1:]:
+            current /= part
+            details = os.lstat(current)
+            attributes = getattr(details, "st_file_attributes", 0)
+            tag = getattr(details, "st_reparse_tag", 0)
+            cloud = tag != 0 and tag & CLOUD_TAG_MASK == CLOUD_TAG_BASE
+            if attributes & REPARSE_POINT and not (allow_cloud and cloud):
+                stop()
+        details = os.stat(resolved)
+        expected = stat.S_ISDIR if directory else stat.S_ISREG
+        if not expected(details.st_mode):
+            stop()
+        return resolved
+    except (OSError, RuntimeError, TypeError, ValueError):
+        stop()
+
+
+if len(sys.argv) != 18:
+    stop()
+(
+    expected_bundle_sha256,
+    bundle_path_raw,
+    logical_root_raw,
+    base_runtime_raw,
+    expected_runtime_tree_sha256,
+    expected_runtime_file_count_raw,
+    expected_runtime_directory_count_raw,
+    expected_runtime_directory_sha256,
+    expected_runtime_total_bytes_raw,
+    worker_python_raw,
+    expected_worker_python_sha256,
+    python_path_configuration_raw,
+    expected_python_path_configuration_sha256,
+    queue_path_raw,
+    connection_profile_path_raw,
+    expected_connection_profile_sha256,
+    worker_switch,
+) = sys.argv[1:]
+expected_bundle_sha256 = digest(expected_bundle_sha256)
+expected_runtime_tree_sha256 = digest(expected_runtime_tree_sha256)
+expected_runtime_directory_sha256 = digest(expected_runtime_directory_sha256)
+expected_worker_python_sha256 = digest(expected_worker_python_sha256)
+expected_python_path_configuration_sha256 = digest(
+    expected_python_path_configuration_sha256
+)
+expected_connection_profile_sha256 = digest(expected_connection_profile_sha256)
+expected_runtime_file_count = positive_integer(
+    expected_runtime_file_count_raw, MAX_RUNTIME_FILES
+)
+expected_runtime_directory_count = positive_integer(
+    expected_runtime_directory_count_raw, MAX_RUNTIME_FILES
+)
+expected_runtime_total_bytes = positive_integer(
+    expected_runtime_total_bytes_raw, MAX_RUNTIME_BYTES
+)
+if os.name != "nt":
+    stop()
+bundle_path = exact_path(bundle_path_raw, directory=False)
+logical_root = exact_path(logical_root_raw, directory=True, allow_cloud=True)
+base_runtime = exact_path(base_runtime_raw, directory=True)
+worker_python = exact_path(worker_python_raw, directory=False)
+python_path_configuration = exact_path(
+    python_path_configuration_raw, directory=False
+)
+queue_path = exact_path(queue_path_raw, directory=False, allow_cloud=True)
+connection_profile_path = exact_path(
+    connection_profile_path_raw,
+    directory=False,
+    allow_cloud=True,
+)
+try:
+    worker_python.relative_to(base_runtime)
+    python_path_configuration.relative_to(base_runtime)
+except ValueError:
+    stop()
+if os.path.normcase(str(Path(sys.executable).resolve(strict=True))) != os.path.normcase(
+    str(worker_python)
+):
+    stop()
+version_tag = f"python{sys.version_info.major}{sys.version_info.minor}"
+if python_path_configuration.name.casefold() != f"{version_tag}._pth":
+    stop()
+expected_path_configuration = (
+    f"{version_tag}.zip\nDLLs\nLib\n.\n".encode("ascii", "strict")
+)
+try:
+    if python_path_configuration.read_bytes() != expected_path_configuration:
+        stop()
+except OSError:
+    stop()
+expected_sys_path = [
+    str(base_runtime / f"{version_tag}.zip"),
+    str(base_runtime / "DLLs"),
+    str(base_runtime / "Lib"),
+    str(base_runtime),
+]
+if [os.path.normcase(str(Path(item))) for item in sys.path] != [
+    os.path.normcase(item) for item in expected_sys_path
+]:
+    stop()
+
+
+def verified_file(path, *, maximum):
+    try:
+        before = os.stat(path)
+        if not stat.S_ISREG(before.st_mode) or before.st_size < 0 or before.st_size > maximum:
+            stop()
+        checksum = hashlib.sha256()
+        size = 0
+        with path.open("rb") as stream:
+            opened = os.fstat(stream.fileno())
+            if (
+                (opened.st_dev, opened.st_ino, opened.st_size, opened.st_mtime_ns)
+                != (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns)
+            ):
+                stop()
+            while True:
+                chunk = stream.read(1048576)
+                if not chunk:
+                    break
+                size += len(chunk)
+                if size > maximum:
+                    stop()
+                checksum.update(chunk)
+            after = os.fstat(stream.fileno())
+            if (
+                (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns)
+                != (opened.st_dev, opened.st_ino, opened.st_size, opened.st_mtime_ns)
+                or size != opened.st_size
+            ):
+                stop()
+        return size, checksum.hexdigest()
+    except (OSError, RuntimeError, TypeError, ValueError):
+        stop()
+
+
+bundle_size, actual_bundle_sha256 = verified_file(bundle_path, maximum=MAX_BUNDLE)
+if bundle_size == 0 or actual_bundle_sha256 != expected_bundle_sha256:
+    stop()
+try:
+    bundle = bundle_path.read_bytes()
+except OSError:
+    stop()
+if len(bundle) != bundle_size or hashlib.sha256(bundle).hexdigest() != expected_bundle_sha256:
+    stop()
+
+archive = None
+try:
+    archive = zipfile.ZipFile(io.BytesIO(bundle), "r")
+    infos = archive.infolist()
+    names = [item.filename for item in infos]
+    if (
+        len(names) != len(set(names))
+        or MANIFEST_NAME not in names
+        or any(item.is_dir() or item.compress_type != zipfile.ZIP_STORED for item in infos)
+        or sum(item.file_size for item in infos) > MAX_BUNDLE
+    ):
+        stop()
+    manifest_raw = archive.read(MANIFEST_NAME)
+    manifest = json.loads(manifest_raw.decode("ascii", "strict"))
+    if (
+        type(manifest) is not dict
+        or set(manifest) != {"files", "logical_root", "schema"}
+        or manifest.get("schema") != PROTOCOL
+        or manifest.get("logical_root") != str(logical_root)
+        or json.dumps(
+            manifest,
+            ensure_ascii=True,
+            sort_keys=True,
+            separators=(",", ":"),
+            allow_nan=False,
+        ).encode("ascii", "strict") + b"\n" != manifest_raw
+    ):
+        stop()
+    files = manifest.get("files")
+    if type(files) is not dict or not files or set(names) != set(files) | {MANIFEST_NAME}:
+        stop()
+    sources = {}
+    for relative, expected_source_sha256 in sorted(files.items()):
+        if (
+            type(relative) is not str
+            or type(expected_source_sha256) is not str
+            or re.fullmatch(r"[0-9a-f]{64}", expected_source_sha256) is None
+        ):
+            stop()
+        pure = PurePosixPath(relative)
+        if (
+            pure.is_absolute()
+            or ".." in pure.parts
+            or not relative.startswith("lead_factory/")
+            or not relative.endswith(".py")
+            or str(pure) != relative
+        ):
+            stop()
+        source = archive.read(relative)
+        if hashlib.sha256(source).hexdigest() != expected_source_sha256:
+            stop()
+        parts = list(pure.parts)
+        package = parts[-1] == "__init__.py"
+        module_parts = parts[:-1] if package else parts[:-1] + [parts[-1][:-3]]
+        module_name = ".".join(module_parts)
+        if not module_name or module_name in sources:
+            stop()
+        origin = str(logical_root.joinpath(*parts))
+        sources[module_name] = (source, origin, package)
+    if (
+        "lead_factory" not in sources
+        or "lead_factory.tenderplan_read_only_transport" not in sources
+    ):
+        stop()
+finally:
+    if archive is not None:
+        archive.close()
+
+
+class SealedLoader(importlib.abc.Loader):
+    def __init__(self, fullname):
+        self.fullname = fullname
+
+    def create_module(self, spec):
+        return None
+
+    def exec_module(self, module):
+        source, origin, package = sources[self.fullname]
+        module.__file__ = origin
+        module.__package__ = self.fullname if package else self.fullname.rpartition(".")[0]
+        if package:
+            module.__path__ = [str(Path(origin).parent)]
+        exec(compile(source, origin, "exec", dont_inherit=True), module.__dict__)
+
+
+class SealedFinder(importlib.abc.MetaPathFinder):
+    def find_spec(self, fullname, path=None, target=None):
+        if fullname in sources:
+            _source, origin, package = sources[fullname]
+            return importlib.util.spec_from_loader(
+                fullname,
+                SealedLoader(fullname),
+                origin=origin,
+                is_package=package,
+            )
+        if fullname == "lead_factory" or fullname.startswith("lead_factory."):
+            raise ModuleNotFoundError("sealed lead_factory module unavailable")
+        return None
+
+
+setattr(sys, "_tenderplan_sealed_worker", True)
+sys.meta_path.insert(0, SealedFinder())
+import lead_factory.tenderplan_read_only_transport as worker
+if worker_switch != worker.TENDERPLAN_READ_ONLY_WORKER_SWITCH:
+    stop()
+worker.TENDERPLAN_READ_ONLY_QUEUE_PATH = queue_path
+worker._SEALED_CONNECTION_PROFILE_PATH = str(connection_profile_path)
+worker._SEALED_CONNECTION_PROFILE_SHA256 = expected_connection_profile_sha256
+
+# Load every file-backed standard-library dependency before the final inventory.
+# No new file-backed import is permitted after this point.
+try:
+    if "tenderplan.ru".encode("idna", "strict") != b"tenderplan.ru":
+        stop()
+    tls_probe = ssl.create_default_context()
+    if not tls_probe.check_hostname or tls_probe.verify_mode != ssl.CERT_REQUIRED:
+        stop()
+    kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel.GetSystemDirectoryW.argtypes = (wintypes.LPWSTR, wintypes.UINT)
+    kernel.GetSystemDirectoryW.restype = wintypes.UINT
+    system_buffer = ctypes.create_unicode_buffer(32768)
+    system_length = int(kernel.GetSystemDirectoryW(system_buffer, len(system_buffer)))
+    if not 1 <= system_length < len(system_buffer):
+        stop()
+    system32 = exact_path(system_buffer.value, directory=True)
+    system_libraries = [
+        ctypes.WinDLL(str(exact_path(system32 / name, directory=False)), use_last_error=True)
+        for name in ("Advapi32.dll", "bcrypt.dll", "crypt32.dll")
+    ]
+    kernel.SetDefaultDllDirectories.argtypes = (wintypes.DWORD,)
+    kernel.SetDefaultDllDirectories.restype = wintypes.BOOL
+    if not kernel.SetDefaultDllDirectories(LOAD_LIBRARY_SEARCH_SYSTEM32):
+        stop()
+except (AttributeError, OSError, TypeError, ValueError):
+    stop()
+
+
+def runtime_inventory():
+    files = []
+    directories = [("", base_runtime)]
+    try:
+        for path in base_runtime.rglob("*"):
+            details = os.lstat(path)
+            if getattr(details, "st_file_attributes", 0) & REPARSE_POINT:
+                stop()
+            relative = path.relative_to(base_runtime).as_posix()
+            if (
+                not relative
+                or relative.startswith("/")
+                or ".." in PurePosixPath(relative).parts
+                or ":" in relative
+            ):
+                stop()
+            if stat.S_ISDIR(details.st_mode):
+                directories.append((relative, path))
+                continue
+            if not stat.S_ISREG(details.st_mode):
+                stop()
+            files.append((relative, path))
+            if len(files) > MAX_RUNTIME_FILES:
+                stop()
+        return sorted(files), sorted(directories)
+    except (OSError, RuntimeError, TypeError, ValueError):
+        stop()
+
+
+runtime_entries, runtime_directories = runtime_inventory()
+runtime_digest = hashlib.sha256()
+runtime_directory_digest = hashlib.sha256()
+for relative, _path in runtime_directories:
+    runtime_directory_digest.update(relative.encode("utf-8", "strict"))
+    runtime_directory_digest.update(b"\n")
+runtime_total_bytes = 0
+runtime_hashes = {}
+for relative, path in runtime_entries:
+    remaining = MAX_RUNTIME_BYTES - runtime_total_bytes
+    if remaining <= 0:
+        stop()
+    size, file_sha256 = verified_file(path, maximum=remaining)
+    runtime_hashes[relative] = file_sha256
+    runtime_digest.update(relative.encode("utf-8", "strict"))
+    runtime_digest.update(b"\0")
+    runtime_digest.update(str(size).encode("ascii"))
+    runtime_digest.update(b"\0")
+    runtime_digest.update(file_sha256.encode("ascii"))
+    runtime_digest.update(b"\n")
+    runtime_total_bytes += size
+final_runtime_entries, final_runtime_directories = runtime_inventory()
+try:
+    worker_relative = worker_python.relative_to(base_runtime).as_posix()
+except ValueError:
+    stop()
+if (
+    len(runtime_entries) != expected_runtime_file_count
+    or len(runtime_directories) != expected_runtime_directory_count
+    or runtime_directory_digest.hexdigest() != expected_runtime_directory_sha256
+    or runtime_total_bytes != expected_runtime_total_bytes
+    or runtime_digest.hexdigest() != expected_runtime_tree_sha256
+    or runtime_hashes.get(worker_relative) != expected_worker_python_sha256
+    or [relative for relative, _path in final_runtime_entries]
+    != [relative for relative, _path in runtime_entries]
+    or [relative for relative, _path in final_runtime_directories]
+    != [relative for relative, _path in runtime_directories]
+):
+    stop()
+if (
+    verified_file(python_path_configuration, maximum=4096)[1]
+    != expected_python_path_configuration_sha256
+):
+    stop()
+if verified_file(connection_profile_path, maximum=65536)[1] != expected_connection_profile_sha256:
+    stop()
+
+
+class RuntimeFence(importlib.abc.MetaPathFinder):
+    def find_spec(self, fullname, path=None, target=None):
+        if importlib.machinery.BuiltinImporter.find_spec(fullname) is not None:
+            return None
+        if importlib.machinery.FrozenImporter.find_spec(fullname) is not None:
+            return None
+        raise ModuleNotFoundError("sealed runtime import unavailable")
+
+
+sys.meta_path.insert(1, RuntimeFence())
+
+
+def audit(event, arguments):
+    if event == "open":
+        raw_path = arguments[0] if arguments else None
+        mode = arguments[1] if len(arguments) > 1 else None
+        if isinstance(raw_path, int):
+            return
+        try:
+            opened_path = Path(raw_path).resolve(strict=False)
+        except (OSError, RuntimeError, TypeError, ValueError):
+            stop()
+        if os.path.normcase(str(opened_path)) == os.path.normcase(
+            str(connection_profile_path)
+        ) and (mode is None or (type(mode) is str and set(mode) <= set("rbt"))):
+            return
+        stop()
+    if event in {
+        "os.remove",
+        "os.rename",
+        "os.replace",
+        "os.rmdir",
+        "os.mkdir",
+        "os.link",
+        "os.symlink",
+        "subprocess.Popen",
+    }:
+        stop()
+    if event == "ctypes.dlopen":
+        library = str(arguments[0]).casefold() if arguments else ""
+        allowed = {
+            "advapi32",
+            "advapi32.dll",
+            "bcrypt.dll",
+            "crypt32.dll",
+            "kernel32",
+            "kernel32.dll",
+        }
+        if library in allowed:
+            return
+        try:
+            library_path = Path(str(arguments[0])).resolve(strict=True)
+            library_path.relative_to(system32)
+        except (OSError, RuntimeError, TypeError, ValueError):
+            stop()
+        if library_path.name.casefold() not in allowed:
+            stop()
+    if event == "socket.getaddrinfo":
+        if len(arguments) < 2 or arguments[0] != "tenderplan.ru" or arguments[1] != 443:
+            stop()
+    if event == "socket.connect":
+        address = arguments[1] if len(arguments) > 1 else None
+        if type(address) is not tuple or len(address) < 2 or address[1] != 443:
+            stop()
+    if event in {"socket.bind", "socket.listen"}:
+        stop()
+    if event == "sqlite3.connect":
+        database = arguments[0] if arguments else None
+        try:
+            database_path = Path(database).resolve(strict=True)
+        except (OSError, RuntimeError, TypeError, ValueError):
+            stop()
+        if os.path.normcase(str(database_path)) != os.path.normcase(str(queue_path)):
+            stop()
+
+
+sys.addaudithook(audit)
+request = sys.stdin.buffer.read(MAX_REQUEST + 1)
+if not request or len(request) > MAX_REQUEST:
+    stop()
+
+
+class SealedInput:
+    def __init__(self, payload):
+        self.buffer = io.BytesIO(payload)
+
+
+sys.stdin = SealedInput(request)
+sys.argv = [str(Path(worker.__file__).resolve()), worker_switch]
+raise SystemExit(worker._worker_main())
+"""
+
+
+def _is_cloud_reparse_tag(tag: int) -> bool:
+    return tag != 0 and tag & _CLOUD_TAG_MASK == _CLOUD_TAG_BASE
+
+
+def _plain_sealed_path(
+    value: str,
+    *,
+    directory: bool,
+    allow_cloud: bool = False,
+) -> Path:
+    if (
+        type(value) is not str
+        or not value
+        or len(value) > 4096
+        or _CONTROL.search(value) is not None
+    ):
+        raise TenderPlanIsolatedValidationError(
+            "TenderPlan sealed worker path is invalid"
+        )
+    path = Path(value)
+    try:
+        if not path.is_absolute():
+            raise OSError
+        resolved = path.resolve(strict=True)
+        if os.path.normcase(str(path)) != os.path.normcase(str(resolved)):
+            raise OSError
+        current = Path(resolved.anchor)
+        for part in resolved.parts[1:]:
+            current /= part
+            details = os.lstat(current)
+            attributes = getattr(details, "st_file_attributes", 0)
+            tag = getattr(details, "st_reparse_tag", 0)
+            if attributes & 0x400 and not (
+                allow_cloud and _is_cloud_reparse_tag(tag)
+            ):
+                raise OSError
+        details = os.stat(resolved)
+        expected_kind = stat.S_ISDIR if directory else stat.S_ISREG
+        if not expected_kind(details.st_mode):
+            raise OSError
+        return resolved
+    except (OSError, RuntimeError, ValueError):
+        raise TenderPlanIsolatedValidationError(
+            "TenderPlan sealed worker path is invalid"
+        ) from None
+
+
+def _sealed_runtime_inventory(
+    root: Path,
+) -> tuple[list[tuple[str, Path]], list[tuple[str, Path]]]:
+    files: list[tuple[str, Path]] = []
+    directories: list[tuple[str, Path]] = [("", root)]
+    try:
+        for path in root.rglob("*"):
+            details = os.lstat(path)
+            if getattr(details, "st_file_attributes", 0) & 0x400:
+                raise OSError
+            relative = path.relative_to(root).as_posix()
+            if (
+                not relative
+                or relative.startswith("/")
+                or ".." in Path(relative).parts
+                or ":" in relative
+                or _CONTROL.search(relative) is not None
+            ):
+                raise OSError
+            if stat.S_ISDIR(details.st_mode):
+                directories.append((relative, path))
+            elif stat.S_ISREG(details.st_mode):
+                files.append((relative, path))
+                if len(files) > _MAX_SEALED_RUNTIME_FILES:
+                    raise OSError
+            else:
+                raise OSError
+        return sorted(files), sorted(directories)
+    except (OSError, RuntimeError, ValueError):
+        raise TenderPlanIsolatedAuthorizationError(
+            "TenderPlan sealed runtime inventory differs"
+        ) from None
+
+
+def _sealed_file_material(path: Path, maximum: int) -> tuple[int, str]:
+    try:
+        before = os.stat(path)
+        if not stat.S_ISREG(before.st_mode) or not 0 <= before.st_size <= maximum:
+            raise OSError
+        digest = hashlib.sha256()
+        size = 0
+        with path.open("rb") as stream:
+            opened = os.fstat(stream.fileno())
+            if (
+                (opened.st_dev, opened.st_ino, opened.st_size, opened.st_mtime_ns)
+                != (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns)
+            ):
+                raise OSError
+            while True:
+                chunk = stream.read(1_048_576)
+                if not chunk:
+                    break
+                size += len(chunk)
+                if size > maximum:
+                    raise OSError
+                digest.update(chunk)
+            after = os.fstat(stream.fileno())
+            if (
+                (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns)
+                != (opened.st_dev, opened.st_ino, opened.st_size, opened.st_mtime_ns)
+                or size != opened.st_size
+            ):
+                raise OSError
+        return size, digest.hexdigest()
+    except OSError:
+        raise TenderPlanIsolatedAuthorizationError(
+            "TenderPlan sealed worker material differs"
+        ) from None
+
+
+class _WindowsSealedWorkerLease:
+    """Hold exact runtime and operational paths across the child lifetime."""
+
+    _GENERIC_READ = 0x80000000
+    _GENERIC_WRITE = 0x40000000
+    _FILE_LIST_DIRECTORY = 0x00000001
+    _FILE_ADD_FILE = 0x00000002
+    _FILE_ADD_SUBDIRECTORY = 0x00000004
+    _FILE_DELETE_CHILD = 0x00000040
+    _FILE_READ_ATTRIBUTES = 0x00000080
+    _DELETE = 0x00010000
+    _FILE_SHARE_READ = 0x00000001
+    _FILE_SHARE_WRITE = 0x00000002
+    _FILE_SHARE_DELETE = 0x00000004
+    _OPEN_EXISTING = 3
+    _FILE_ATTRIBUTE_NORMAL = 0x00000080
+    _FILE_FLAG_BACKUP_SEMANTICS = 0x02000000
+    _FILE_FLAG_OPEN_REPARSE_POINT = 0x00200000
+    _INVALID_HANDLE_VALUE = ctypes.c_void_p(-1).value
+    _ERROR_ACCESS_DENIED = 5
+    _DRIVE_CDROM = 5
+    _FILE_READ_ONLY_VOLUME = 0x00080000
+
+    def __init__(self, worker: TenderPlanSealedWorker) -> None:
+        self._worker = worker
+        self._handles: list[object] = []
+        self._kernel: object | None = None
+
+    def _open_handle(
+        self,
+        path: Path,
+        *,
+        directory: bool,
+        allow_write_sharing: bool,
+    ) -> None:
+        kernel = self._kernel
+        if kernel is None:
+            raise TenderPlanIsolatedAuthorizationError(
+                "TenderPlan sealed runtime lease is unavailable"
+            )
+        desired_access = (
+            self._FILE_LIST_DIRECTORY | self._FILE_READ_ATTRIBUTES
+            if directory
+            else self._GENERIC_READ
+        )
+        share_mode = self._FILE_SHARE_READ | (
+            self._FILE_SHARE_WRITE if allow_write_sharing else 0
+        )
+        flags = (
+            self._FILE_FLAG_BACKUP_SEMANTICS | self._FILE_FLAG_OPEN_REPARSE_POINT
+            if directory
+            else self._FILE_ATTRIBUTE_NORMAL | self._FILE_FLAG_OPEN_REPARSE_POINT
+        )
+        handle = kernel.CreateFileW(
+            str(path),
+            desired_access,
+            share_mode,
+            None,
+            self._OPEN_EXISTING,
+            flags,
+            None,
+        )
+        if handle in {None, 0, self._INVALID_HANDLE_VALUE}:
+            raise TenderPlanIsolatedAuthorizationError(
+                "TenderPlan sealed runtime lease is unavailable"
+            )
+        self._handles.append(handle)
+
+    def _require_access_denied(
+        self,
+        path: Path,
+        *,
+        directory: bool,
+        desired_access: int,
+    ) -> None:
+        kernel = self._kernel
+        if kernel is None:
+            raise TenderPlanIsolatedAuthorizationError(
+                "TenderPlan sealed runtime access check is unavailable"
+            )
+        flags = (
+            self._FILE_FLAG_BACKUP_SEMANTICS | self._FILE_FLAG_OPEN_REPARSE_POINT
+            if directory
+            else self._FILE_ATTRIBUTE_NORMAL | self._FILE_FLAG_OPEN_REPARSE_POINT
+        )
+        ctypes.set_last_error(0)
+        handle = kernel.CreateFileW(
+            str(path),
+            desired_access,
+            self._FILE_SHARE_READ
+            | self._FILE_SHARE_WRITE
+            | self._FILE_SHARE_DELETE,
+            None,
+            self._OPEN_EXISTING,
+            flags,
+            None,
+        )
+        if handle not in {None, 0, self._INVALID_HANDLE_VALUE}:
+            kernel.CloseHandle(handle)
+            raise TenderPlanIsolatedAuthorizationError(
+                "TenderPlan sealed runtime remains writable"
+            )
+        if ctypes.get_last_error() != self._ERROR_ACCESS_DENIED:
+            raise TenderPlanIsolatedAuthorizationError(
+                "TenderPlan sealed runtime access could not be proven"
+            )
+
+    def _require_runtime_read_only(
+        self,
+        entries: list[tuple[str, Path]],
+        directories: list[tuple[str, Path]],
+    ) -> None:
+        for _relative, directory in directories:
+            for desired_access in (
+                self._FILE_ADD_FILE,
+                self._FILE_ADD_SUBDIRECTORY,
+                self._FILE_DELETE_CHILD,
+                self._GENERIC_WRITE,
+                self._DELETE,
+            ):
+                self._require_access_denied(
+                    directory,
+                    directory=True,
+                    desired_access=desired_access,
+                )
+        for _relative, path in entries:
+            for desired_access in (self._GENERIC_WRITE, self._DELETE):
+                self._require_access_denied(
+                    path,
+                    directory=False,
+                    desired_access=desired_access,
+                )
+
+    def _require_immutable_volume(self, runtime: Path) -> None:
+        """Require the production runtime to live at a read-only optical root."""
+
+        kernel = self._kernel
+        if kernel is None:
+            raise TenderPlanIsolatedAuthorizationError(
+                "TenderPlan sealed runtime volume check is unavailable"
+            )
+        volume_root = Path(runtime.anchor)
+        if os.path.normcase(str(runtime)) != os.path.normcase(str(volume_root)):
+            raise TenderPlanIsolatedAuthorizationError(
+                "TenderPlan sealed runtime is not an immutable volume root"
+            )
+        kernel.GetDriveTypeW.argtypes = (wintypes.LPCWSTR,)
+        kernel.GetDriveTypeW.restype = wintypes.UINT
+        kernel.GetVolumeInformationW.argtypes = (
+            wintypes.LPCWSTR,
+            wintypes.LPWSTR,
+            wintypes.DWORD,
+            ctypes.POINTER(wintypes.DWORD),
+            ctypes.POINTER(wintypes.DWORD),
+            ctypes.POINTER(wintypes.DWORD),
+            wintypes.LPWSTR,
+            wintypes.DWORD,
+        )
+        kernel.GetVolumeInformationW.restype = wintypes.BOOL
+        kernel.GetDiskFreeSpaceExW.argtypes = (
+            wintypes.LPCWSTR,
+            ctypes.POINTER(ctypes.c_ulonglong),
+            ctypes.POINTER(ctypes.c_ulonglong),
+            ctypes.POINTER(ctypes.c_ulonglong),
+        )
+        kernel.GetDiskFreeSpaceExW.restype = wintypes.BOOL
+        volume_name = ctypes.create_unicode_buffer(261)
+        filesystem_name = ctypes.create_unicode_buffer(261)
+        serial_number = wintypes.DWORD()
+        maximum_component_length = wintypes.DWORD()
+        filesystem_flags = wintypes.DWORD()
+        available_bytes = ctypes.c_ulonglong()
+        total_bytes = ctypes.c_ulonglong()
+        free_bytes = ctypes.c_ulonglong()
+        root_value = str(volume_root)
+        if (
+            int(kernel.GetDriveTypeW(root_value)) != self._DRIVE_CDROM
+            or not kernel.GetVolumeInformationW(
+                root_value,
+                volume_name,
+                len(volume_name),
+                ctypes.byref(serial_number),
+                ctypes.byref(maximum_component_length),
+                ctypes.byref(filesystem_flags),
+                filesystem_name,
+                len(filesystem_name),
+            )
+            or filesystem_name.value.casefold() not in {"cdfs", "udf"}
+            or not filesystem_flags.value & self._FILE_READ_ONLY_VOLUME
+            or serial_number.value == 0
+            or maximum_component_length.value == 0
+            or not kernel.GetDiskFreeSpaceExW(
+                root_value,
+                ctypes.byref(available_bytes),
+                ctypes.byref(total_bytes),
+                ctypes.byref(free_bytes),
+            )
+            or available_bytes.value != 0
+            or free_bytes.value != 0
+            or total_bytes.value == 0
+        ):
+            raise TenderPlanIsolatedAuthorizationError(
+                "TenderPlan sealed runtime volume is not immutable"
+            )
+
+    @staticmethod
+    def _operational_directories(targets: tuple[Path, ...]) -> list[Path]:
+        selected: dict[str, Path] = {}
+        for target in targets:
+            current = Path(target.anchor)
+            selected[os.path.normcase(str(current))] = current
+            for part in target.parent.parts[1:]:
+                current /= part
+                selected[os.path.normcase(str(current))] = current
+        return sorted(selected.values(), key=lambda item: (len(item.parts), str(item)))
+
+    def acquire(self) -> None:
+        if self._handles or self._kernel is not None:
+            raise TenderPlanIsolatedStopped(
+                "TenderPlan sealed runtime lease is already active"
+            )
+        if os.name != "nt":
+            raise TenderPlanIsolatedStopped(
+                "TenderPlan sealed runtime lease requires Windows"
+            )
+        worker = self._worker
+        runtime = _plain_sealed_path(worker.base_runtime_path, directory=True)
+        logical_root = _plain_sealed_path(
+            worker.logical_root,
+            directory=True,
+            allow_cloud=True,
+        )
+        bundle = _plain_sealed_path(worker.bundle_path, directory=False)
+        queue = _plain_sealed_path(
+            worker.queue_path,
+            directory=False,
+            allow_cloud=True,
+        )
+        profile = _plain_sealed_path(
+            worker.connection_profile_path,
+            directory=False,
+            allow_cloud=True,
+        )
+        worker_python = _plain_sealed_path(worker.worker_python_path, directory=False)
+        path_configuration = _plain_sealed_path(
+            worker.python_path_configuration_path,
+            directory=False,
+        )
+        entries, directories = _sealed_runtime_inventory(runtime)
+        try:
+            kernel = _kernel32()
+            kernel.CreateFileW.argtypes = (
+                wintypes.LPCWSTR,
+                wintypes.DWORD,
+                wintypes.DWORD,
+                wintypes.LPVOID,
+                wintypes.DWORD,
+                wintypes.DWORD,
+                wintypes.HANDLE,
+            )
+            kernel.CreateFileW.restype = wintypes.HANDLE
+            self._kernel = kernel
+            self._require_immutable_volume(runtime)
+            self._require_runtime_read_only(entries, directories)
+            directory_digest = hashlib.sha256()
+            for relative, _directory in directories:
+                directory_digest.update(relative.encode("utf-8", "strict"))
+                directory_digest.update(b"\n")
+            for _relative, directory in directories:
+                self._open_handle(
+                    directory,
+                    directory=True,
+                    allow_write_sharing=False,
+                )
+            runtime_digest = hashlib.sha256()
+            runtime_total_bytes = 0
+            runtime_hashes: dict[str, str] = {}
+            for relative, path in entries:
+                self._open_handle(
+                    path,
+                    directory=False,
+                    allow_write_sharing=False,
+                )
+                remaining = _MAX_SEALED_RUNTIME_BYTES - runtime_total_bytes
+                if remaining <= 0:
+                    raise TenderPlanIsolatedAuthorizationError(
+                        "TenderPlan sealed runtime size differs"
+                    )
+                size, file_sha256 = _sealed_file_material(path, remaining)
+                runtime_hashes[relative] = file_sha256
+                runtime_digest.update(relative.encode("utf-8", "strict"))
+                runtime_digest.update(b"\0")
+                runtime_digest.update(str(size).encode("ascii"))
+                runtime_digest.update(b"\0")
+                runtime_digest.update(file_sha256.encode("ascii"))
+                runtime_digest.update(b"\n")
+                runtime_total_bytes += size
+
+            for directory in self._operational_directories(
+                (logical_root, bundle, queue, profile),
+            ):
+                self._open_handle(
+                    directory,
+                    directory=True,
+                    allow_write_sharing=True,
+                )
+            self._open_handle(
+                bundle,
+                directory=False,
+                allow_write_sharing=False,
+            )
+            self._open_handle(
+                profile,
+                directory=False,
+                allow_write_sharing=False,
+            )
+            self._open_handle(
+                queue,
+                directory=False,
+                allow_write_sharing=True,
+            )
+
+            final_entries, final_directories = _sealed_runtime_inventory(runtime)
+            worker_relative = worker_python.relative_to(runtime).as_posix()
+            path_configuration_relative = path_configuration.relative_to(
+                runtime
+            ).as_posix()
+            if (
+                len(entries) != worker.base_runtime_file_count
+                or len(directories) != worker.base_runtime_directory_count
+                or directory_digest.hexdigest()
+                != worker.base_runtime_directory_sha256
+                or runtime_total_bytes != worker.base_runtime_total_bytes
+                or runtime_digest.hexdigest() != worker.base_runtime_tree_sha256
+                or runtime_hashes.get(worker_relative) != worker.worker_python_sha256
+                or runtime_hashes.get(path_configuration_relative)
+                != worker.python_path_configuration_sha256
+                or _sealed_file_material(bundle, _MAX_SEALED_WORKER_BUNDLE_BYTES)[1]
+                != worker.bundle_sha256
+                or _sealed_file_material(profile, 65_536)[1]
+                != worker.connection_profile_sha256
+                or [relative for relative, _path in final_entries]
+                != [relative for relative, _path in entries]
+                or [relative for relative, _path in final_directories]
+                != [relative for relative, _path in directories]
+            ):
+                raise TenderPlanIsolatedAuthorizationError(
+                    "TenderPlan sealed runtime binding differs"
+                )
+        except BaseException:
+            self.close()
+            raise
+
+    def close(self) -> None:
+        kernel = self._kernel
+        handles = self._handles
+        self._handles = []
+        self._kernel = None
+        if kernel is None:
+            return
+        for handle in reversed(handles):
+            try:
+                kernel.CloseHandle(handle)
+            except Exception:
+                pass
+
+
+_UNCONFIRMED_SEALED_WORKER_LEASES: list[_WindowsSealedWorkerLease] = []
+
+
+def _release_or_retain_sealed_worker_lease(
+    lease: _WindowsSealedWorkerLease | None,
+    supervisor: object | None,
+) -> None:
+    """Never release sealed material while a started child may still be alive."""
+
+    if lease is None:
+        return
+    if supervisor is None or getattr(supervisor, "_last_process_id", object()) is None:
+        lease.close()
+        return
+    if getattr(supervisor, "_last_wait_confirmed", False) is True:
+        lease.close()
+        return
+    # The handles intentionally remain live until this parent process exits.
+    # Releasing them on an ambiguous death would reopen runtime/path mutation.
+    _UNCONFIRMED_SEALED_WORKER_LEASES.append(lease)
+
+
+def _sealed_worker_environment() -> dict[str, str]:
+    try:
+        windows_root = _plain_sealed_path(
+            os.environ.get("SYSTEMROOT", ""),
+            directory=True,
+        )
+        system32 = _plain_sealed_path(
+            str(windows_root / "System32"),
+            directory=True,
+        )
+    except TenderPlanIsolatedTransportError:
+        raise TenderPlanIsolatedAuthorizationError(
+            "TenderPlan sealed worker environment is unavailable"
+        ) from None
+    return {
+        "PATH": str(system32),
+        "PYTHONIOENCODING": "utf-8",
+        "PYTHONNOUSERSITE": "1",
+        "PYTHONUTF8": "1",
+        "SYSTEMROOT": str(windows_root),
+        "WINDIR": str(windows_root),
+    }
+
+
+def _sealed_worker_material(
+    worker: TenderPlanSealedWorker,
+    request: bytes,
+) -> tuple[tuple[str, ...], bytes]:
+    if type(worker) is not TenderPlanSealedWorker:
+        raise TenderPlanIsolatedValidationError(
+            "TenderPlan sealed worker configuration is invalid"
+        )
+    bundle_digest = _digest(worker.bundle_sha256)
+    worker_python_digest = _digest(worker.worker_python_sha256)
+    path_configuration_digest = _digest(worker.python_path_configuration_sha256)
+    runtime_tree_digest = _digest(worker.base_runtime_tree_sha256)
+    runtime_directory_digest = _digest(worker.base_runtime_directory_sha256)
+    connection_profile_digest = _digest(worker.connection_profile_sha256)
+    if (
+        type(worker.base_runtime_file_count) is not int
+        or not 1 <= worker.base_runtime_file_count <= _MAX_SEALED_RUNTIME_FILES
+        or type(worker.base_runtime_directory_count) is not int
+        or not 1
+        <= worker.base_runtime_directory_count
+        <= _MAX_SEALED_RUNTIME_FILES
+        or type(worker.base_runtime_total_bytes) is not int
+        or not 1 <= worker.base_runtime_total_bytes <= _MAX_SEALED_RUNTIME_BYTES
+    ):
+        raise TenderPlanIsolatedValidationError(
+            "TenderPlan sealed worker runtime binding is invalid"
+        )
+    bundle_path = _plain_sealed_path(worker.bundle_path, directory=False)
+    logical_root = _plain_sealed_path(
+        worker.logical_root,
+        directory=True,
+        allow_cloud=True,
+    )
+    worker_python = _plain_sealed_path(worker.worker_python_path, directory=False)
+    path_configuration = _plain_sealed_path(
+        worker.python_path_configuration_path,
+        directory=False,
+    )
+    base_runtime = _plain_sealed_path(worker.base_runtime_path, directory=True)
+    queue_path = _plain_sealed_path(
+        worker.queue_path,
+        directory=False,
+        allow_cloud=True,
+    )
+    connection_profile = _plain_sealed_path(
+        worker.connection_profile_path,
+        directory=False,
+        allow_cloud=True,
+    )
+    if os.path.normcase(str(logical_root)) != os.path.normcase(str(_ROOT)):
+        raise TenderPlanIsolatedAuthorizationError(
+            "TenderPlan sealed worker logical root differs"
+        )
+    try:
+        worker_python.relative_to(base_runtime)
+        path_configuration.relative_to(base_runtime)
+        queue_path.relative_to(logical_root)
+        connection_profile.relative_to(logical_root)
+    except ValueError:
+        raise TenderPlanIsolatedAuthorizationError(
+            "TenderPlan sealed worker path binding differs"
+        ) from None
+
+    def stable_read(path: Path, maximum: int) -> bytes:
+        try:
+            before = os.stat(path)
+            if not stat.S_ISREG(before.st_mode) or not 0 <= before.st_size <= maximum:
+                raise OSError
+            with path.open("rb") as stream:
+                opened = os.fstat(stream.fileno())
+                if (
+                    (opened.st_dev, opened.st_ino, opened.st_size, opened.st_mtime_ns)
+                    != (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns)
+                ):
+                    raise OSError
+                payload = stream.read(maximum + 1)
+                after = os.fstat(stream.fileno())
+                if (
+                    (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns)
+                    != (opened.st_dev, opened.st_ino, opened.st_size, opened.st_mtime_ns)
+                    or len(payload) != opened.st_size
+                ):
+                    raise OSError
+                return payload
+        except OSError:
+            raise TenderPlanIsolatedValidationError(
+                "TenderPlan sealed worker material is unavailable"
+            ) from None
+
+    bundle = stable_read(bundle_path, _MAX_SEALED_WORKER_BUNDLE_BYTES)
+    python_image = stable_read(worker_python, _MAX_SEALED_RUNTIME_BYTES)
+    path_configuration_bytes = stable_read(path_configuration, 4_096)
+    connection_profile_bytes = stable_read(connection_profile, 65_536)
+    try:
+        version = f"python{sys.version_info.major}{sys.version_info.minor}"
+        expected_path_configuration = (
+            f"{version}.zip\nDLLs\nLib\n.\n".encode("ascii", "strict")
+        )
+    except (UnicodeEncodeError, ValueError):
+        raise TenderPlanIsolatedValidationError(
+            "TenderPlan sealed worker runtime binding is invalid"
+        ) from None
+    if (
+        not bundle
+        or len(bundle) > _MAX_SEALED_WORKER_BUNDLE_BYTES
+        or _sha256_bytes(bundle) != bundle_digest
+        or _sha256_bytes(python_image) != worker_python_digest
+        or _sha256_bytes(path_configuration_bytes) != path_configuration_digest
+        or path_configuration.name.casefold() != f"{version}._pth"
+        or path_configuration_bytes != expected_path_configuration
+        or _sha256_bytes(connection_profile_bytes) != connection_profile_digest
+        or not request
+        or len(request) > _MAX_WORKER_INPUT_BYTES
+    ):
+        raise TenderPlanIsolatedAuthorizationError(
+            "TenderPlan sealed worker material differs"
+        )
+    command = (
+        str(worker_python),
+        "-I",
+        "-B",
+        "-S",
+        "-c",
+        _SEALED_WORKER_BOOTSTRAP,
+        bundle_digest,
+        str(bundle_path),
+        str(logical_root),
+        str(base_runtime),
+        runtime_tree_digest,
+        str(worker.base_runtime_file_count),
+        str(worker.base_runtime_directory_count),
+        runtime_directory_digest,
+        str(worker.base_runtime_total_bytes),
+        str(worker_python),
+        worker_python_digest,
+        str(path_configuration),
+        path_configuration_digest,
+        str(queue_path),
+        str(connection_profile),
+        connection_profile_digest,
+        TENDERPLAN_READ_ONLY_WORKER_SWITCH,
+    )
+    return command, request
+
+
 class TenderPlanReadOnlyTransport:
     """Manual one-use ciphertext-only transport."""
 
@@ -1194,9 +2609,14 @@ class TenderPlanReadOnlyTransport:
     automatic_schedule_eligible = False
     maximum_requests = 1
 
-    def __init__(self) -> None:
+    def __init__(self, *, sealed_worker: TenderPlanSealedWorker | None = None) -> None:
+        if sealed_worker is not None and type(sealed_worker) is not TenderPlanSealedWorker:
+            raise TenderPlanIsolatedValidationError(
+                "TenderPlan sealed worker configuration is invalid"
+            )
         self._lock = threading.Lock()
         self._used = False
+        self._sealed_worker = sealed_worker
 
     def __repr__(self) -> str:
         return (
@@ -1305,33 +2725,58 @@ class TenderPlanReadOnlyTransport:
             raise TenderPlanIsolatedQuotaExceeded(
                 "TenderPlan read-only worker request exceeded its bound"
             )
-        supervisor = _WindowsIsolatedProcessSupervisor(
-            (
-                _worker_python_executable(),
-                "-I",
-                str(Path(__file__).resolve()),
-                TENDERPLAN_READ_ONLY_WORKER_SWITCH,
-            ),
-            maximum_output_bytes=TENDERPLAN_READ_ONLY_MAX_OUTPUT_BYTES,
+        command = (
+            _worker_python_executable(),
+            "-I",
+            str(Path(__file__).resolve()),
+            TENDERPLAN_READ_ONLY_WORKER_SWITCH,
         )
+        payload = encoded
+        lease: _WindowsSealedWorkerLease | None = None
+        supervisor: object | None = None
+        supervisor_options: dict[str, object] = {}
+        if self._sealed_worker is not None:
+            command, payload = _sealed_worker_material(self._sealed_worker, encoded)
+            lease = _WindowsSealedWorkerLease(self._sealed_worker)
+            # Acquisition finishes before Popen and holds every existing base
+            # runtime entry plus the exact queue/profile/bundle paths until the
+            # supervisor has confirmed child exit.
+            lease.acquire()
+            supervisor_options = {
+                "cwd": str(
+                    _plain_sealed_path(
+                        self._sealed_worker.base_runtime_path,
+                        directory=True,
+                    )
+                ),
+                "environment": _sealed_worker_environment(),
+            }
         try:
-            raw = supervisor.run(
-                encoded,
-                total_timeout_seconds=total_timeout_seconds,
+            supervisor = _WindowsIsolatedProcessSupervisor(
+                command,
+                maximum_output_bytes=TENDERPLAN_READ_ONLY_MAX_OUTPUT_BYTES,
+                **supervisor_options,
             )
-        except TenderPlanIsolatedTransportError as error:
-            # Once process creation begins, the worker may already have
-            # reached the POST.  Keep only a fixed local enum; never retain
-            # exception text, worker output, query material, or credentials.
-            raise TenderPlanReadOnlyDiagnosticUncertain(
-                _supervisor_diagnostic_code(error),
-                TenderPlanReadOnlyObservationStage.SUPERVISOR,
-            ) from None
-        except Exception:
-            raise TenderPlanReadOnlyDiagnosticUncertain(
-                TenderPlanReadOnlyDiagnosticCode.PARENT_UNEXPECTED,
-                TenderPlanReadOnlyObservationStage.SUPERVISOR,
-            ) from None
+            try:
+                raw = supervisor.run(
+                    payload,
+                    total_timeout_seconds=total_timeout_seconds,
+                )
+            except TenderPlanIsolatedTransportError as error:
+                # Once process creation begins, the worker may already have
+                # reached the POST.  Keep only a fixed local enum; never retain
+                # exception text, worker output, query material, or credentials.
+                raise TenderPlanReadOnlyDiagnosticUncertain(
+                    _supervisor_diagnostic_code(error),
+                    TenderPlanReadOnlyObservationStage.SUPERVISOR,
+                ) from None
+            except Exception:
+                raise TenderPlanReadOnlyDiagnosticUncertain(
+                    TenderPlanReadOnlyDiagnosticCode.PARENT_UNEXPECTED,
+                    TenderPlanReadOnlyObservationStage.SUPERVISOR,
+                ) from None
+        finally:
+            _release_or_retain_sealed_worker_lease(lease, supervisor)
         try:
             return _decode_worker_response(
                 raw,
@@ -1363,6 +2808,8 @@ __all__ = [
     "TENDERPLAN_READ_ONLY_MAX_RESPONSE_BYTES",
     "TENDERPLAN_READ_ONLY_QUERY_POLICY_PROTOCOL_V1",
     "TENDERPLAN_READ_ONLY_TOTAL_TIMEOUT_SECONDS",
+    "TENDERPLAN_SEALED_WORKER_PROTOCOL_V1",
+    "TenderPlanSealedWorker",
     "TENDERPLAN_READ_ONLY_WORKER_PROTOCOL_V1",
     "TenderPlanReadOnlyDiagnosticUncertain",
     "TenderPlanReadOnlyEncryptedBatch",

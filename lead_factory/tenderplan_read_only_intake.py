@@ -73,6 +73,7 @@ from lead_factory.tenderplan_read_only_transport import (
     TenderPlanReadOnlyDiagnosticUncertain,
     TenderPlanReadOnlyEncryptedBatch,
     TenderPlanReadOnlyTransport,
+    TenderPlanSealedWorker,
     tenderplan_read_only_query_policy_sha256,
     tenderplan_read_only_request_sha256,
 )
@@ -390,6 +391,11 @@ def run_tenderplan_read_only_intake(
     require_existing_store: bool = False,
     run_id: str | None = None,
     profile_request: PreparedTenderPlanSearch | None = None,
+    expected_account_transition_sha256: str | None = None,
+    expected_connection_profile_sha256: str | None = None,
+    expected_connection_profile_record_sha256: str | None = None,
+    expected_credential_target_sha256: str | None = None,
+    tenderplan_sealed_worker: TenderPlanSealedWorker | None = None,
 ) -> TenderPlanReadOnlyIntakeResult:
     """Perform exactly one explicit read and queue only encrypted cards."""
 
@@ -397,6 +403,11 @@ def run_tenderplan_read_only_intake(
         confirmation != TENDERPLAN_READ_ONLY_CONFIRMATION
         or type(require_existing_store) is not bool
         or (run_id is not None and (type(run_id) is not str or re.fullmatch(r"tpri_[0-9a-f]{32}", run_id) is None))
+        or (
+            tenderplan_sealed_worker is not None
+            and type(tenderplan_sealed_worker) is not TenderPlanSealedWorker
+        )
+        or (transport is not None and tenderplan_sealed_worker is not None)
     ):
         raise TenderPlanReadOnlyIntakeValidationError
     # Freeze admitted criteria before account lookup, queue creation or reserve.
@@ -471,12 +482,20 @@ def run_tenderplan_read_only_intake(
             if require_existing_store or account_registration is not None
             else TenderPlanReadOnlyStore(store_path, clock=now_clock)
         )
-        if account_registration is None:
-            reservation = store.reserve_intent(intent)
-        else:
-            reservation = store.reserve_intent(
-                intent, expected_account_transition_sha256=account_registration[2]
-            )
+        transition_pin = expected_account_transition_sha256
+        if transition_pin is None and account_registration is not None:
+            transition_pin = account_registration[2]
+        reservation = store.reserve_intent(
+            intent,
+            expected_account_transition_sha256=transition_pin,
+            expected_connection_profile_sha256=(
+                expected_connection_profile_sha256
+            ),
+            expected_connection_profile_record_sha256=(
+                expected_connection_profile_record_sha256
+            ),
+            expected_credential_target_sha256=expected_credential_target_sha256,
+        )
     except TenderPlanReadOnlyStoreError:
         raise TenderPlanReadOnlyIntakeReconciliationRequired from None
     if (
@@ -487,7 +506,9 @@ def run_tenderplan_read_only_intake(
         raise TenderPlanReadOnlyIntakeReconciliationRequired
 
     uses_production_transport = transport is None
-    boundary = transport or TenderPlanReadOnlyTransport()
+    boundary = transport or TenderPlanReadOnlyTransport(
+        sealed_worker=tenderplan_sealed_worker
+    )
     if type(boundary) is not TenderPlanReadOnlyTransport:
         _terminal_or_reconciliation(
             store,

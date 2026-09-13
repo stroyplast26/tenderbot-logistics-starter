@@ -24,10 +24,15 @@ import hmac
 import json
 import os
 import re
+import sys
 from typing import Final, Protocol, Self, runtime_checkable
 
-from cryptography.exceptions import InvalidTag
-from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+_SEALED_WORKER = getattr(sys, "_tenderplan_sealed_worker", False) is True
+
+if _SEALED_WORKER:
+    AESGCM = None
+else:
+    from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 
 TENDERPLAN_READ_ONLY_CARD_PROTOCOL: Final = "tenderplan-read-only-card-v1"
@@ -43,6 +48,13 @@ _MAX_JSON_DEPTH = 16
 _MAX_JSON_ITEMS = 1_024
 _MAX_JSON_STRING_CHARS = 8_192
 _MAX_JSON_KEY_CHARS = 256
+_MAX_BCRYPT_KEY_OBJECT_BYTES = 1_048_576
+
+_BCRYPT_AES_ALGORITHM = "AES"
+_BCRYPT_CHAINING_MODE = "ChainingMode"
+_BCRYPT_CHAIN_MODE_GCM = "ChainingModeGCM"
+_BCRYPT_OBJECT_LENGTH = "ObjectLength"
+_BCRYPT_AUTH_MODE_INFO_VERSION = 1
 
 _HEX64 = re.compile(r"^[0-9a-f]{64}$")
 _SAFE_RUN_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:+-]{0,159}$")
@@ -79,6 +91,24 @@ class _DataBlob(ctypes.Structure):
     _fields_ = [
         ("cbData", wintypes.DWORD),
         ("pbData", ctypes.POINTER(ctypes.c_ubyte)),
+    ]
+
+
+class _BcryptAuthenticatedCipherModeInfo(ctypes.Structure):
+    _fields_ = [
+        ("cbSize", wintypes.ULONG),
+        ("dwInfoVersion", wintypes.ULONG),
+        ("pbNonce", ctypes.POINTER(ctypes.c_ubyte)),
+        ("cbNonce", wintypes.ULONG),
+        ("pbAuthData", ctypes.POINTER(ctypes.c_ubyte)),
+        ("cbAuthData", wintypes.ULONG),
+        ("pbTag", ctypes.POINTER(ctypes.c_ubyte)),
+        ("cbTag", wintypes.ULONG),
+        ("pbMacContext", ctypes.POINTER(ctypes.c_ubyte)),
+        ("cbMacContext", wintypes.ULONG),
+        ("cbAAD", wintypes.ULONG),
+        ("cbData", ctypes.c_ulonglong),
+        ("dwFlags", wintypes.ULONG),
     ]
 
 
@@ -128,6 +158,211 @@ def _windows_libraries() -> tuple[object, object]:
     except (AttributeError, OSError, TypeError):
         raise TenderPlanReadOnlyCryptoError from None
     return crypt32, kernel32
+
+
+def _windows_bcrypt_library() -> object:
+    if os.name != "nt":
+        raise TenderPlanReadOnlyCryptoError
+    try:
+        bcrypt = ctypes.WinDLL("bcrypt.dll", use_last_error=True)
+        byte_pointer = ctypes.POINTER(ctypes.c_ubyte)
+        handle_pointer = ctypes.POINTER(ctypes.c_void_p)
+
+        bcrypt.BCryptOpenAlgorithmProvider.argtypes = [
+            handle_pointer,
+            wintypes.LPCWSTR,
+            wintypes.LPCWSTR,
+            wintypes.ULONG,
+        ]
+        bcrypt.BCryptOpenAlgorithmProvider.restype = wintypes.LONG
+        bcrypt.BCryptSetProperty.argtypes = [
+            ctypes.c_void_p,
+            wintypes.LPCWSTR,
+            byte_pointer,
+            wintypes.ULONG,
+            wintypes.ULONG,
+        ]
+        bcrypt.BCryptSetProperty.restype = wintypes.LONG
+        bcrypt.BCryptGetProperty.argtypes = [
+            ctypes.c_void_p,
+            wintypes.LPCWSTR,
+            byte_pointer,
+            wintypes.ULONG,
+            ctypes.POINTER(wintypes.ULONG),
+            wintypes.ULONG,
+        ]
+        bcrypt.BCryptGetProperty.restype = wintypes.LONG
+        bcrypt.BCryptGenerateSymmetricKey.argtypes = [
+            ctypes.c_void_p,
+            handle_pointer,
+            byte_pointer,
+            wintypes.ULONG,
+            byte_pointer,
+            wintypes.ULONG,
+            wintypes.ULONG,
+        ]
+        bcrypt.BCryptGenerateSymmetricKey.restype = wintypes.LONG
+        bcrypt.BCryptEncrypt.argtypes = [
+            ctypes.c_void_p,
+            byte_pointer,
+            wintypes.ULONG,
+            ctypes.POINTER(_BcryptAuthenticatedCipherModeInfo),
+            byte_pointer,
+            wintypes.ULONG,
+            byte_pointer,
+            wintypes.ULONG,
+            ctypes.POINTER(wintypes.ULONG),
+            wintypes.ULONG,
+        ]
+        bcrypt.BCryptEncrypt.restype = wintypes.LONG
+        bcrypt.BCryptDestroyKey.argtypes = [ctypes.c_void_p]
+        bcrypt.BCryptDestroyKey.restype = wintypes.LONG
+        bcrypt.BCryptCloseAlgorithmProvider.argtypes = [
+            ctypes.c_void_p,
+            wintypes.ULONG,
+        ]
+        bcrypt.BCryptCloseAlgorithmProvider.restype = wintypes.LONG
+    except (AttributeError, OSError, TypeError):
+        raise TenderPlanReadOnlyCryptoError from None
+    return bcrypt
+
+
+def _bcrypt_aes_gcm_encrypt(
+    key: bytes,
+    nonce: bytes,
+    plaintext: bytes,
+    aad: bytes,
+) -> bytes:
+    """Encrypt with the Windows CNG provider using AESGCM wire semantics."""
+
+    if (
+        type(key) is not bytes
+        or len(key) != _AES_KEY_BYTES
+        or type(nonce) is not bytes
+        or len(nonce) != _GCM_NONCE_BYTES
+        or type(plaintext) is not bytes
+        or not 1 <= len(plaintext) <= _MAX_CARD_PLAINTEXT_BYTES
+        or type(aad) is not bytes
+        or not aad
+    ):
+        raise TenderPlanReadOnlyCryptoError
+
+    bcrypt = _windows_bcrypt_library()
+    algorithm_handle = ctypes.c_void_p()
+    key_handle = ctypes.c_void_p()
+    key_buffer = (ctypes.c_ubyte * len(key)).from_buffer_copy(key)
+    nonce_buffer = (ctypes.c_ubyte * len(nonce)).from_buffer_copy(nonce)
+    plaintext_buffer = (ctypes.c_ubyte * len(plaintext)).from_buffer_copy(plaintext)
+    aad_buffer = (ctypes.c_ubyte * len(aad)).from_buffer_copy(aad)
+    ciphertext_buffer = (ctypes.c_ubyte * len(plaintext))()
+    tag_buffer = (ctypes.c_ubyte * _GCM_TAG_BYTES)()
+    key_object_buffer = (ctypes.c_ubyte * 0)()
+    try:
+        status = bcrypt.BCryptOpenAlgorithmProvider(
+            ctypes.byref(algorithm_handle),
+            _BCRYPT_AES_ALGORITHM,
+            None,
+            0,
+        )
+        if status != 0 or not algorithm_handle.value:
+            raise TenderPlanReadOnlyCryptoError
+
+        chain_mode = ctypes.create_unicode_buffer(_BCRYPT_CHAIN_MODE_GCM)
+        status = bcrypt.BCryptSetProperty(
+            algorithm_handle,
+            _BCRYPT_CHAINING_MODE,
+            ctypes.cast(chain_mode, ctypes.POINTER(ctypes.c_ubyte)),
+            ctypes.sizeof(chain_mode),
+            0,
+        )
+        if status != 0:
+            raise TenderPlanReadOnlyCryptoError
+
+        object_length = wintypes.ULONG()
+        result_length = wintypes.ULONG()
+        status = bcrypt.BCryptGetProperty(
+            algorithm_handle,
+            _BCRYPT_OBJECT_LENGTH,
+            ctypes.cast(ctypes.byref(object_length), ctypes.POINTER(ctypes.c_ubyte)),
+            ctypes.sizeof(object_length),
+            ctypes.byref(result_length),
+            0,
+        )
+        if (
+            status != 0
+            or result_length.value != ctypes.sizeof(object_length)
+            or not 1 <= object_length.value <= _MAX_BCRYPT_KEY_OBJECT_BYTES
+        ):
+            raise TenderPlanReadOnlyCryptoError
+
+        key_object_buffer = (ctypes.c_ubyte * object_length.value)()
+        status = bcrypt.BCryptGenerateSymmetricKey(
+            algorithm_handle,
+            ctypes.byref(key_handle),
+            key_object_buffer,
+            len(key_object_buffer),
+            key_buffer,
+            len(key_buffer),
+            0,
+        )
+        if status != 0 or not key_handle.value:
+            raise TenderPlanReadOnlyCryptoError
+
+        auth_info = _BcryptAuthenticatedCipherModeInfo(
+            cbSize=ctypes.sizeof(_BcryptAuthenticatedCipherModeInfo),
+            dwInfoVersion=_BCRYPT_AUTH_MODE_INFO_VERSION,
+            pbNonce=nonce_buffer,
+            cbNonce=len(nonce_buffer),
+            pbAuthData=aad_buffer,
+            cbAuthData=len(aad_buffer),
+            pbTag=tag_buffer,
+            cbTag=len(tag_buffer),
+            pbMacContext=ctypes.POINTER(ctypes.c_ubyte)(),
+            cbMacContext=0,
+            cbAAD=0,
+            cbData=0,
+            dwFlags=0,
+        )
+        result_length = wintypes.ULONG()
+        status = bcrypt.BCryptEncrypt(
+            key_handle,
+            plaintext_buffer,
+            len(plaintext_buffer),
+            ctypes.byref(auth_info),
+            None,
+            0,
+            ciphertext_buffer,
+            len(ciphertext_buffer),
+            ctypes.byref(result_length),
+            0,
+        )
+        if status != 0 or result_length.value != len(ciphertext_buffer):
+            raise TenderPlanReadOnlyCryptoError
+        return bytes(ciphertext_buffer) + bytes(tag_buffer)
+    except TenderPlanReadOnlyCryptoError:
+        raise
+    except Exception:
+        raise TenderPlanReadOnlyCryptoError from None
+    finally:
+        if key_handle.value:
+            bcrypt.BCryptDestroyKey(key_handle)
+        if algorithm_handle.value:
+            bcrypt.BCryptCloseAlgorithmProvider(algorithm_handle, 0)
+        _zero_mutable(key_object_buffer)
+        _zero_mutable(tag_buffer)
+        _zero_mutable(ciphertext_buffer)
+        _zero_mutable(aad_buffer)
+        _zero_mutable(plaintext_buffer)
+        _zero_mutable(nonce_buffer)
+        _zero_mutable(key_buffer)
+
+
+def _aes_gcm_encrypt(key: bytes, nonce: bytes, plaintext: bytes, aad: bytes) -> bytes:
+    if _SEALED_WORKER:
+        return _bcrypt_aes_gcm_encrypt(key, nonce, plaintext, aad)
+    if AESGCM is None:
+        raise TenderPlanReadOnlyCryptoError
+    return AESGCM(key).encrypt(nonce, plaintext, aad)
 
 
 def _input_blob(value: bytes) -> tuple[_DataBlob, ctypes.Array[ctypes.c_ubyte]]:
@@ -746,7 +981,7 @@ def encrypt_tenderplan_card(
             or not 1 <= len(wrapped_key) <= _MAX_WRAPPED_KEY_BYTES
         ):
             raise TenderPlanReadOnlyCryptoError
-        ciphertext = AESGCM(key).encrypt(nonce, plaintext, aad)
+        ciphertext = _aes_gcm_encrypt(key, nonce, plaintext, aad)
         nonce_b64 = _b64_encode(nonce)
         ciphertext_b64 = _b64_encode(ciphertext)
         wrapped_key_b64 = _b64_encode(wrapped_key)
@@ -861,6 +1096,8 @@ def decrypt_tenderplan_card(
         if type(unwrapped) is not bytes or len(unwrapped) != _AES_KEY_BYTES:
             raise TenderPlanReadOnlyCryptoError
         key_buffer = bytearray(unwrapped)
+        if AESGCM is None:
+            raise TenderPlanReadOnlyCryptoError
         plaintext = AESGCM(bytes(key_buffer)).decrypt(nonce, ciphertext, aad)
         plaintext_buffer = bytearray(plaintext)
         normalized, _canonical = _strict_canonical_plaintext(bytes(plaintext_buffer))
@@ -871,7 +1108,7 @@ def decrypt_tenderplan_card(
             semantic_status=envelope.semantic_status,
         )
         return normalized
-    except (InvalidTag, TenderPlanReadOnlyCryptoError):
+    except TenderPlanReadOnlyCryptoError:
         raise TenderPlanReadOnlyCryptoError from None
     except Exception:
         raise TenderPlanReadOnlyCryptoError from None
