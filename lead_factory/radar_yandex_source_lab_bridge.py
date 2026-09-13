@@ -147,6 +147,16 @@ class YandexBatchClosureSnapshot:
     decision_counts: Mapping[str, int]
 
 
+@dataclass(frozen=True, slots=True)
+class YandexBatchDeferralSnapshot:
+    attempt_id: str
+    review_count: int
+    decisions_sha256: str
+    decision_counts: Mapping[str, int]
+    unresolved_review_ids: tuple[str, ...]
+    manifest: tuple[Mapping[str, Any], ...]
+
+
 @dataclass(frozen=True, slots=True, repr=False)
 class _BatchBinding:
     receipt: YandexSourceLabBatchReceipt
@@ -788,6 +798,35 @@ def _load_batch_binding(
         )
 
 
+def _list_yandex_review_batch_receipts_tx(
+    connection: sqlite3.Connection,
+) -> tuple[YandexSourceLabBatchReceipt, ...]:
+    """Validate the existing schema and every receipt in the caller's snapshot."""
+    if FactoryStore()._probe_schema(connection) != 17:
+        _fail("YANDEX_SOURCE_LAB_INTEGRITY_FAILED")
+    validate_source_lab_integrity(connection)
+    validate_source_review_queue_integrity(connection)
+    rows = connection.execute(
+        """SELECT payload_json FROM events
+           WHERE producer=? AND event_type=? ORDER BY rowid""",
+        (_PRODUCER, _BATCH_EVENT_TYPE),
+    ).fetchall()
+    receipts: list[YandexSourceLabBatchReceipt] = []
+    seen_attempts: set[str] = set()
+    for row in rows:
+        payload = _strict_object(row["payload_json"])
+        attempt = _attempt_id(payload.get("attempt_id"))
+        receipt_sha256 = _receipt_sha256(payload.get("receipt_sha256"))
+        if attempt in seen_attempts:
+            _fail("YANDEX_SOURCE_LAB_INTEGRITY_FAILED")
+        binding = _load_batch_binding_tx(
+            connection, attempt=attempt, expected_receipt_sha256=receipt_sha256,
+        )
+        seen_attempts.add(attempt)
+        receipts.append(binding.receipt)
+    return tuple(receipts)
+
+
 def _list_yandex_review_batch_receipts_core(
     source_lab_path: str | os.PathLike[str] = SOURCE_DISCOVERY_SOURCE_LAB_PATH,
 ) -> tuple[YandexSourceLabBatchReceipt, ...]:
@@ -804,31 +843,8 @@ def _list_yandex_review_batch_receipts_core(
             timeout=5,
         )
         connection.row_factory = sqlite3.Row
-        if int(connection.execute("PRAGMA user_version").fetchone()[0]) != 17:
-            _fail("YANDEX_SOURCE_LAB_INTEGRITY_FAILED")
-        validate_source_lab_integrity(connection)
-        validate_source_review_queue_integrity(connection)
-        rows = connection.execute(
-            """SELECT payload_json FROM events
-               WHERE producer=? AND event_type=? ORDER BY rowid""",
-            (_PRODUCER, _BATCH_EVENT_TYPE),
-        ).fetchall()
-        receipts: list[YandexSourceLabBatchReceipt] = []
-        seen_attempts: set[str] = set()
-        for row in rows:
-            payload = _strict_object(row["payload_json"])
-            attempt = _attempt_id(payload.get("attempt_id"))
-            receipt_sha256 = _receipt_sha256(payload.get("receipt_sha256"))
-            if attempt in seen_attempts:
-                _fail("YANDEX_SOURCE_LAB_INTEGRITY_FAILED")
-            binding = _load_batch_binding_tx(
-                connection,
-                attempt=attempt,
-                expected_receipt_sha256=receipt_sha256,
-            )
-            seen_attempts.add(attempt)
-            receipts.append(binding.receipt)
-        return tuple(receipts)
+        connection.execute("BEGIN")
+        return _list_yandex_review_batch_receipts_tx(connection)
     except YandexSourceLabBridgeError:
         raise
     except Exception:
@@ -1432,6 +1448,107 @@ def _decide_yandex_review_candidate_core(
         raise YandexSourceLabBridgeError("YANDEX_REVIEW_DECISION_FAILED") from None
 
 
+def _inspect_yandex_batch_closure_tx(
+    con: sqlite3.Connection,
+    *,
+    attempt_id: str,
+    expected_receipt_sha256: str,
+) -> YandexBatchClosureSnapshot:
+    binding = _load_batch_binding_tx(
+        con, attempt=_attempt_id(attempt_id),
+        expected_receipt_sha256=_receipt_sha256(expected_receipt_sha256),
+    )
+    decisions: list[dict[str, Any]] = []
+    counts = {"APPROVE": 0, "REJECT": 0}
+    for review_id in binding.receipt.review_ids:
+        latest = con.execute(
+            """SELECT resolution_id,sequence_number,decision,command_hash,event_id
+               FROM source_lab_review_resolutions WHERE review_id=?
+               ORDER BY sequence_number DESC LIMIT 1""", (review_id,),
+        ).fetchone()
+        if latest is None or str(latest["decision"]) not in _TERMINAL_CLOSE_DECISIONS:
+            _fail("YANDEX_REVIEW_BATCH_INCOMPLETE")
+        decision = str(latest["decision"])
+        counts[decision] += 1
+        decisions.append({
+            "review_id": review_id, "decision": decision,
+            "resolution_id": str(latest["resolution_id"]),
+            "sequence_number": int(latest["sequence_number"]),
+            "command_hash": str(latest["command_hash"]),
+            "event_id": str(latest["event_id"]),
+        })
+    if len(decisions) != binding.receipt.candidate_count:
+        _fail("YANDEX_REVIEW_BATCH_INCOMPLETE")
+    return YandexBatchClosureSnapshot(
+        binding.receipt.attempt_id, binding.receipt.candidate_count,
+        len(decisions), payload_hash(decisions), MappingProxyType(counts),
+    )
+
+
+def _inspect_yandex_batch_deferral_tx(
+    con: sqlite3.Connection,
+    *,
+    attempt_id: str,
+    expected_receipt_sha256: str,
+) -> YandexBatchDeferralSnapshot:
+    """Pin current human resolutions and queue heads without altering the Lab."""
+    binding = _load_batch_binding_tx(
+        con, attempt=_attempt_id(attempt_id),
+        expected_receipt_sha256=_receipt_sha256(expected_receipt_sha256),
+    )
+    manifest: list[dict[str, Any]] = []
+    counts = {"APPROVE": 0, "REJECT": 0, "NEEDS_RESEARCH": 0}
+    unresolved: list[str] = []
+    for review_id in binding.receipt.review_ids:
+        latest = con.execute(
+            """SELECT * FROM source_lab_review_resolutions WHERE review_id=?
+               ORDER BY sequence_number DESC LIMIT 1""", (review_id,),
+        ).fetchone()
+        head = con.execute(
+            """SELECT * FROM events WHERE producer=? AND aggregate_id=?
+               ORDER BY rowid DESC LIMIT 1""", (QUEUE_PRODUCER, review_id),
+        ).fetchone()
+        if latest is None or head is None or str(latest["decision"]) not in _ALLOWED_BRIDGE_DECISIONS:
+            _fail("YANDEX_REVIEW_BATCH_INCOMPLETE")
+        head_payload = _strict_object(head["payload_json"])
+        if (
+            head_payload.get("action") != "RESOLUTION_RECORDED"
+            or head_payload.get("resolution_id") != latest["resolution_id"]
+            or head_payload.get("resolution_sequence") != latest["sequence_number"]
+            or head_payload.get("decision") != latest["decision"]
+            or head_payload.get("resolution_event_id") != latest["event_id"]
+            or head_payload.get("resolution_command_hash") != latest["command_hash"]
+        ):
+            _fail("YANDEX_REVIEW_BATCH_INCOMPLETE")
+        event = con.execute("SELECT * FROM events WHERE event_id=?", (latest["event_id"],)).fetchone()
+        if event is None:
+            _fail("YANDEX_SOURCE_LAB_INTEGRITY_FAILED")
+        decision = str(latest["decision"])
+        counts[decision] += 1
+        if decision == "NEEDS_RESEARCH":
+            unresolved.append(review_id)
+        manifest.append({
+            "review_id": review_id, "decision": decision,
+            "resolution_id": str(latest["resolution_id"]),
+            "sequence_number": int(latest["sequence_number"]),
+            "command_hash": str(latest["command_hash"]),
+            "event_id": str(latest["event_id"]),
+            "event_sha256": payload_hash(dict(event)),
+            "resolution_sha256": payload_hash(dict(latest)),
+            "queue_head_event_id": str(head["event_id"]),
+            "queue_head_payload_sha256": str(head["payload_hash"]),
+            "queue_head_event_sha256": payload_hash(dict(head)),
+            "queue_revision": int(head_payload["revision"]),
+        })
+    if not unresolved or len(manifest) != binding.receipt.candidate_count:
+        _fail("YANDEX_REVIEW_BATCH_INCOMPLETE")
+    return YandexBatchDeferralSnapshot(
+        binding.receipt.attempt_id, binding.receipt.candidate_count,
+        payload_hash(manifest), MappingProxyType(counts), tuple(unresolved),
+        tuple(MappingProxyType(item) for item in manifest),
+    )
+
+
 def _inspect_yandex_batch_closure_core(
     *,
     attempt_id: str,
@@ -1446,46 +1563,8 @@ def _inspect_yandex_batch_closure_core(
         path = _local_database_path(source_lab_path)
         store = FactoryStore(path)
         with store.transaction(min_schema_version=17) as con:
-            binding = _load_batch_binding_tx(
-                con,
-                attempt=attempt,
-                expected_receipt_sha256=receipt_sha256,
-            )
-            decisions: list[dict[str, Any]] = []
-            counts = {"APPROVE": 0, "REJECT": 0}
-            terminal_count = 0
-            for review_id in binding.receipt.review_ids:
-                latest = con.execute(
-                    """SELECT resolution_id,sequence_number,decision,
-                              command_hash,event_id
-                       FROM source_lab_review_resolutions
-                       WHERE review_id=?
-                       ORDER BY sequence_number DESC LIMIT 1""",
-                    (review_id,),
-                ).fetchone()
-                if latest is None or str(latest["decision"]) not in _TERMINAL_CLOSE_DECISIONS:
-                    _fail("YANDEX_REVIEW_BATCH_INCOMPLETE")
-                decision = str(latest["decision"])
-                counts[decision] += 1
-                terminal_count += 1
-                decisions.append(
-                    {
-                        "review_id": review_id,
-                        "decision": decision,
-                        "resolution_id": str(latest["resolution_id"]),
-                        "sequence_number": int(latest["sequence_number"]),
-                        "command_hash": str(latest["command_hash"]),
-                        "event_id": str(latest["event_id"]),
-                    }
-                )
-            if terminal_count != binding.receipt.candidate_count:
-                _fail("YANDEX_REVIEW_BATCH_INCOMPLETE")
-            return YandexBatchClosureSnapshot(
-                attempt,
-                binding.receipt.candidate_count,
-                terminal_count,
-                payload_hash(decisions),
-                MappingProxyType(counts),
+            return _inspect_yandex_batch_closure_tx(
+                con, attempt_id=attempt, expected_receipt_sha256=receipt_sha256,
             )
     except YandexSourceLabBridgeError:
         raise

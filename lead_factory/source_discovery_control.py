@@ -17,6 +17,7 @@ from pathlib import Path
 import re
 import secrets
 import sqlite3
+import stat
 import time
 from typing import Final, Mapping, NoReturn
 
@@ -36,8 +37,11 @@ from lead_factory.radar_yandex_source_lab_bridge import (
     SOURCE_DISCOVERY_SOURCE_LAB_PATH,
     YandexSourceLabBatchReceipt,
     YandexSourceLabBridgeError,
+    YandexBatchDeferralSnapshot,
+    _inspect_yandex_batch_closure_tx,
+    _inspect_yandex_batch_deferral_tx,
+    _list_yandex_review_batch_receipts_tx,
     inspect_yandex_batch_closure,
-    list_yandex_review_batch_receipts,
     persist_yandex_review_batch,
     preflight_yandex_source_lab,
     select_yandex_reviewable_page,
@@ -65,6 +69,7 @@ SOURCE_DISCOVERY_CONTROL_VERSION: Final = "source-discovery-control-v5"
 SOURCE_DISCOVERY_PREPARE_CONFIRMATION: Final = "PREPARE_LOCAL_TENDERPLAN_RECEIPT_BINDINGS"
 SOURCE_DISCOVERY_ONE_SHOT_CONFIRMATION: Final = "AUTHORIZE_ONE_PREAUTHORIZED_SOURCE_READ"
 SOURCE_DISCOVERY_LOCAL_CLOSE_CONFIRMATION: Final = "CLOSE_LOCAL_SOURCE_REVIEW_ONLY"
+SOURCE_DISCOVERY_LOCAL_DEFER_CONFIRMATION: Final = "DEFER_LOCAL_INCOMPLETE_SOURCE_REVIEW_ONLY"
 SOURCE_DISCOVERY_STATE_PATH: Final = (
     Path(__file__).resolve().parent.parent
     / "state"
@@ -94,6 +99,11 @@ _SAFE_CONTROL_ERROR_CODES: Final = frozenset(
         "CONTROL_SCHEMA_PREPARATION_IN_FLIGHT",
         "TENDERPLAN_RECEIPT_INVALID",
         "LOCAL_CLOSE_CONFIRMATION_REQUIRED",
+        "LOCAL_DEFER_CONFIRMATION_REQUIRED",
+        "LOCAL_REVIEW_BATCH_NOT_DEFERRABLE",
+        "LOCAL_REVIEW_DEFER_CONFLICT",
+        "LOCAL_REVIEW_PIN_MISMATCH",
+        "LOCAL_REVIEW_REASON_INVALID",
         "LOCAL_REVIEW_ACTOR_INVALID",
         "LOCAL_REVIEW_BATCH_NOT_CLOSABLE",
         "LOCAL_REVIEW_CLOSE_CONFLICT",
@@ -426,6 +436,26 @@ def _digest(value: object) -> str:
 
 _CONTROL_V4_SCHEMA_SHA256 = "461c0d93475ebcb0700b1d62343067e5d05e170f344b46b7b1749537456f6246"
 _CONTROL_V5_SCHEMA_SHA256 = "c516f1ab7630cc809efd835a965e12f61d376fb7ba06f849f928f9816bb854da"
+_CONTROL_V6_SCHEMA_SHA256 = "85b6fa4d848ffbce3d93b36136e4366a284a724d6dfd7e937752984c6d458563"
+_REVIEW_DEFERRALS = "source_discovery_review_deferrals"
+_REVIEW_DEFERRAL_SCHEMA_SQL = """CREATE TABLE source_discovery_review_deferrals(
+    sequence INTEGER PRIMARY KEY AUTOINCREMENT,
+    attempt_id TEXT NOT NULL UNIQUE REFERENCES source_discovery_attempts(attempt_id),
+    source_lab_receipt_sha256 TEXT NOT NULL CHECK(length(source_lab_receipt_sha256)=64),
+    source_lab_path_sha256 TEXT NOT NULL CHECK(length(source_lab_path_sha256)=64),
+    decisions_sha256 TEXT NOT NULL CHECK(length(decisions_sha256)=64),
+    manifest_json TEXT NOT NULL,
+    decision_counts_json TEXT NOT NULL,
+    unresolved_review_ids_json TEXT NOT NULL,
+    review_count INTEGER NOT NULL CHECK(review_count BETWEEN 1 AND 30),
+    unresolved_count INTEGER NOT NULL CHECK(unresolved_count BETWEEN 1 AND review_count),
+    deferred_by TEXT NOT NULL CHECK(length(deferred_by) BETWEEN 1 AND 128),
+    reason TEXT NOT NULL CHECK(length(reason) BETWEEN 1 AND 512),
+    evidence_ref TEXT NOT NULL CHECK(length(evidence_ref) BETWEEN 1 AND 2048),
+    idempotency_key TEXT NOT NULL UNIQUE CHECK(length(idempotency_key) BETWEEN 1 AND 256),
+    deferral_command_sha256 TEXT NOT NULL CHECK(length(deferral_command_sha256)=64),
+    deferred_at_utc TEXT NOT NULL
+)"""
 _TP_BINDINGS = "source_discovery_tenderplan_bindings"
 _TP_SCHEMA_SQL = (
     "ALTER TABLE source_discovery_attempts ADD COLUMN tenderplan_binding_required INTEGER NOT NULL DEFAULT 0 CHECK(tenderplan_binding_required IN (0,1))",
@@ -475,6 +505,8 @@ def _control_schema_version(connection: sqlite3.Connection) -> int:
         return 4
     if version == 5 and digest == _CONTROL_V5_SCHEMA_SHA256:
         return 5
+    if version == 6 and digest == _CONTROL_V6_SCHEMA_SHA256:
+        return 6
     raise SourceDiscoveryControlError("CONTROL_STATE_INTEGRITY_FAILED")
 
 
@@ -491,7 +523,7 @@ def _tenderplan_schema_ready(path: Path) -> bool:
         return False
     connection = _open_read_only(path)
     try:
-        return _control_schema_version(connection) == 5
+        return _control_schema_version(connection) in {5, 6}
     finally:
         connection.close()
 
@@ -504,10 +536,11 @@ def prepare_source_discovery_tenderplan_bindings(
         raise SourceDiscoveryControlError("CONTROL_SCHEMA_PREPARATION_CONFIRMATION_REQUIRED")
     path = _state_path(state_path)
     connection = _open_for_write(path, prepare_tenderplan=True)
+    schema_version = _control_schema_version(connection)
     connection.close()
     return {
         "operation": "PREPARE_TENDERPLAN_BINDINGS_LOCAL", "state": "PREPARED",
-        "schema_version": 5, "version": SOURCE_DISCOVERY_CONTROL_VERSION,
+        "schema_version": schema_version, "version": SOURCE_DISCOVERY_CONTROL_VERSION,
         "effects": _local_effects(),
     }
 
@@ -592,7 +625,7 @@ def _tenderplan_binding_body(row: sqlite3.Row) -> dict[str, object]:
 
 def _validate_tenderplan_bindings(connection: sqlite3.Connection) -> dict[str, dict[str, object]]:
     try:
-        if _control_schema_version(connection) != 5:
+        if _control_schema_version(connection) not in {5, 6}:
             raise ValueError
         attempts = {row["attempt_id"]: row for row in connection.execute("SELECT * FROM source_discovery_attempts")}
         bindings = {}
@@ -688,7 +721,7 @@ def _open_for_write(
             probe = _open_read_only(path)
             try:
                 version = _control_schema_version(probe)
-                if require_tenderplan and version != 5:
+                if require_tenderplan and version not in {5, 6}:
                     raise SourceDiscoveryControlError("CONTROL_SCHEMA_PREPARATION_REQUIRED")
             finally:
                 probe.close()
@@ -721,7 +754,7 @@ def _open_for_write(
         ).fetchone() is not None
         if (prepare_tenderplan and actual_schema_present) or require_tenderplan:
             version = _control_schema_version(connection)
-            if require_tenderplan and version != 5:
+            if require_tenderplan and version not in {5, 6}:
                 raise SourceDiscoveryControlError("CONTROL_SCHEMA_PREPARATION_REQUIRED")
             _rows(path)  # Revalidate committed history while holding the writer fence.
         native_schema_present = (
@@ -991,11 +1024,89 @@ def _validate_yandex_receipts(
             raise SourceDiscoveryControlError("CONTROL_STATE_INTEGRITY_FAILED")
 
 
-def _rows(path: Path) -> tuple[dict[str, object], ...]:
+def _review_deferral_body(row: sqlite3.Row) -> dict[str, object]:
+    return {
+        "deferral_version": 1,
+        **{key: row[key] for key in (
+            "attempt_id", "source_lab_receipt_sha256", "source_lab_path_sha256",
+            "decisions_sha256", "review_count", "unresolved_count", "deferred_by",
+            "reason", "evidence_ref", "idempotency_key", "deferred_at_utc",
+        )},
+        "manifest": json.loads(row["manifest_json"]),
+        "decision_counts": json.loads(row["decision_counts_json"]),
+        "unresolved_review_ids": json.loads(row["unresolved_review_ids_json"]),
+    }
+
+
+def _validate_review_deferrals_tx(
+    connection: sqlite3.Connection, rows: list[sqlite3.Row],
+) -> dict[str, dict[str, object]]:
+    """Scan the whole immutable table; an orphan must never disappear in a JOIN."""
+    if connection.execute(
+        "SELECT 1 FROM sqlite_master WHERE name=?", (_REVIEW_DEFERRALS,),
+    ).fetchone() is None:
+        return {}
+    if _control_schema_version(connection) != 6:
+        raise SourceDiscoveryControlError("CONTROL_STATE_INTEGRITY_FAILED")
+    try:
+        by_attempt = {str(row["attempt_id"]): row for row in rows}
+        deferrals: dict[str, dict[str, object]] = {}
+        for row in connection.execute(f"SELECT * FROM {_REVIEW_DEFERRALS} ORDER BY sequence"):
+            body = _review_deferral_body(row)
+            attempt = by_attempt.get(body["attempt_id"])
+            manifest = body["manifest"]
+            counts = body["decision_counts"]
+            unresolved = body["unresolved_review_ids"]
+            if (
+                attempt is None or attempt["source"] != "YANDEX"
+                or attempt["state"] != "READY_FOR_REVIEW"
+                or attempt["closed_at_utc"] is not None
+                or attempt["source_lab_batch_id"] is None
+                or attempt["source_lab_receipt_sha256"] != body["source_lab_receipt_sha256"]
+                or attempt["source_lab_path_sha256"] != body["source_lab_path_sha256"]
+                or type(body["review_count"]) is not int
+                or body["review_count"] != attempt["review_count"]
+                or type(body["unresolved_count"]) is not int
+                or type(manifest) is not list or len(manifest) != body["review_count"]
+                or any(type(item) is not dict for item in manifest)
+                or type(counts) is not dict or set(counts) != {"APPROVE", "REJECT", "NEEDS_RESEARCH"}
+                or any(type(value) is not int or value < 0 for value in counts.values())
+                or sum(counts.values()) != body["review_count"]
+                or counts["NEEDS_RESEARCH"] < 1
+                or counts["NEEDS_RESEARCH"] != body["unresolved_count"]
+                or type(unresolved) is not list or len(unresolved) != body["unresolved_count"]
+                or any(type(item) is not str for item in unresolved)
+                or len(set(unresolved)) != len(unresolved)
+                or unresolved != [item.get("review_id") for item in manifest if item.get("decision") == "NEEDS_RESEARCH"]
+                or any(counts[decision] != sum(item.get("decision") == decision for item in manifest) for decision in counts)
+                or len({item.get("review_id") for item in manifest}) != len(manifest)
+                or any(type(body[key]) is not str or _SHA256.fullmatch(body[key]) is None for key in (
+                    "source_lab_receipt_sha256", "source_lab_path_sha256", "decisions_sha256",
+                ))
+                or _digest(manifest) != body["decisions_sha256"]
+                or not _valid_recorded_at(body["deferred_at_utc"])
+                or _digest(body) != row["deferral_command_sha256"]
+                or body["attempt_id"] in deferrals
+            ):
+                raise ValueError
+            for key, maximum in (("deferred_by", 128), ("reason", 512), ("evidence_ref", 2048), ("idempotency_key", 256)):
+                if _local_text(body[key], maximum=maximum, code="CONTROL_STATE_INTEGRITY_FAILED") != body[key]:
+                    raise ValueError
+            if re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}", body["deferred_by"]) is None:
+                raise ValueError
+            deferrals[body["attempt_id"]] = {**body, "deferral_command_sha256": row["deferral_command_sha256"]}
+        return deferrals
+    except (ValueError, TypeError, KeyError, sqlite3.Error):
+        raise SourceDiscoveryControlError("CONTROL_STATE_INTEGRITY_FAILED") from None
+
+
+def _rows(
+    path: Path, *, _connection: sqlite3.Connection | None = None,
+) -> tuple[dict[str, object], ...]:
     for attempt in range(_SCHEMA_VISIBILITY_RETRIES):
         if not path.exists():
             return ()
-        connection = _open_read_only(path)
+        connection = _connection if _connection is not None else _open_read_only(path)
         try:
             schema_ready = connection.execute(
                 """SELECT 1 FROM sqlite_master
@@ -1170,13 +1281,20 @@ def _rows(path: Path) -> tuple[dict[str, object], ...]:
                             raise SourceDiscoveryControlError("CONTROL_STATE_INTEGRITY_FAILED")
                 if append_only_tables == set(_APPEND_ONLY_TABLES):
                     _validate_yandex_receipts(connection, rows)
-                return tuple({**dict(row), "tenderplan_binding": native_bindings.get(row["attempt_id"])} for row in rows)
+                    if connection.execute("PRAGMA foreign_key_check").fetchone() is not None:
+                        raise SourceDiscoveryControlError("CONTROL_STATE_INTEGRITY_FAILED")
+                deferrals = _validate_review_deferrals_tx(connection, rows)
+                return tuple({
+                    **dict(row), "tenderplan_binding": native_bindings.get(row["attempt_id"]),
+                    "deferred_review": deferrals.get(row["attempt_id"]),
+                } for row in rows)
         except SourceDiscoveryControlError:
             raise
         except sqlite3.Error:
             raise SourceDiscoveryControlError("CONTROL_STATE_INTEGRITY_FAILED") from None
         finally:
-            connection.close()
+            if _connection is None:
+                connection.close()
         if attempt + 1 < _SCHEMA_VISIBILITY_RETRIES:
             time.sleep(_SCHEMA_VISIBILITY_RETRY_SECONDS)
     raise SourceDiscoveryControlError("CONTROL_STATE_INTEGRITY_FAILED")
@@ -1185,37 +1303,28 @@ def _rows(path: Path) -> tuple[dict[str, object], ...]:
 def _validate_closed_yandex_batches(
     path: Path,
     rows: tuple[sqlite3.Row, ...],
+    *,
+    _lab_connection: sqlite3.Connection | None = None,
 ) -> None:
     linked_rows = tuple(row for row in rows if row["source_lab_batch_id"] is not None)
     closed_rows = tuple(row for row in rows if row["closed_at_utc"] is not None)
+    deferred_rows = tuple(row for row in rows if row.get("deferred_review") is not None)
     lab_path = _source_lab_path(control_path=path)
     if not lab_path.exists():
         if linked_rows:
             raise SourceDiscoveryControlError("CONTROL_SOURCE_LAB_RECONCILIATION_REQUIRED")
         return
     lab_path_sha256 = _source_lab_path_sha256(lab_path)
+    connection: sqlite3.Connection | None = None
+    receipts_validated = False
     try:
         if not lab_path.is_file() or lab_path.stat().st_size <= 0:
             raise OSError
-        connection = _open_read_only(lab_path)
-        try:
-            if int(connection.execute("PRAGMA user_version").fetchone()[0]) != 17:
-                raise sqlite3.DatabaseError
-        finally:
-            connection.close()
-        receipts = list_yandex_review_batch_receipts(lab_path)
-    except (
-        OSError,
-        TypeError,
-        sqlite3.Error,
-        SourceDiscoveryControlError,
-        YandexSourceLabBridgeError,
-    ):
-        if not linked_rows:
-            raise YandexSourceLabBridgeError("YANDEX_SOURCE_LAB_PREFLIGHT_FAILED") from None
-        raise SourceDiscoveryControlError("CONTROL_SOURCE_LAB_RECONCILIATION_REQUIRED") from None
-
-    try:
+        connection = _lab_connection if _lab_connection is not None else _open_read_only(lab_path)
+        if _lab_connection is None:
+            connection.execute("BEGIN")
+        receipts = _list_yandex_review_batch_receipts_tx(connection)
+        receipts_validated = True
         receipts_by_attempt = {receipt.attempt_id: receipt for receipt in receipts}
         links_by_attempt = {str(row["attempt_id"]): row for row in linked_rows}
         if (
@@ -1242,9 +1351,9 @@ def _validate_closed_yandex_batches(
                 or str(row["closed_source_lab_path_sha256"]) != lab_path_sha256
             ):
                 raise ValueError
-            closure = inspect_yandex_batch_closure(
+            closure = _inspect_yandex_batch_closure_tx(
+                connection,
                 attempt_id=str(row["attempt_id"]),
-                source_lab_path=lab_path,
                 expected_receipt_sha256=str(row["source_lab_receipt_sha256"]),
             )
             if (
@@ -1254,13 +1363,28 @@ def _validate_closed_yandex_batches(
                 or closure.decisions_sha256 != str(row["decisions_sha256"])
             ):
                 raise ValueError
-    except (
-        TypeError,
-        ValueError,
-        SourceDiscoveryControlError,
-        YandexSourceLabBridgeError,
-    ):
+        for row in deferred_rows:
+            recorded = row["deferred_review"]
+            current = _inspect_yandex_batch_deferral_tx(
+                connection, attempt_id=str(row["attempt_id"]),
+                expected_receipt_sha256=str(row["source_lab_receipt_sha256"]),
+            )
+            if (
+                recorded["source_lab_path_sha256"] != lab_path_sha256
+                or current.decisions_sha256 != recorded["decisions_sha256"]
+                or current.review_count != recorded["review_count"]
+                or list(current.unresolved_review_ids) != recorded["unresolved_review_ids"]
+                or dict(current.decision_counts) != recorded["decision_counts"]
+                or [dict(item) for item in current.manifest] != recorded["manifest"]
+            ):
+                raise ValueError
+    except Exception:
+        if not linked_rows and not receipts_validated:
+            raise YandexSourceLabBridgeError("YANDEX_SOURCE_LAB_PREFLIGHT_FAILED") from None
         raise SourceDiscoveryControlError("CONTROL_SOURCE_LAB_RECONCILIATION_REQUIRED") from None
+    finally:
+        if connection is not None and _lab_connection is None:
+            connection.close()
 
 
 def _snapshot(path: Path, wip_limit: int) -> dict[str, object]:
@@ -1270,9 +1394,11 @@ def _snapshot(path: Path, wip_limit: int) -> dict[str, object]:
         state: sum(str(row["state"]) == state for row in rows) for state in sorted(_ATTEMPT_STATES)
     }
     open_review_batches = sum(
-        str(row["state"]) == "READY_FOR_REVIEW" and row["closed_at_utc"] is None for row in rows
+        str(row["state"]) == "READY_FOR_REVIEW" and row["closed_at_utc"] is None
+        and row["deferred_review"] is None for row in rows
     )
     closed_review_batches = sum(row["closed_at_utc"] is not None for row in rows)
+    deferred_review_batches = sum(row["deferred_review"] is not None for row in rows)
     if state_counts["UNCERTAIN"]:
         gate = "BLOCKED_UNCERTAIN"
     elif state_counts["RUNNING"]:
@@ -1288,7 +1414,10 @@ def _snapshot(path: Path, wip_limit: int) -> dict[str, object]:
             "attempt_id": str(row["attempt_id"]),
             "review_count": int(row["review_count"]),
             "source": str(row["source"]),
-            "state": ("CLOSED_LOCAL" if row["closed_at_utc"] is not None else str(row["state"])),
+            "state": (
+                "CLOSED_LOCAL" if row["closed_at_utc"] is not None else
+                "DEFERRED_LOCAL" if row["deferred_review"] is not None else str(row["state"])
+            ),
         }
         if str(row["source"]) == SourceDiscoverySource.YANDEX.value:
             latest["yandex_reconciliation"] = {
@@ -1318,6 +1447,7 @@ def _snapshot(path: Path, wip_limit: int) -> dict[str, object]:
         "gate": gate,
         "in_flight_count": state_counts["RUNNING"],
         "closed_review_batches": closed_review_batches,
+        "deferred_review_batches": deferred_review_batches,
         "latest": latest,
         "manual_reconciliation_required": gate != "READY",
         "open_review_batches": open_review_batches,
@@ -1603,10 +1733,18 @@ def _reserve(
     wip_limit: int,
 ) -> tuple[str | None, str | None]:
     connection = _open_for_write(path, require_tenderplan=source is SourceDiscoverySource.TENDERPLAN)
+    lab_connection: sqlite3.Connection | None = None
     try:
         connection.execute("BEGIN IMMEDIATE")
+        deferred_attempts: set[str] = set()
+        if connection.execute("SELECT 1 FROM sqlite_master WHERE name=?", (_REVIEW_DEFERRALS,)).fetchone():
+            validated_rows = _rows(path, _connection=connection)
+            deferred_attempts = {str(row["attempt_id"]) for row in validated_rows if row["deferred_review"] is not None}
+            if deferred_attempts:
+                lab_connection = _open_existing_local_fence(_source_lab_path(control_path=path))
+            _validate_closed_yandex_batches(path, validated_rows, _lab_connection=lab_connection)
         rows = connection.execute(
-            """SELECT a.state,c.attempt_id AS closed_attempt_id
+            """SELECT a.attempt_id,a.state,c.attempt_id AS closed_attempt_id
                FROM source_discovery_attempts a
                LEFT JOIN source_discovery_review_closures c
                  ON c.attempt_id=a.attempt_id"""
@@ -1621,6 +1759,7 @@ def _reserve(
         if (
             sum(
                 str(row["state"]) == "READY_FOR_REVIEW" and row["closed_attempt_id"] is None
+                and str(row["attempt_id"]) not in deferred_attempts
                 for row in rows
             )
             >= wip_limit
@@ -1650,6 +1789,8 @@ def _reserve(
             pass
         raise SourceDiscoveryControlError("CONTROL_STATE_UNAVAILABLE") from None
     finally:
+        if lab_connection is not None:
+            lab_connection.close()
         connection.close()
 
 
@@ -1985,7 +2126,7 @@ def _finish(
                 f"INSERT INTO source_discovery_tenderplan_bindings({','.join(columns)}) VALUES({','.join('?' for _ in columns)})",
                 tuple(persisted[key] for key in columns),
             )
-        if connection.execute("PRAGMA user_version").fetchone()[0] == 5:
+        if connection.execute("PRAGMA user_version").fetchone()[0] in {5, 6}:
             _validate_tenderplan_bindings(connection)
         connection.execute("COMMIT")
     except SourceDiscoveryControlError:
@@ -2000,6 +2141,262 @@ def _finish(
         raise SourceDiscoveryControlError("CONTROL_RECONCILIATION_REQUIRED") from None
     finally:
         connection.close()
+
+
+def _open_existing_local_fence(path: Path) -> sqlite3.Connection:
+    """Acquire an existing SQLite writer fence without bootstrap or journal changes."""
+    _assert_no_reparse_components(path)
+    connection: sqlite3.Connection | None = None
+    try:
+        before = path.lstat()
+        if not stat.S_ISREG(before.st_mode) or before.st_size <= 0:
+            raise SourceDiscoveryControlError("CONTROL_STATE_UNAVAILABLE")
+        if before.st_nlink != 1:
+            raise SourceDiscoveryControlError("CONTROL_STATE_PATH_INVALID")
+        connection = sqlite3.connect(path.as_uri() + "?mode=rw", uri=True, isolation_level=None, timeout=5)
+        connection.row_factory = sqlite3.Row
+        connection.execute("PRAGMA foreign_keys=ON")
+        connection.execute("PRAGMA synchronous=FULL")
+        connection.execute("BEGIN IMMEDIATE")
+        _assert_no_reparse_components(path)
+        after = path.lstat()
+        if (
+            not stat.S_ISREG(after.st_mode) or after.st_size <= 0 or after.st_nlink != 1
+            or (after.st_dev, after.st_ino) != (before.st_dev, before.st_ino)
+        ):
+            raise SourceDiscoveryControlError("CONTROL_STATE_PATH_INVALID")
+        return connection
+    except SourceDiscoveryControlError:
+        if connection is not None:
+            connection.close()
+        raise
+    except Exception:
+        if connection is not None:
+            connection.close()
+        raise SourceDiscoveryControlError("CONTROL_STATE_UNAVAILABLE") from None
+
+
+def _source_review_deferral_snapshot_tx(
+    path: Path, connection: sqlite3.Connection, lab_connection: sqlite3.Connection,
+    *, attempt_id: str,
+) -> tuple[dict[str, object], YandexBatchDeferralSnapshot]:
+    _control_schema_version(connection)
+    rows = _rows(path, _connection=connection)
+    if any(row["state"] in {"RUNNING", "UNCERTAIN"} for row in rows):
+        raise SourceDiscoveryControlError("CONTROL_RECONCILIATION_REQUIRED")
+    selected = next((row for row in rows if row["attempt_id"] == attempt_id), None)
+    if (
+        selected is None or selected["source"] != "YANDEX"
+        or selected["state"] != "READY_FOR_REVIEW" or selected["source_lab_batch_id"] is None
+    ):
+        raise SourceDiscoveryControlError("LOCAL_REVIEW_BATCH_NOT_DEFERRABLE")
+    if selected["closed_at_utc"] is not None:
+        raise SourceDiscoveryControlError("LOCAL_REVIEW_DEFER_CONFLICT")
+    if selected["source_lab_path_sha256"] != _source_lab_path_sha256(_source_lab_path(control_path=path)):
+        raise SourceDiscoveryControlError("LOCAL_REVIEW_STORE_MISMATCH")
+    _validate_closed_yandex_batches(path, rows, _lab_connection=lab_connection)
+    try:
+        snapshot = _inspect_yandex_batch_deferral_tx(
+            lab_connection, attempt_id=attempt_id,
+            expected_receipt_sha256=str(selected["source_lab_receipt_sha256"]),
+        )
+    except YandexSourceLabBridgeError as error:
+        if error.code == "YANDEX_REVIEW_BATCH_INCOMPLETE":
+            raise SourceDiscoveryControlError("LOCAL_REVIEW_BATCH_NOT_DEFERRABLE") from None
+        raise SourceDiscoveryControlError("CONTROL_SOURCE_LAB_RECONCILIATION_REQUIRED") from None
+    if snapshot.review_count != selected["review_count"]:
+        raise SourceDiscoveryControlError("CONTROL_SOURCE_LAB_RECONCILIATION_REQUIRED")
+    return selected, snapshot
+
+
+def _source_review_deferral_report(
+    selected: Mapping[str, object], snapshot: YandexBatchDeferralSnapshot,
+    *, state: str, created: bool, command_sha256: str = "",
+) -> dict[str, object]:
+    return {
+        "attempt_id": snapshot.attempt_id,
+        "batch_receipt_sha256": selected["source_lab_receipt_sha256"],
+        "decisions_sha256": snapshot.decisions_sha256,
+        "decision_counts": dict(snapshot.decision_counts),
+        "review_count": snapshot.review_count,
+        "unresolved_count": len(snapshot.unresolved_review_ids),
+        "unresolved_review_ids": list(snapshot.unresolved_review_ids),
+        "deferral_receipt_sha256": command_sha256,
+        "created": created, "state": state, "schema_version": 6,
+        "operation": "SOURCE_DISCOVERY_REVIEW_DEFER_LOCAL",
+        "effects": _local_effects(), "version": SOURCE_DISCOVERY_CONTROL_VERSION,
+    }
+
+
+def _preview_source_discovery_review_deferral_core(
+    *, attempt_id: str, state_path: str | Path,
+) -> dict[str, object]:
+    if type(attempt_id) is not str or re.fullmatch(r"sd_[0-9a-f]{32}", attempt_id) is None:
+        raise SourceDiscoveryControlError("SOURCE_DISCOVERY_ATTEMPT_INVALID")
+    path = _state_path(state_path)
+    lab_path = _source_lab_path(control_path=path)
+    connection = _open_read_only(path)
+    lab_connection: sqlite3.Connection | None = None
+    try:
+        connection.execute("BEGIN")
+        lab_connection = _open_read_only(lab_path)
+        lab_connection.execute("BEGIN")
+        selected, snapshot = _source_review_deferral_snapshot_tx(
+            path, connection, lab_connection, attempt_id=attempt_id,
+        )
+        existing = selected["deferred_review"]
+        return _source_review_deferral_report(
+            selected, snapshot, state="DEFERRED_LOCAL" if existing else "READY_TO_DEFER",
+            created=False, command_sha256=str(existing["deferral_command_sha256"]) if existing else "",
+        )
+    finally:
+        if lab_connection is not None:
+            lab_connection.close()
+        connection.close()
+
+
+def preview_source_discovery_review_deferral(
+    *, attempt_id: str, state_path: str | Path = SOURCE_DISCOVERY_STATE_PATH,
+) -> dict[str, object]:
+    """Read-only preview; validates existing databases and never creates a store."""
+    try:
+        return _preview_source_discovery_review_deferral_core(attempt_id=attempt_id, state_path=state_path)
+    except SourceDiscoveryControlError as error:
+        failure_code = _known_control_failure_code(error, "CONTROL_RECONCILIATION_REQUIRED")
+    except Exception:
+        failure_code = "CONTROL_RECONCILIATION_REQUIRED"
+    del attempt_id, state_path
+    _raise_detached_control_failure(failure_code)
+
+
+def _defer_source_discovery_review_core(
+    *, attempt_id: str, confirmation: str | None, state_path: str | Path,
+    expected_receipt_sha256: str, expected_decisions_sha256: str,
+    actor: str, reason: str, evidence_ref: str, idempotency_key: str,
+) -> dict[str, object]:
+    if confirmation != SOURCE_DISCOVERY_LOCAL_DEFER_CONFIRMATION:
+        raise SourceDiscoveryControlError("LOCAL_DEFER_CONFIRMATION_REQUIRED")
+    if type(attempt_id) is not str or re.fullmatch(r"sd_[0-9a-f]{32}", attempt_id) is None:
+        raise SourceDiscoveryControlError("SOURCE_DISCOVERY_ATTEMPT_INVALID")
+    if any(type(value) is not str or _SHA256.fullmatch(value) is None for value in (expected_receipt_sha256, expected_decisions_sha256)):
+        raise SourceDiscoveryControlError("LOCAL_REVIEW_PIN_MISMATCH")
+    operator = _local_text(actor, maximum=128, code="LOCAL_REVIEW_ACTOR_INVALID")
+    if re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}", operator) is None:
+        raise SourceDiscoveryControlError("LOCAL_REVIEW_ACTOR_INVALID")
+    explanation = _local_text(reason, maximum=512, code="LOCAL_REVIEW_REASON_INVALID")
+    evidence = _local_text(evidence_ref, maximum=2048, code="LOCAL_REVIEW_EVIDENCE_INVALID")
+    idem = _local_text(idempotency_key, maximum=256, code="LOCAL_REVIEW_IDEMPOTENCY_INVALID")
+    path = _state_path(state_path)
+    connection = _open_existing_local_fence(path)
+    lab_connection: sqlite3.Connection | None = None
+    try:
+        # The controller lock is acquired first everywhere. Hold the Lab writer
+        # fence through the controller commit, including when the Lab uses WAL.
+        version = _control_schema_version(connection)
+        if str(connection.execute("PRAGMA journal_mode").fetchone()[0]).lower() != "delete":
+            raise SourceDiscoveryControlError("CONTROL_STATE_INTEGRITY_FAILED")
+        lab_connection = _open_existing_local_fence(_source_lab_path(control_path=path))
+        selected, snapshot = _source_review_deferral_snapshot_tx(
+            path, connection, lab_connection, attempt_id=attempt_id,
+        )
+        if expected_receipt_sha256 != selected["source_lab_receipt_sha256"] or expected_decisions_sha256 != snapshot.decisions_sha256:
+            raise SourceDiscoveryControlError("LOCAL_REVIEW_PIN_MISMATCH")
+        existing_attempt = selected["deferred_review"]
+        existing_idem = connection.execute(
+            f"SELECT * FROM {_REVIEW_DEFERRALS} WHERE idempotency_key=?", (idem,),
+        ).fetchone() if version == 6 else None
+        body = {
+            "deferral_version": 1, "attempt_id": attempt_id,
+            "source_lab_receipt_sha256": expected_receipt_sha256,
+            "source_lab_path_sha256": selected["source_lab_path_sha256"],
+            "decisions_sha256": snapshot.decisions_sha256,
+            "manifest": [dict(item) for item in snapshot.manifest],
+            "decision_counts": dict(snapshot.decision_counts),
+            "unresolved_review_ids": list(snapshot.unresolved_review_ids),
+            "review_count": snapshot.review_count,
+            "unresolved_count": len(snapshot.unresolved_review_ids),
+            "deferred_by": operator, "reason": explanation,
+            "evidence_ref": evidence, "idempotency_key": idem,
+            "deferred_at_utc": existing_attempt["deferred_at_utc"] if existing_attempt else _now_utc(),
+        }
+        command_sha256 = _digest(body)
+        created = existing_attempt is None and existing_idem is None
+        if not created:
+            if (
+                existing_attempt is None or existing_idem is None
+                or existing_idem["attempt_id"] != attempt_id
+                or existing_attempt["deferral_command_sha256"] != command_sha256
+            ):
+                raise SourceDiscoveryControlError("LOCAL_REVIEW_DEFER_CONFLICT")
+        else:
+            # No DDL precedes exact schema, full history, receipt, queue, pins,
+            # uncertainty, and idempotency validation. All migration is atomic.
+            if version == 4:
+                _install_tenderplan_binding_schema(connection)
+            if version in {4, 5}:
+                connection.execute(_REVIEW_DEFERRAL_SCHEMA_SQL)
+                for operation in ("UPDATE", "DELETE"):
+                    connection.execute(_append_only_trigger_sql(_REVIEW_DEFERRALS, operation))
+                connection.execute("PRAGMA user_version=6")
+            if _control_schema_version(connection) != 6:
+                raise SourceDiscoveryControlError("CONTROL_STATE_INTEGRITY_FAILED")
+            connection.execute(
+                f"""INSERT INTO {_REVIEW_DEFERRALS}(
+                    attempt_id,source_lab_receipt_sha256,source_lab_path_sha256,
+                    decisions_sha256,manifest_json,decision_counts_json,unresolved_review_ids_json,
+                    review_count,unresolved_count,deferred_by,reason,evidence_ref,idempotency_key,
+                    deferral_command_sha256,deferred_at_utc
+                ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                (
+                    attempt_id, expected_receipt_sha256, body["source_lab_path_sha256"],
+                    snapshot.decisions_sha256,
+                    json.dumps(body["manifest"], ensure_ascii=False, sort_keys=True, separators=(",", ":")),
+                    json.dumps(body["decision_counts"], ensure_ascii=False, sort_keys=True, separators=(",", ":")),
+                    json.dumps(body["unresolved_review_ids"], ensure_ascii=False, sort_keys=True, separators=(",", ":")),
+                    snapshot.review_count, body["unresolved_count"], operator, explanation,
+                    evidence, idem, command_sha256, body["deferred_at_utc"],
+                ),
+            )
+            _rows(path, _connection=connection)
+        connection.execute("COMMIT")
+    except SourceDiscoveryControlError:
+        if connection.in_transaction:
+            connection.execute("ROLLBACK")
+        raise
+    except Exception:
+        if connection.in_transaction:
+            connection.execute("ROLLBACK")
+        raise SourceDiscoveryControlError("CONTROL_RECONCILIATION_REQUIRED") from None
+    finally:
+        if lab_connection is not None:
+            lab_connection.close()
+        connection.close()
+    return {
+        **_source_review_deferral_report(selected, snapshot, state="DEFERRED_LOCAL", created=created, command_sha256=command_sha256),
+        "control": _snapshot(path, SOURCE_DISCOVERY_DEFAULT_WIP_LIMIT),
+    }
+
+
+def defer_source_discovery_review(
+    *, attempt_id: str, confirmation: str | None,
+    state_path: str | Path = SOURCE_DISCOVERY_STATE_PATH,
+    expected_receipt_sha256: str, expected_decisions_sha256: str,
+    actor: str, reason: str, evidence_ref: str, idempotency_key: str,
+) -> dict[str, object]:
+    """Append one explicit local deferral while preserving all source decisions."""
+    try:
+        return _defer_source_discovery_review_core(
+            attempt_id=attempt_id, confirmation=confirmation, state_path=state_path,
+            expected_receipt_sha256=expected_receipt_sha256,
+            expected_decisions_sha256=expected_decisions_sha256,
+            actor=actor, reason=reason, evidence_ref=evidence_ref, idempotency_key=idempotency_key,
+        )
+    except SourceDiscoveryControlError as error:
+        failure_code = _known_control_failure_code(error, "CONTROL_RECONCILIATION_REQUIRED")
+    except Exception:
+        failure_code = "CONTROL_RECONCILIATION_REQUIRED"
+    del attempt_id, confirmation, state_path, expected_receipt_sha256, expected_decisions_sha256, actor, reason, evidence_ref, idempotency_key
+    _raise_detached_control_failure(failure_code)
 
 
 def close_source_discovery_review(
@@ -2037,6 +2434,8 @@ def close_source_discovery_review(
         raise SourceDiscoveryControlError("LOCAL_REVIEW_BATCH_NOT_CLOSABLE")
     if str(selected["source_lab_path_sha256"]) != lab_path_sha256:
         raise SourceDiscoveryControlError("LOCAL_REVIEW_STORE_MISMATCH")
+    if selected["deferred_review"] is not None:
+        raise SourceDiscoveryControlError("LOCAL_REVIEW_CLOSE_CONFLICT")
     _validate_closed_yandex_batches(path, rows)
     expected_receipt = str(selected["source_lab_receipt_sha256"])
     closure = inspect_yandex_batch_closure(
@@ -2066,6 +2465,10 @@ def close_source_discovery_review(
     command_sha256 = ""
     try:
         connection.execute("BEGIN IMMEDIATE")
+        if connection.execute("SELECT 1 FROM sqlite_master WHERE name=?", (_REVIEW_DEFERRALS,)).fetchone() and connection.execute(
+            f"SELECT 1 FROM {_REVIEW_DEFERRALS} WHERE attempt_id=?", (attempt,),
+        ).fetchone():
+            raise SourceDiscoveryControlError("LOCAL_REVIEW_CLOSE_CONFLICT")
         current = connection.execute(
             """SELECT a.source,a.state,a.review_count,
                       l.source_lab_receipt_sha256,l.source_lab_path_sha256
@@ -2454,6 +2857,7 @@ __all__ = [
     "SOURCE_DISCOVERY_CONTROL_VERSION",
     "SOURCE_DISCOVERY_DEFAULT_WIP_LIMIT",
     "SOURCE_DISCOVERY_LOCAL_CLOSE_CONFIRMATION",
+    "SOURCE_DISCOVERY_LOCAL_DEFER_CONFIRMATION",
     "SOURCE_DISCOVERY_ONE_SHOT_CONFIRMATION",
     "SOURCE_DISCOVERY_PILOT_CAP",
     "SOURCE_DISCOVERY_STATE_PATH",
@@ -2461,6 +2865,8 @@ __all__ = [
     "SourceDiscoverySource",
     "check_source_discovery",
     "close_source_discovery_review",
+    "defer_source_discovery_review",
+    "preview_source_discovery_review_deferral",
     "run_source_discovery_once",
     "source_discovery_plan",
     "source_discovery_status",
