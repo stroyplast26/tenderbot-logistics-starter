@@ -36,6 +36,7 @@ from tests.test_lead_factory_tenderplan_read_only_transport import (
     _bindings as _legacy_bindings,
     _response_body,
 )
+from tests.test_lead_factory_tenderplan_profile_request import _synthetic_expanded_binding
 
 
 def _canonical(value: object) -> bytes:
@@ -598,3 +599,51 @@ def test_maximum_profile_binding_still_fits_bounded_worker_envelope() -> None:
 def test_profile_privacy_guard_does_not_reject_numeric_geography_identifiers() -> None:
     prepared = _prepared()
     assert json.loads(prepared.body_bytes)["key"]["deliveryPlaces"] == ["0000000000001"]
+
+
+def test_synthetic_expanded_filters_keep_exact_body_digest_through_worker_and_fake_http(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Synthetic kind=[1,2] diagnostic; not admission of the full real profile."""
+    binding = _synthetic_expanded_binding()
+    raw = _canonical(binding)
+    prepared = profile.prepare_tenderplan_profile_request(raw, expected_sha256=hashlib.sha256(raw).hexdigest())
+    assert prepared.body_bytes == _canonical({"key": binding["criteria"]})
+    assert prepared.binding_sha256 == "fcc37af7a5f4154914891ed9c2b1d447fa0a48cdfd9089b0d0f70c03b2238627"
+    expected_body_sha256 = "022b59a6c54a7ff19ea93b45c668d6647f02bd0546365e47284ecd8f147d1700"
+    assert hashlib.sha256(prepared.body_bytes).hexdigest() == expected_body_sha256
+    envelope = _envelope(prepared)
+    assert envelope["query_policy_sha256"] == "cce9834ba2315823e6c6bc81a80f0b711e31720eb0257b5d6fde79866a1e7d27"
+    assert envelope["request_sha256"] == "ab0d40f857cfefb76b52e707d6f7a65e338d9e2396cd8e6069c90e3bbbe71b66"
+    validated = transport._validate_request(envelope)  # noqa: SLF001
+    assert validated["profile_request"].body_bytes == prepared.body_bytes
+    assert len(raw) <= 4096 and len(_canonical(envelope)) <= 8192
+    session = _fake_session(monkeypatch)
+    isolated._perform_worker_post("", "synthetic-token", 1_048_576, profile_request=validated["profile_request"])  # noqa: SLF001
+    sent = session.post.call_args.kwargs["data"]
+    assert sent == prepared.body_bytes
+    assert hashlib.sha256(sent).hexdigest() == expected_body_sha256
+    actual = json.loads(sent)["key"]
+    assert actual["types"] == list(range(1000, 1201))
+    assert actual["docWords"] == {"value": None, "excluded": None, "slop": None}
+    assert actual["words"]["excluded"] == binding["criteria"]["words"]["excluded"]
+    assert actual["placingWayNames"] == binding["criteria"]["placingWayNames"]
+    assert len(actual["placingWayNames"]) == 30 and 6 not in actual["placingWayNames"]
+    assert session.post.call_count == 1
+
+
+def test_synthetic_placing_selection_cannot_gain_id_six_after_request_seal() -> None:
+    binding = _synthetic_expanded_binding()
+    raw = _canonical(binding)
+    prepared = profile.prepare_tenderplan_profile_request(raw, expected_sha256=hashlib.sha256(raw).hexdigest())
+    envelope = _envelope(prepared)
+    binding["criteria"]["placingWayNames"].append(6)
+    tampered = _canonical(binding)
+    # Even an internally recomputed binding pin cannot reuse the old sealed
+    # policy/request. The journal claim and credential boundary stay untouched.
+    envelope["profile_binding"] = tampered.decode("ascii")
+    envelope["expected_profile_binding_sha256"] = hashlib.sha256(tampered).hexdigest()
+    with patch.object(transport, "verify_worker_intent") as claim:
+        with pytest.raises(isolated.TenderPlanIsolatedValidationError):
+            transport._execute_worker(envelope)  # noqa: SLF001
+        claim.assert_not_called()

@@ -232,7 +232,7 @@ def test_geography_requires_delivery_or_gar_place_in_addition_to_region() -> Non
     ("words", "excluded", None), ("words", "excluded", ""),
     ("words", "excluded", "different exclusion"), ("words", "extra", "unexpected"),
     ("docWords", "value", "documents cannot narrow this direct cohort"),
-    ("docWords", "slop", 0), ("docWords", "excluded", None),
+    ("docWords", "slop", 0),
     ("docWords", "excluded", "different exclusion"),
 ])
 def test_word_semantics_not_inferred_or_silently_changed(
@@ -240,6 +240,138 @@ def test_word_semantics_not_inferred_or_silently_changed(
 ) -> None:
     material = _binding()
     material["criteria"][group][field] = value
+    _reject(_bytes(material))
+
+
+def _synthetic_placing_selection() -> list[int]:
+    """Thirty synthetic identifiers in deliberate order, excluding identifier six."""
+    return [identifier for identifier in reversed(range(31)) if identifier != 6]
+
+
+def _synthetic_expanded_binding() -> dict[str, object]:
+    """Diagnostic kind>=1 only; this is never the disputed full real profile."""
+    material = _binding()
+    material["criteria"]["types"] = list(range(1000, 1201))
+    material["criteria"]["kind"] = [1, 2]
+    material["criteria"]["docWords"]["excluded"] = None
+    material["criteria"]["placingWayNames"] = _synthetic_placing_selection()
+    material["mapping_evidence"]["placing_ways_sha256"] = "8" * 64
+    return material
+
+
+def test_201_synthetic_platform_types_roundtrip_without_truncation() -> None:
+    """The platform fix is tested with a separate synthetic kind=[1] binding."""
+    material = _binding()
+    expected_types = list(range(1000, 1201))
+    material["criteria"]["types"] = expected_types
+    prepared = _prepare(material)
+    assert prepared.body_bytes == _bytes({"key": material["criteria"]})
+    actual = json.loads(prepared.body_bytes)["key"]["types"]
+    assert actual == expected_types
+    assert len(actual) == 201
+
+
+def test_nullable_document_exclusion_stays_null_without_global_copy() -> None:
+    """A synthetic kind=[1] profile preserves the original global exclusion."""
+    material = _binding()
+    global_exclusion = material["criteria"]["words"]["excluded"]
+    material["criteria"]["docWords"]["excluded"] = None
+    prepared = _prepare(material)
+    assert prepared.body_bytes == _bytes({"key": material["criteria"]})
+    actual = json.loads(prepared.body_bytes)["key"]
+    assert actual["words"]["excluded"] == global_exclusion
+    assert actual["docWords"] == {"value": None, "excluded": None, "slop": None}
+
+
+def test_30_synthetic_placing_ways_preserve_selection_without_id_six() -> None:
+    """A synthetic kind=[1] profile carries the thirty selected identifiers."""
+    material = _binding()
+    expected_ways = _synthetic_placing_selection()
+    material["criteria"]["placingWayNames"] = expected_ways
+    material["mapping_evidence"]["placing_ways_sha256"] = "8" * 64
+    prepared = _prepare(material)
+    assert prepared.body_bytes == _bytes({"key": material["criteria"]})
+    actual = json.loads(prepared.body_bytes)["key"]["placingWayNames"]
+    assert actual == expected_ways
+    assert len(actual) == 30 and 6 not in actual
+
+
+@pytest.mark.parametrize("types", [
+    list(range(1000, 1202)),
+    [*range(1000, 1200), True],
+    [*range(1000, 1200), 1000],
+    [*range(1000, 1200), -1],
+    [*range(1000, 1200), 2**31],
+])
+def test_expanded_types_still_enforce_count_and_every_integer(types: object) -> None:
+    material = _binding()
+    material["criteria"]["types"] = types
+    _reject(_bytes(material))
+
+
+@pytest.mark.parametrize(("field", "values"), [
+    ("regions", list(range(17))),
+    ("kind", list(range(1, 18))),
+    ("deliveryPlaces", [f"{number:013d}" for number in range(17)]),
+    ("garDeliveryPlaces", [f"synthetic-place-{number}" for number in range(17)]),
+])
+def test_types_expansion_does_not_expand_other_array_limits(field: str, values: object) -> None:
+    material = _binding()
+    material["criteria"][field] = values
+    _reject(_bytes(material))
+
+
+def test_placing_ways_allow_31_valid_synthetic_ids_without_silent_filtering() -> None:
+    material = _binding()
+    material["criteria"]["placingWayNames"] = list(range(31))
+    material["mapping_evidence"]["placing_ways_sha256"] = "8" * 64
+    # Selection semantics belong to the pinned profile. The generic builder
+    # preserves all supplied IDs; it must not silently drop identifier six.
+    assert json.loads(_prepare(material).body_bytes)["key"]["placingWayNames"] == list(range(31))
+
+
+@pytest.mark.parametrize("ways", [
+    None, [], list(range(32)), [True], [1.0], ["1"], [-1], [2**31], [1, 1],
+])
+def test_placing_ways_reject_unbounded_or_ambiguous_identifiers(ways: object) -> None:
+    material = _binding()
+    material["criteria"]["placingWayNames"] = ways
+    material["mapping_evidence"]["placing_ways_sha256"] = "8" * 64
+    _reject(_bytes(material))
+
+
+@pytest.mark.parametrize("missing", ["filter", "evidence"])
+def test_placing_filter_and_its_evidence_must_be_present_together(missing: str) -> None:
+    material = _binding()
+    if missing != "filter":
+        material["criteria"]["placingWayNames"] = _synthetic_placing_selection()
+    if missing != "evidence":
+        material["mapping_evidence"]["placing_ways_sha256"] = "8" * 64
+    _reject(_bytes(material))
+
+
+@pytest.mark.parametrize("evidence", [None, "", "0" * 64, "F" * 64, False, 123])
+def test_placing_evidence_requires_an_exact_nonzero_digest(evidence: object) -> None:
+    material = _binding()
+    material["criteria"]["placingWayNames"] = _synthetic_placing_selection()
+    material["mapping_evidence"]["placing_ways_sha256"] = evidence
+    _reject(_bytes(material))
+
+
+@pytest.mark.parametrize("private_text", ["person@example.test", "https://example.test", "1234567"])
+def test_nullable_doc_words_do_not_disable_global_exclusion_privacy_guard(private_text: str) -> None:
+    material = _binding()
+    material["criteria"]["docWords"]["excluded"] = None
+    material["criteria"]["words"]["excluded"] = private_text
+    _reject(_bytes(material))
+
+
+def test_synthetic_expanded_filters_do_not_admit_disputed_kind_zero() -> None:
+    material = _synthetic_expanded_binding()
+    # First prove that only the disputed kind selection makes this otherwise
+    # valid synthetic diagnostic binding fail; no real profile is authorized.
+    _prepare(material)
+    material["criteria"]["kind"] = [0, 2]
     _reject(_bytes(material))
 
 

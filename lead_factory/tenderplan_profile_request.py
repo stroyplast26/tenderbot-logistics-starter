@@ -26,6 +26,10 @@ TENDERPLAN_PROFILE_BINDING_PROTOCOL = "tenderplan-direct-profile-binding/v1"
 TENDERPLAN_PROFILE_BINDING_MAX_BYTES = 4096
 _REPARSE_POINT = 0x400
 _MAX_ARRAY_ITEMS = 16
+# Bounded local support for the reviewed profile and placing-way catalog.
+# These are admission limits, not claims about provider-wide schema maxima.
+_MAX_PURCHASE_TYPES = 201
+_MAX_PLACING_WAYS = 31
 _MAX_TEXT_CHARS = 1024
 _MAX_IDENTIFIER_CHARS = 128
 _MAX_INTEGER = 2_147_483_647
@@ -97,8 +101,8 @@ def _text(value: object, maximum: int = _MAX_TEXT_CHARS) -> str:
     return value
 
 
-def _integer_array(value: object, minimum: int) -> None:
-    _require(type(value) is list and 0 < len(value) <= _MAX_ARRAY_ITEMS)
+def _integer_array(value: object, minimum: int, *, maximum: int = _MAX_ARRAY_ITEMS) -> None:
+    _require(type(value) is list and 0 < len(value) <= maximum)
     _require(all(type(item) is int and minimum <= item <= _MAX_INTEGER for item in value))
     _require(len(set(value)) == len(value))
 
@@ -127,14 +131,26 @@ def _validated_material(binding_bytes: bytes, expected_sha256: str) -> tuple[byt
     profile_id = binding["profile_id"]
     _require(type(profile_id) is str and _PROFILE_ID.fullmatch(profile_id) is not None)
     _digest(binding["profile_snapshot_sha256"])
-    evidence = _shape(binding["mapping_evidence"], _EVIDENCE_FIELDS)
+    criteria = binding["criteria"]
+    _require(type(criteria) is dict)
+    has_placing_ways = "placingWayNames" in criteria
+    # Preserve old bindings while requiring reviewed mapping evidence whenever
+    # the optional placing-way selection is supplied. Neither is synthesized.
+    criteria_fields = _CRITERIA_FIELDS
+    evidence_fields = _EVIDENCE_FIELDS
+    if has_placing_ways:
+        criteria_fields = criteria_fields | {"placingWayNames"}
+        evidence_fields = evidence_fields | {"placing_ways_sha256"}
+    evidence = _shape(binding["mapping_evidence"], evidence_fields)
     for value in evidence.values():
         _digest(value)
 
-    criteria = _shape(binding["criteria"], _CRITERIA_FIELDS)
+    criteria = _shape(criteria, criteria_fields)
     _integer_array(criteria["regions"], 0)
-    _integer_array(criteria["types"], 0)
+    _integer_array(criteria["types"], 0, maximum=_MAX_PURCHASE_TYPES)
     _integer_array(criteria["kind"], 1)
+    if has_placing_ways:
+        _integer_array(criteria["placingWayNames"], 0, maximum=_MAX_PLACING_WAYS)
     _place_array(criteria["deliveryPlaces"], kladr=True)
     _place_array(criteria["garDeliveryPlaces"], kladr=False)
     _require(bool(criteria["deliveryPlaces"] or criteria["garDeliveryPlaces"]))
@@ -144,13 +160,14 @@ def _validated_material(binding_bytes: bytes, expected_sha256: str) -> tuple[byt
     doc_words = _shape(criteria["docWords"], _WORD_FIELDS)
     _text(words["value"])
     _text(words["excluded"])
-    _text(doc_words["excluded"])
+    if doc_words["excluded"] is not None:
+        _text(doc_words["excluded"])
+        _require(words["excluded"] == doc_words["excluded"])
     # Preserve the legacy query privacy boundary only for search text. Provider
     # geography identifiers legitimately contain long numeric sequences.
     _require(not any(_OBVIOUS_PERSONAL_WORD.search(value) for value in (
         words["value"], words["excluded"], doc_words["excluded"],
-    )))
-    _require(words["excluded"] == doc_words["excluded"])
+    ) if value is not None))
     _require(words["slop"] is None and doc_words["slop"] is None)
     _require(doc_words["value"] is None)
     return _canonical({"key": criteria}), profile_id
