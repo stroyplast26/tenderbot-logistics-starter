@@ -375,6 +375,150 @@ def test_synthetic_expanded_filters_do_not_admit_disputed_kind_zero() -> None:
     _reject(_bytes(material))
 
 
+def _synthetic_full_saved_profile_binding() -> dict[str, object]:
+    """Exact full-profile shape with synthetic evidence and no provider authority."""
+    material = _binding()
+    material["protocol"] = "tenderplan-full-saved-profile-binding/v1"
+    criteria = material["criteria"]
+    criteria.update({
+        "customers": None,
+        "excludedCustomers": None,
+        "participants": None,
+        "excludedParticipants": None,
+        "classificators": [],
+        "statuses": [],
+        "placingWayNames": _synthetic_placing_selection(),
+        "minPrice": None,
+        "maxPrice": None,
+        "guaranteeAppMax": None,
+        "guaranteeContractMax": None,
+        "prepayment": None,
+        "preference": [],
+        "excludedPreference": [],
+        "classificatorCondition": "or",
+        "selectedDeliveryPlaces": [{
+            "name": "synthetic region",
+            "fiasId": "synthetic-place-identifier",
+            "kladrId": "0000000000001",
+        }],
+    })
+    criteria["garDeliveryPlaces"] = ["synthetic-place-identifier"]
+    criteria["types"] = list(range(1000, 1201))
+    criteria["kind"] = [0, 2]
+    criteria["docWords"]["excluded"] = None
+    material["mapping_evidence"].update({
+        "placing_ways_sha256": "8" * 64,
+        "kind_zero_ui_evidence_sha256": "9" * 64,
+        "body_projection_sha256": _pin(_bytes({"key": criteria})),
+    })
+    return material
+
+
+def _refresh_full_body_projection(material: dict[str, object]) -> None:
+    material["mapping_evidence"]["body_projection_sha256"] = _pin(
+        _bytes({"key": material["criteria"]}),
+    )
+
+
+def test_full_saved_profile_protocol_preserves_all_26_fields_and_kind_zero() -> None:
+    material = _synthetic_full_saved_profile_binding()
+    payload = _bytes(material)
+    prepared = profile.prepare_tenderplan_profile_request(payload, expected_sha256=_pin(payload))
+    expected_body = _bytes({"key": material["criteria"]})
+
+    assert material["protocol"] == profile.TENDERPLAN_FULL_SAVED_PROFILE_BINDING_PROTOCOL
+    assert len(material["criteria"]) == 26
+    assert material["criteria"]["kind"] == [0, 2]
+    assert len(material["criteria"]["types"]) == 201
+    assert len(material["criteria"]["placingWayNames"]) == 30
+    assert prepared.body_bytes == expected_body
+    assert material["mapping_evidence"]["body_projection_sha256"] == _pin(expected_body)
+    assert len(payload) <= profile.TENDERPLAN_PROFILE_BINDING_MAX_BYTES
+
+
+@pytest.mark.parametrize("evidence", [
+    "missing_placing", "missing_kind", "missing_body", "wrong", "stale",
+])
+def test_full_saved_profile_requires_exact_body_and_kind_zero_evidence(evidence: str) -> None:
+    material = _synthetic_full_saved_profile_binding()
+    if evidence == "missing_placing":
+        del material["mapping_evidence"]["placing_ways_sha256"]
+    elif evidence == "missing_kind":
+        del material["mapping_evidence"]["kind_zero_ui_evidence_sha256"]
+    elif evidence == "missing_body":
+        del material["mapping_evidence"]["body_projection_sha256"]
+    elif evidence == "wrong":
+        material["mapping_evidence"]["body_projection_sha256"] = "a" * 64
+    else:
+        material["criteria"]["selectedDeliveryPlaces"][0]["name"] = "changed synthetic region"
+    _reject(_bytes(material))
+
+
+@pytest.mark.parametrize("kind", [
+    [0], [2], [1, 2], [2, 0], [0, 1, 2], [0, 2, 2], [False, 2], [-1, 2],
+])
+def test_full_saved_profile_protocol_admits_only_observed_notice_price_pair(kind: list[int]) -> None:
+    material = _synthetic_full_saved_profile_binding()
+    material["criteria"]["kind"] = kind
+    _refresh_full_body_projection(material)
+    _reject(_bytes(material))
+
+
+def test_full_saved_profile_protocol_requires_complete_shape() -> None:
+    material = _synthetic_full_saved_profile_binding()
+    del material["criteria"]["statuses"]
+    _refresh_full_body_projection(material)
+    _reject(_bytes(material))
+
+
+def test_full_saved_profile_protocol_rejects_extra_shape() -> None:
+    material = _synthetic_full_saved_profile_binding()
+    material["criteria"]["unexpected"] = None
+    _refresh_full_body_projection(material)
+    _reject(_bytes(material))
+
+
+@pytest.mark.parametrize("field", [
+    "customers", "excludedCustomers", "participants", "excludedParticipants",
+    "classificators", "statuses", "minPrice", "maxPrice", "guaranteeAppMax",
+    "guaranteeContractMax", "prepayment", "preference", "excludedPreference",
+])
+def test_full_saved_profile_does_not_admit_unreviewed_optional_filters(field: str) -> None:
+    material = _synthetic_full_saved_profile_binding()
+    material["criteria"][field] = "synthetic expansion"
+    _refresh_full_body_projection(material)
+    _reject(_bytes(material))
+
+
+def test_full_saved_profile_selected_places_must_match_exact_geography() -> None:
+    material = _synthetic_full_saved_profile_binding()
+    material["criteria"]["selectedDeliveryPlaces"][0]["fiasId"] = "other-place"
+    _refresh_full_body_projection(material)
+    _reject(_bytes(material))
+
+
+@pytest.mark.parametrize("mutation", ["missing", "extra", "kladr", "name"])
+def test_full_saved_profile_selected_place_shape_stays_strict(mutation: str) -> None:
+    material = _synthetic_full_saved_profile_binding()
+    selected = material["criteria"]["selectedDeliveryPlaces"]
+    if mutation == "missing":
+        selected.clear()
+    elif mutation == "extra":
+        selected[0]["unexpected"] = None
+    elif mutation == "kladr":
+        selected[0]["kladrId"] = "0000000000002"
+    else:
+        selected[0]["name"] = " invalid"
+    _refresh_full_body_projection(material)
+    _reject(_bytes(material))
+
+
+def test_legacy_protocol_cannot_claim_the_full_saved_profile_shape() -> None:
+    material = _synthetic_full_saved_profile_binding()
+    material["protocol"] = profile.TENDERPLAN_PROFILE_BINDING_PROTOCOL
+    _reject(_bytes(material))
+
+
 @pytest.mark.parametrize("group", ["words", "docWords"])
 @pytest.mark.parametrize("field", ["value", "excluded", "slop"])
 def test_all_word_fields_explicit_including_nulls(group: str, field: str) -> None:

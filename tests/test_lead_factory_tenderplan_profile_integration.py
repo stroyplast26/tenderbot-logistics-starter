@@ -36,7 +36,11 @@ from tests.test_lead_factory_tenderplan_read_only_transport import (
     _bindings as _legacy_bindings,
     _response_body,
 )
-from tests.test_lead_factory_tenderplan_profile_request import _synthetic_expanded_binding
+from tests.test_lead_factory_tenderplan_profile_request import (
+    _refresh_full_body_projection,
+    _synthetic_expanded_binding,
+    _synthetic_full_saved_profile_binding,
+)
 
 
 def _canonical(value: object) -> bytes:
@@ -643,6 +647,56 @@ def test_synthetic_placing_selection_cannot_gain_id_six_after_request_seal() -> 
     # policy/request. The journal claim and credential boundary stay untouched.
     envelope["profile_binding"] = tampered.decode("ascii")
     envelope["expected_profile_binding_sha256"] = hashlib.sha256(tampered).hexdigest()
+    with patch.object(transport, "verify_worker_intent") as claim:
+        with pytest.raises(isolated.TenderPlanIsolatedValidationError):
+            transport._execute_worker(envelope)  # noqa: SLF001
+        claim.assert_not_called()
+
+
+def test_full_saved_profile_bytes_survive_envelope_and_fake_http_once(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Local UI projection only; server acceptance is deliberately not claimed."""
+    binding = _synthetic_full_saved_profile_binding()
+    raw = _canonical(binding)
+    prepared = profile.prepare_tenderplan_profile_request(
+        raw, expected_sha256=hashlib.sha256(raw).hexdigest(),
+    )
+    envelope = _envelope(prepared)
+    validated = transport._validate_request(envelope)  # noqa: SLF001
+    session = _fake_session(monkeypatch)
+
+    isolated._perform_worker_post(  # noqa: SLF001
+        "", "synthetic-token", 1_048_576, profile_request=validated["profile_request"],
+    )
+
+    expected_body = _canonical({"key": binding["criteria"]})
+    assert prepared.body_bytes == expected_body
+    assert hashlib.sha256(expected_body).hexdigest() == binding["mapping_evidence"][
+        "body_projection_sha256"
+    ]
+    assert session.post.call_args.args == (
+        "https://tenderplan.ru/api/search/v2/list?set=actual&page=0",
+    )
+    assert session.post.call_args.kwargs["data"] == expected_body
+    assert len(raw) <= 4096 and len(_canonical(envelope)) <= 8192
+    assert session.post.call_count == 1
+
+
+def test_resealed_full_profile_change_cannot_reuse_sealed_request() -> None:
+    binding = _synthetic_full_saved_profile_binding()
+    raw = _canonical(binding)
+    prepared = profile.prepare_tenderplan_profile_request(
+        raw, expected_sha256=hashlib.sha256(raw).hexdigest(),
+    )
+    envelope = _envelope(prepared)
+
+    binding["criteria"]["words"]["value"] = "changed synthetic aluminum*"
+    _refresh_full_body_projection(binding)
+    changed = _canonical(binding)
+    envelope["profile_binding"] = changed.decode("ascii")
+    envelope["expected_profile_binding_sha256"] = hashlib.sha256(changed).hexdigest()
+
     with patch.object(transport, "verify_worker_intent") as claim:
         with pytest.raises(isolated.TenderPlanIsolatedValidationError):
             transport._execute_worker(envelope)  # noqa: SLF001

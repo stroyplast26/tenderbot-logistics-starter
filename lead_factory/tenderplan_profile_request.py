@@ -5,9 +5,11 @@ including its mapping evidence. A digest proves byte identity, not the truth of
 the evidence or provider semantics. This module neither discovers mappings nor
 authorizes a search. Unknown mappings must remain absent and fail validation.
 
-Only the direct-profile subset of Tenderplan's published ``body.key`` schema is
-accepted. No saved-profile lookup, query grammar conversion, HTTP, credentials,
-operational database, or environment-controlled defaults are involved.
+The legacy direct-profile subset and one separately evidenced full saved-profile
+shape are accepted. The latter preserves an observed UI projection even when it
+conflicts with the published ``kind`` minimum; it does not claim server support.
+No saved-profile lookup, query grammar conversion, HTTP, credentials, operational
+database, or environment-controlled defaults are involved.
 """
 
 from __future__ import annotations
@@ -23,6 +25,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 TENDERPLAN_PROFILE_BINDING_PROTOCOL = "tenderplan-direct-profile-binding/v1"
+TENDERPLAN_FULL_SAVED_PROFILE_BINDING_PROTOCOL = "tenderplan-full-saved-profile-binding/v1"
 TENDERPLAN_PROFILE_BINDING_MAX_BYTES = 4096
 _REPARSE_POINT = 0x400
 _MAX_ARRAY_ITEMS = 16
@@ -48,7 +51,24 @@ _CRITERIA_FIELDS = frozenset({
     "regions", "deliveryPlaces", "garDeliveryPlaces", "words", "docWords", "types", "kind",
     "condition", "regionCondition", "inDocs",
 })
+_FULL_SAVED_PROFILE_CRITERIA_FIELDS = _CRITERIA_FIELDS | frozenset({
+    "placingWayNames", "customers", "excludedCustomers", "participants",
+    "excludedParticipants", "classificators", "statuses", "minPrice", "maxPrice",
+    "guaranteeAppMax", "guaranteeContractMax", "prepayment", "preference",
+    "excludedPreference", "classificatorCondition", "selectedDeliveryPlaces",
+})
+_FULL_SAVED_PROFILE_EVIDENCE_FIELDS = _EVIDENCE_FIELDS | frozenset({
+    "placing_ways_sha256", "kind_zero_ui_evidence_sha256", "body_projection_sha256",
+})
+_FULL_SAVED_PROFILE_NULL_FIELDS = frozenset({
+    "customers", "excludedCustomers", "participants", "excludedParticipants",
+    "minPrice", "maxPrice", "guaranteeAppMax", "guaranteeContractMax", "prepayment",
+})
+_FULL_SAVED_PROFILE_EMPTY_ARRAY_FIELDS = frozenset({
+    "classificators", "statuses", "preference", "excludedPreference",
+})
 _WORD_FIELDS = frozenset({"value", "excluded", "slop"})
+_SELECTED_PLACE_FIELDS = frozenset({"name", "fiasId", "kladrId"})
 
 
 class TenderPlanProfileRequestError(ValueError):
@@ -116,6 +136,27 @@ def _place_array(value: object, *, kladr: bool) -> None:
     _require(len(set(value)) == len(value))
 
 
+def _selected_place_array(
+    value: object, *, delivery_places: list[object], gar_delivery_places: list[object],
+) -> None:
+    _require(type(value) is list and 0 < len(value) <= _MAX_ARRAY_ITEMS)
+    selected_kladr: list[str] = []
+    selected_fias: list[str] = []
+    selected_pairs: list[tuple[str, str]] = []
+    for item in value:
+        place = _shape(item, _SELECTED_PLACE_FIELDS)
+        _text(place["name"])
+        fias_id = _text(place["fiasId"], _MAX_IDENTIFIER_CHARS)
+        kladr_id = _text(place["kladrId"], _MAX_IDENTIFIER_CHARS)
+        _require(_KLADR_ID.fullmatch(kladr_id) is not None)
+        selected_kladr.append(kladr_id)
+        selected_fias.append(fias_id)
+        selected_pairs.append((kladr_id, fias_id))
+    _require(len(set(selected_pairs)) == len(selected_pairs))
+    _require(set(selected_kladr) == set(delivery_places))
+    _require(set(selected_fias) == set(gar_delivery_places))
+
+
 def _validated_material(binding_bytes: bytes, expected_sha256: str) -> tuple[bytes, str]:
     _require(type(binding_bytes) is bytes
              and 0 < len(binding_bytes) <= TENDERPLAN_PROFILE_BINDING_MAX_BYTES)
@@ -127,28 +168,46 @@ def _validated_material(binding_bytes: bytes, expected_sha256: str) -> tuple[byt
     )
     binding = _shape(document, _BINDING_FIELDS)
     _require(_canonical(binding) == binding_bytes)
-    _require(binding["protocol"] == TENDERPLAN_PROFILE_BINDING_PROTOCOL)
+    protocol = binding["protocol"]
+    _require(protocol in {
+        TENDERPLAN_PROFILE_BINDING_PROTOCOL,
+        TENDERPLAN_FULL_SAVED_PROFILE_BINDING_PROTOCOL,
+    })
     profile_id = binding["profile_id"]
     _require(type(profile_id) is str and _PROFILE_ID.fullmatch(profile_id) is not None)
     _digest(binding["profile_snapshot_sha256"])
     criteria = binding["criteria"]
     _require(type(criteria) is dict)
+    is_full_saved_profile = protocol == TENDERPLAN_FULL_SAVED_PROFILE_BINDING_PROTOCOL
     has_placing_ways = "placingWayNames" in criteria
-    # Preserve old bindings while requiring reviewed mapping evidence whenever
-    # the optional placing-way selection is supplied. Neither is synthesized.
-    criteria_fields = _CRITERIA_FIELDS
-    evidence_fields = _EVIDENCE_FIELDS
-    if has_placing_ways:
-        criteria_fields = criteria_fields | {"placingWayNames"}
-        evidence_fields = evidence_fields | {"placing_ways_sha256"}
+    if is_full_saved_profile:
+        criteria_fields = _FULL_SAVED_PROFILE_CRITERIA_FIELDS
+        evidence_fields = _FULL_SAVED_PROFILE_EVIDENCE_FIELDS
+    else:
+        # Preserve old bindings while requiring reviewed mapping evidence whenever
+        # the optional placing-way selection is supplied. Neither is synthesized.
+        criteria_fields = _CRITERIA_FIELDS
+        evidence_fields = _EVIDENCE_FIELDS
+        if has_placing_ways:
+            criteria_fields = criteria_fields | {"placingWayNames"}
+            evidence_fields = evidence_fields | {"placing_ways_sha256"}
+    criteria = _shape(criteria, criteria_fields)
     evidence = _shape(binding["mapping_evidence"], evidence_fields)
     for value in evidence.values():
         _digest(value)
 
-    criteria = _shape(criteria, criteria_fields)
+    body = _canonical({"key": criteria})
+    if is_full_saved_profile:
+        _require(hmac.compare_digest(
+            hashlib.sha256(body).hexdigest(), evidence["body_projection_sha256"],
+        ))
     _integer_array(criteria["regions"], 0)
     _integer_array(criteria["types"], 0, maximum=_MAX_PURCHASE_TYPES)
-    _integer_array(criteria["kind"], 1)
+    _integer_array(criteria["kind"], 0 if is_full_saved_profile else 1)
+    if is_full_saved_profile:
+        # This exact pair is observed in the saved UI profile. Server acceptance
+        # remains the result sought by the separately authorized one-shot read.
+        _require(criteria["kind"] == [0, 2])
     if has_placing_ways:
         _integer_array(criteria["placingWayNames"], 0, maximum=_MAX_PLACING_WAYS)
     _place_array(criteria["deliveryPlaces"], kladr=True)
@@ -156,6 +215,16 @@ def _validated_material(binding_bytes: bytes, expected_sha256: str) -> tuple[byt
     _require(bool(criteria["deliveryPlaces"] or criteria["garDeliveryPlaces"]))
     _require(criteria["condition"] == "or" and criteria["regionCondition"] == "or")
     _require(criteria["inDocs"] is False)
+    if is_full_saved_profile:
+        _require(criteria["classificatorCondition"] == "or")
+        _require(all(criteria[field] is None for field in _FULL_SAVED_PROFILE_NULL_FIELDS))
+        _require(all(criteria[field] == []
+                     for field in _FULL_SAVED_PROFILE_EMPTY_ARRAY_FIELDS))
+        _selected_place_array(
+            criteria["selectedDeliveryPlaces"],
+            delivery_places=criteria["deliveryPlaces"],
+            gar_delivery_places=criteria["garDeliveryPlaces"],
+        )
     words = _shape(criteria["words"], _WORD_FIELDS)
     doc_words = _shape(criteria["docWords"], _WORD_FIELDS)
     _text(words["value"])
@@ -170,7 +239,7 @@ def _validated_material(binding_bytes: bytes, expected_sha256: str) -> tuple[byt
     ) if value is not None))
     _require(words["slop"] is None and doc_words["slop"] is None)
     _require(doc_words["value"] is None)
-    return _canonical({"key": criteria}), profile_id
+    return body, profile_id
 
 
 @dataclass(frozen=True, repr=False, slots=True)
