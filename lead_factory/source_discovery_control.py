@@ -49,6 +49,7 @@ from lead_factory.tenderplan_read_only_intake import (
     check_tenderplan_read_only_intake,
     run_tenderplan_read_only_intake,
     _verified_registration_safe,
+    _verified_account_registration,
 )
 from lead_factory.tenderplan_owner_canary import TENDERPLAN_OWNER_CANARY_REGISTRATION_PATH
 from lead_factory.tenderplan_read_only_store import TENDERPLAN_READ_ONLY_QUEUE_PATH, _existing_store
@@ -528,7 +529,11 @@ def _verified_tenderplan_binding(
         # A frozen dataclass can still be replaced or forged at a boundary.
         result.__post_init__()
         policy = tenderplan_read_only_query_policy_sha256(query, maximum_records=TENDERPLAN_READ_ONLY_MAX_RECORDS)
-        auth_reference, credential_target_sha256 = _verified_registration_safe(registration_path)
+        account_registration = _verified_account_registration(store_path)
+        auth_reference, credential_target_sha256 = (
+            account_registration[:2] if account_registration is not None
+            else _verified_registration_safe(registration_path)
+        )
         auth_reference_sha256 = hashlib.sha256(auth_reference.encode("ascii")).hexdigest()
         store = _existing_store(store_path)
         with store._transaction(write=False) as connection:

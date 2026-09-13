@@ -55,6 +55,9 @@ from lead_factory.tenderplan_isolated_transport import (  # noqa: E402
     _read_registered_bearer,
     _worker_python_executable,
 )
+from lead_factory.tenderplan_account_connection import (  # noqa: E402
+    validate_tenderplan_account_connection,
+)
 from lead_factory.tenderplan_read_only_crypto import (  # noqa: E402
     EncryptedTenderPlanCardV1,
     TenderPlanReadOnlyCryptoError,
@@ -766,7 +769,7 @@ def _execute_worker(request: dict[str, object]) -> TenderPlanReadOnlyEncryptedBa
     except BaseException:
         raise _WorkerDiagnosticFailure("pre_dispatch_validation") from None
     try:
-        verify_worker_intent(
+        verified_intent = verify_worker_intent(
             TENDERPLAN_READ_ONLY_QUEUE_PATH,
             run_id=str(values["run_id"]),
             intent_record_sha256=str(values["intent_record_sha256"]),
@@ -782,7 +785,21 @@ def _execute_worker(request: dict[str, object]) -> TenderPlanReadOnlyEncryptedBa
     except BaseException:
         raise _WorkerDiagnosticFailure("pre_dispatch_validation") from None
     try:
-        bearer = _read_registered_bearer(str(values["auth_reference_id"]))
+        account = getattr(verified_intent, "account_connection", None)
+        if account is None:
+            bearer = _read_registered_bearer(str(values["auth_reference_id"]))
+        else:
+            current = validate_tenderplan_account_connection(
+                account["profile_path"], expected_sha256=account["profile_sha256"]
+            )
+            if current != account or current["auth_reference_id"] != values["auth_reference_id"]:
+                raise TenderPlanIsolatedAuthorizationError("tenderplan_account_binding_invalid")
+            bearer = _read_registered_bearer(
+                str(values["auth_reference_id"]),
+                verified_write_window=(
+                    account["credential_created_at_utc"], account["verified_at_utc"]
+                ),
+            )
     except BaseException:
         raise _WorkerDiagnosticFailure("credential_unavailable") from None
     try:

@@ -159,18 +159,30 @@ def test_expiry_during_read_never_returns_plaintext(native, decrypt, monkeypatch
         decrypt.side_effect = expires_on_unwrap
     else:
         original = TenderPlanReadOnlyStore._verify_locked
-        calls = []
+        real_decrypt = decrypt.side_effect
+        decrypted = False
+        expired_after_decrypt = []
+
+        def mark_decrypted(*args, **kwargs):
+            nonlocal decrypted
+            result = real_decrypt(*args, **kwargs)
+            decrypted = True
+            return result
+
+        decrypt.side_effect = mark_decrypted
 
         def expires_on_verify(self, con):
             original(self, con)
-            calls.append(True)
-            if len(calls) == 2:
+            if decrypted:
+                expired_after_decrypt.append(True)
                 clock[0] = EXPIRES
 
         monkeypatch.setattr(TenderPlanReadOnlyStore, "_verify_locked", expires_on_verify)
     with pytest.raises(review.TenderPlanWorkbenchReviewError) as error:
         _detail(adapter, ref)
     assert error.value.status == 410 and decrypt.call_count == 1
+    if phase == "final_verification":
+        assert expired_after_decrypt == [True]
 
 
 def test_replaced_card_rejects_old_reference_before_decrypt(native, decrypt):
@@ -245,18 +257,30 @@ def test_final_integrity_failure_discards_decrypted_card(native, decrypt, monkey
     adapter = review.TenderPlanWorkbenchReview(native[0], clock=lambda: NOW)
     ref = _ref(adapter)
     original = TenderPlanReadOnlyStore._verify_locked
-    calls = []
+    real_decrypt = decrypt.side_effect
+    decrypted = False
+    failed_after_decrypt = []
+
+    def mark_decrypted(*args, **kwargs):
+        nonlocal decrypted
+        result = real_decrypt(*args, **kwargs)
+        decrypted = True
+        return result
+
+    decrypt.side_effect = mark_decrypted
 
     def fail_final(self, con):
         original(self, con)
-        calls.append(True)
-        if len(calls) == 2:
+        if decrypted:
+            failed_after_decrypt.append(True)
             raise RuntimeError("secret-sentinel")
 
     monkeypatch.setattr(TenderPlanReadOnlyStore, "_verify_locked", fail_final)
     with pytest.raises(review.TenderPlanWorkbenchReviewError) as error:
         _detail(adapter, ref)
     assert error.value.status == 409 and decrypt.call_count == 1
+    assert failed_after_decrypt == [True]
+    assert "secret-sentinel" not in str(error.value)
 
 
 @contextmanager

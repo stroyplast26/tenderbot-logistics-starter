@@ -1943,7 +1943,11 @@ def _worker_post(
     return _perform_worker_post(query, bearer_token, maximum_response_bytes)
 
 
-def _read_registered_bearer(reference_id: str) -> str:
+def _read_registered_bearer(
+    reference_id: str,
+    *,
+    verified_write_window: tuple[str, str] | None = None,
+) -> str:
     """Resolve one PAT only inside the short-lived contained Windows worker."""
 
     reference = _normalize_auth_reference(reference_id)
@@ -2000,6 +2004,8 @@ def _read_registered_bearer(reference_id: str) -> str:
             raise TenderPlanIsolatedAuthorizationError(
                 "TenderPlan registered credential is invalid"
             )
+        if verified_write_window is not None:
+            _verify_credential_write_window(credential.LastWritten, verified_write_window)
         secret_copy = bytearray(ctypes.string_at(blob, size))
         try:
             bearer = secret_copy.decode("ascii", "strict")
@@ -2020,6 +2026,35 @@ def _read_registered_bearer(reference_id: str) -> str:
         if secret_copy is not None:
             for index in range(len(secret_copy)):
                 secret_copy[index] = 0
+
+
+def _verify_credential_write_window(
+    last_written: wintypes.FILETIME, window: tuple[str, str]
+) -> None:
+    """Reject a rewritten slot using metadata from the same CredRead as the PAT.
+
+    This is an operational rotation guard, not cryptographic PAT identity.
+    It trusts the recorded fresh-slot write/readback/GET sequence, the Windows
+    clock, and the local receipt; it does not defend against a local admin.
+    FILETIME bounds retain 100 ns precision instead of rounding to seconds.
+    """
+    from datetime import datetime, timezone
+
+    try:
+        if type(window) is not tuple or len(window) != 2:
+            raise ValueError
+        epoch = datetime(1601, 1, 1, tzinfo=timezone.utc)
+        bounds = []
+        for raw in window:
+            if type(raw) is not str or not raw.endswith(("Z", "+00:00")):
+                raise ValueError
+            value = datetime.fromisoformat(raw.replace("Z", "+00:00")) - epoch
+            bounds.append((value.days * 86400 + value.seconds) * 10_000_000 + value.microseconds * 10)
+        written = (int(last_written.dwHighDateTime) << 32) | int(last_written.dwLowDateTime)
+        if not 0 < bounds[0] <= written <= bounds[1]:
+            raise ValueError
+    except (AttributeError, TypeError, ValueError, OverflowError):
+        raise TenderPlanIsolatedAuthorizationError("tenderplan_credential_version_mismatch") from None
 
 
 def _assert_owner_canary_worker_contained() -> None:

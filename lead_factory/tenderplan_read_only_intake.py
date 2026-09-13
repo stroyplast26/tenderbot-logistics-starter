@@ -19,6 +19,11 @@ import re
 import secrets
 from typing import Final
 
+from lead_factory.tenderplan_account_connection import (
+    TenderPlanAccountConnectionError,
+    validate_tenderplan_account_connection,
+)
+
 from lead_factory.tenderplan_isolated_transport import (
     TenderPlanIsolatedTransportError,
     TenderPlanIsolatedUncertain,
@@ -232,6 +237,32 @@ def _verified_registration_safe(path: str | Path) -> tuple[str, str]:
     return reference, target_sha256
 
 
+def _verified_account_registration(store_path: str | Path) -> tuple[str, str, str] | None:
+    """Resolve only an explicit, validated account transition; never bootstrap.
+
+    A missing or invalid store cannot authorize a request: the caller still
+    performs its mandatory store check/reservation.  Returning None here keeps
+    the legacy registration path and its error classification unchanged.
+    """
+    try:
+        checked = validate_tenderplan_read_only_store(store_path)
+    except (TenderPlanReadOnlyStoreError, OSError, TypeError, ValueError):
+        return None
+    transition = checked.get("account_transition")
+    if transition is None:
+        return None
+    try:
+        pinned = transition["active_connection"]
+        current = validate_tenderplan_account_connection(
+            pinned["profile_path"], expected_sha256=pinned["profile_sha256"]
+        )
+        if current != pinned:
+            raise TenderPlanReadOnlyIntakeRegistrationError
+        return current["auth_reference_id"], current["credential_target_sha256"], transition["record_sha256"]
+    except (TenderPlanAccountConnectionError, KeyError, TypeError, ValueError):
+        raise TenderPlanReadOnlyIntakeRegistrationError from None
+
+
 def check_tenderplan_read_only_intake(
     *,
     registration_path: str | Path | None = None,
@@ -255,7 +286,9 @@ def check_tenderplan_read_only_intake(
         "write_count": 0,
     }
     try:
-        _verified_registration_safe(
+        _verified_account_registration(
+            TENDERPLAN_READ_ONLY_QUEUE_PATH if store_path is None else store_path
+        ) or _verified_registration_safe(
             TENDERPLAN_OWNER_CANARY_REGISTRATION_PATH
             if registration_path is None else registration_path
         )
@@ -280,8 +313,11 @@ def check_tenderplan_read_only_intake(
         validated = validate_tenderplan_read_only_store(path)
     except TenderPlanReadOnlyStoreError:
         return report
-    states = validated["states"]
-    report["states"] = states
+    states = validated.get("active_states", validated["states"])
+    report["states"] = validated["states"]
+    if "account_transition" in validated:
+        report["active_states"] = states
+        report["account_transition"] = validated["account_transition"]
     if states[TenderPlanReadOnlyRunState.UNCERTAIN.value]:
         report["state"] = "BLOCKED_TENDERPLAN_UNCERTAIN"
     elif (
@@ -367,7 +403,11 @@ def run_tenderplan_read_only_intake(
         raise TenderPlanReadOnlyIntakeValidationError from None
     requested_at_utc = _utc(requested)
     expires_at_utc = _utc(expires)
-    reference, target_sha256 = _verified_registration_safe(registration_path)
+    account_registration = _verified_account_registration(store_path)
+    reference, target_sha256 = (
+        account_registration[:2] if account_registration is not None
+        else _verified_registration_safe(registration_path)
+    )
     auth_reference_id_sha256 = _sha256(reference.encode("ascii", "strict"))
     run_id = run_id if run_id is not None else f"tpri_{secrets.token_hex(16)}"
     nonce_sha256 = _sha256(secrets.token_bytes(32))
@@ -414,10 +454,15 @@ def run_tenderplan_read_only_intake(
         # that check must fail closed, never bootstrap a replacement history.
         store = (
             _existing_store(store_path, clock=now_clock)
-            if require_existing_store
+            if require_existing_store or account_registration is not None
             else TenderPlanReadOnlyStore(store_path, clock=now_clock)
         )
-        reservation = store.reserve_intent(intent)
+        if account_registration is None:
+            reservation = store.reserve_intent(intent)
+        else:
+            reservation = store.reserve_intent(
+                intent, expected_account_transition_sha256=account_registration[2]
+            )
     except TenderPlanReadOnlyStoreError:
         raise TenderPlanReadOnlyIntakeReconciliationRequired from None
     if (

@@ -679,7 +679,23 @@ def append_tenderplan_read_only_diagnostic_best_effort(
     """Append non-authoritative evidence and never change the caller outcome."""
 
     try:
+        # A legacy sidecar has its own immutable path identity.  Account
+        # transitions start a separate non-authoritative diagnostic stream;
+        # they never rewrite or reuse the old account's sidecar.
+        from lead_factory.tenderplan_read_only_store import validate_tenderplan_read_only_store
+
+        checked = validate_tenderplan_read_only_store(main_store_path)
+        transition = checked.get("account_transition")
+        diagnostic_path = TENDERPLAN_READ_ONLY_DIAGNOSTIC_PATH
+        if transition is not None:
+            transition_hash = transition["record_sha256"]
+            if type(transition_hash) is not str or re.fullmatch(r"[0-9a-f]{64}", transition_hash) is None:
+                return False
+            diagnostic_path = Path(main_store_path).parent / (
+                f"tenderplan_account_diagnostics.{transition_hash}.sqlite3"
+            )
         TenderPlanReadOnlyDiagnosticStore(
+            path=diagnostic_path,
             main_store_path=main_store_path,
             clock=clock,
         ).append_uncertain(
