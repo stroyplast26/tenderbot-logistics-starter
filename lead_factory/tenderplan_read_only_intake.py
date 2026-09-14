@@ -273,6 +273,7 @@ def check_tenderplan_read_only_intake(
     *,
     registration_path: str | Path | None = None,
     store_path: str | Path | None = None,
+    expected_no_dispatch_admission_set_sha256: str | None = None,
 ) -> dict[str, object]:
     """Inspect existing local readiness without credentials, writes, or repair.
 
@@ -316,7 +317,11 @@ def check_tenderplan_read_only_intake(
         # The validator opens an existing path with mode=ro/query_only and
         # verifies schema, path binding and complete chains.  Never construct
         # TenderPlanReadOnlyStore here: its constructor can create a queue.
-        validated = validate_tenderplan_read_only_store(path)
+        validation_options = (
+            {"expected_no_dispatch_admission_set_sha256": expected_no_dispatch_admission_set_sha256}
+            if expected_no_dispatch_admission_set_sha256 is not None else {}
+        )
+        validated = validate_tenderplan_read_only_store(path, **validation_options)
     except TenderPlanReadOnlyStoreError:
         return report
     states = validated.get("active_states", validated["states"])
@@ -324,6 +329,16 @@ def check_tenderplan_read_only_intake(
     if "account_transition" in validated:
         report["active_states"] = states
         report["account_transition"] = validated["account_transition"]
+    if expected_no_dispatch_admission_set_sha256 is not None:
+        if (
+            validated.get("no_dispatch_admission_set_sha256")
+            != expected_no_dispatch_admission_set_sha256
+            or "no_dispatch_admission_states" not in validated
+        ):
+            return report
+        states = validated["no_dispatch_admission_states"]
+        report["no_dispatch_admission_states"] = states
+        report["no_dispatch_admission_set_sha256"] = expected_no_dispatch_admission_set_sha256
     if states[TenderPlanReadOnlyRunState.UNCERTAIN.value]:
         report["state"] = "BLOCKED_TENDERPLAN_UNCERTAIN"
     elif (
@@ -396,6 +411,7 @@ def run_tenderplan_read_only_intake(
     expected_connection_profile_record_sha256: str | None = None,
     expected_credential_target_sha256: str | None = None,
     tenderplan_sealed_worker: TenderPlanSealedWorker | None = None,
+    expected_no_dispatch_admission_set_sha256: str | None = None,
 ) -> TenderPlanReadOnlyIntakeResult:
     """Perform exactly one explicit read and queue only encrypted cards."""
 
@@ -485,6 +501,10 @@ def run_tenderplan_read_only_intake(
         transition_pin = expected_account_transition_sha256
         if transition_pin is None and account_registration is not None:
             transition_pin = account_registration[2]
+        admission_options = (
+            {"expected_no_dispatch_admission_set_sha256": expected_no_dispatch_admission_set_sha256}
+            if expected_no_dispatch_admission_set_sha256 is not None else {}
+        )
         reservation = store.reserve_intent(
             intent,
             expected_account_transition_sha256=transition_pin,
@@ -495,6 +515,7 @@ def run_tenderplan_read_only_intake(
                 expected_connection_profile_record_sha256
             ),
             expected_credential_target_sha256=expected_credential_target_sha256,
+            **admission_options,
         )
     except TenderPlanReadOnlyStoreError:
         raise TenderPlanReadOnlyIntakeReconciliationRequired from None

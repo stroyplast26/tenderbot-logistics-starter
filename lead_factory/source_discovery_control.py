@@ -78,6 +78,11 @@ from lead_factory.tenderplan_profile_request import (
     validate_prepared_tenderplan_search,
 )
 
+from lead_factory.source_discovery_no_dispatch_control import (
+    CONTROL_V8_SCHEMA_SHA256, NO_DISPATCH_TABLE,
+    validate_no_dispatch_reconciliations, source_reconciliation_set_sha256,
+)
+
 
 SOURCE_DISCOVERY_CONTROL_VERSION: Final = "source-discovery-control-v5"
 SOURCE_DISCOVERY_PREPARE_CONFIRMATION: Final = "PREPARE_LOCAL_TENDERPLAN_RECEIPT_BINDINGS"
@@ -571,6 +576,8 @@ def _control_schema_version(connection: sqlite3.Connection) -> int:
         return 6
     if version == 7 and digest == _CONTROL_V7_SCHEMA_SHA256:
         return 7
+    if version == 8 and digest == CONTROL_V8_SCHEMA_SHA256:
+        return 8
     raise SourceDiscoveryControlError("CONTROL_STATE_INTEGRITY_FAILED")
 
 
@@ -616,7 +623,7 @@ def _tenderplan_schema_ready(path: Path) -> bool:
         return False
     connection = _open_read_only(path)
     try:
-        return _control_schema_version(connection) in {5, 6, 7}
+        return _control_schema_version(connection) in {5, 6, 7, 8}
     finally:
         connection.close()
 
@@ -760,7 +767,7 @@ def _tenderplan_binding_body(row: sqlite3.Row) -> dict[str, object]:
 
 def _validate_tenderplan_bindings(connection: sqlite3.Connection) -> dict[str, dict[str, object]]:
     try:
-        if _control_schema_version(connection) not in {5, 6, 7}:
+        if _control_schema_version(connection) not in {5, 6, 7, 8}:
             raise ValueError
         attempts = {
             row["attempt_id"]: row
@@ -994,7 +1001,7 @@ def _validate_tenderplan_failed_closed_reconciliations(
     native_bindings: Mapping[str, Mapping[str, object]],
 ) -> dict[str, dict[str, object]]:
     try:
-        if _control_schema_version(connection) != 7:
+        if _control_schema_version(connection) not in {7, 8}:
             raise ValueError
         _validate_tenderplan_reconciliation_triggers(connection)
         attempts = {
@@ -1081,14 +1088,6 @@ def _validate_tenderplan_failed_closed_reconciliations(
                 "recorded_at_utc": recorded_at_utc,
                 "reconciliation_receipt_sha256": receipt_sha256,
             }
-        running = [attempt for attempt in attempts.values() if attempt["state"] == "RUNNING"]
-        active_uncertain = [
-            attempt
-            for attempt in attempts.values()
-            if attempt["state"] == "UNCERTAIN" and attempt["attempt_id"] not in reconciliations
-        ]
-        if len(running) > 1 or len(active_uncertain) > 1 or (running and active_uncertain):
-            raise ValueError
         return reconciliations
     except SourceDiscoveryControlError:
         raise
@@ -1161,7 +1160,7 @@ def _open_for_write(
                 journal_mode = str(probe.execute("PRAGMA journal_mode").fetchone()[0]).lower()
                 if journal_mode != "delete":
                     raise SourceDiscoveryControlError("CONTROL_STATE_INTEGRITY_FAILED")
-                if require_tenderplan and version not in {5, 6, 7}:
+                if require_tenderplan and version not in {5, 6, 7, 8}:
                     raise SourceDiscoveryControlError("CONTROL_SCHEMA_PREPARATION_REQUIRED")
             finally:
                 probe.close()
@@ -1205,7 +1204,7 @@ def _open_for_write(
         )
         if actual_schema_present:
             version = _control_schema_version(connection)
-            if require_tenderplan and version not in {5, 6, 7}:
+            if require_tenderplan and version not in {5, 6, 7, 8}:
                 raise SourceDiscoveryControlError("CONTROL_SCHEMA_PREPARATION_REQUIRED")
             _rows(
                 path,
@@ -1526,7 +1525,7 @@ def _validate_review_deferrals_tx(
         is None
     ):
         return {}
-    if _control_schema_version(connection) not in {6, 7}:
+    if _control_schema_version(connection) not in {6, 7, 8}:
         raise SourceDiscoveryControlError("CONTROL_STATE_INTEGRITY_FAILED")
     try:
         by_attempt = {str(row["attempt_id"]): row for row in rows}
@@ -1650,6 +1649,25 @@ def _rows(
                     if _TP_FAILED_CLOSED_RECONCILIATIONS in tables
                     else {}
                 )
+                no_dispatch_reconciliations = (
+                    validate_no_dispatch_reconciliations(connection)
+                    if NO_DISPATCH_TABLE in tables else {}
+                )
+                if _TP_FAILED_CLOSED_RECONCILIATIONS in tables:
+                    # Typed proofs are combined before evaluating active uncertainty.
+                    # The raw attempt history remains untouched and blocks legacy paths.
+                    reconciled_ids = set(reconciliations) | set(no_dispatch_reconciliations)
+                    attempts = connection.execute(
+                        "SELECT attempt_id,state FROM source_discovery_attempts"
+                    ).fetchall()
+                    running_count = sum(row["state"] == "RUNNING" for row in attempts)
+                    active_uncertain_count = sum(
+                        row["state"] == "UNCERTAIN" and row["attempt_id"] not in reconciled_ids
+                        for row in attempts
+                    )
+                    if (running_count > 1 or active_uncertain_count > 1
+                            or (running_count and active_uncertain_count)):
+                        raise SourceDiscoveryControlError("CONTROL_STATE_INTEGRITY_FAILED")
                 append_only_tables = set(_APPEND_ONLY_TABLES).intersection(tables)
                 if append_only_tables and append_only_tables != set(_APPEND_ONLY_TABLES):
                     raise SourceDiscoveryControlError("CONTROL_STATE_INTEGRITY_FAILED")
@@ -1814,6 +1832,9 @@ def _rows(
                         **dict(row),
                         "tenderplan_binding": native_bindings.get(row["attempt_id"]),
                         "tenderplan_failed_closed_reconciliation": reconciliations.get(
+                            row["attempt_id"]
+                        ),
+                        "tenderplan_no_dispatch_reconciliation": no_dispatch_reconciliations.get(
                             row["attempt_id"]
                         ),
                         "deferred_review": deferrals.get(row["attempt_id"]),
@@ -2232,6 +2253,173 @@ def _before_tenderplan_reconciliation_commit() -> None:
     """Fault-injection seam immediately before the local controller commit."""
 
 
+def _source_scoped_control(
+    raw_control: Mapping[str, object],
+    *,
+    reconciled_count: int,
+    reconciliation_set_sha256: str,
+    native_admission_set_sha256: str,
+    native_file_sha256: str,
+    wip_limit: int,
+) -> dict[str, object]:
+    blocking_count = int(raw_control["uncertain_count"]) - reconciled_count
+    if blocking_count < 0:
+        raise SourceDiscoveryControlError("CONTROL_STATE_INTEGRITY_FAILED")
+    if blocking_count:
+        gate = "BLOCKED_UNCERTAIN"
+    elif int(raw_control["in_flight_count"]):
+        gate = "BLOCKED_IN_FLIGHT"
+    elif int(raw_control["open_review_batches"]) >= wip_limit:
+        gate = "BLOCKED_BACKPRESSURE"
+    else:
+        gate = "ELIGIBLE_FOR_NEW_PROPOSAL"
+    return {
+        **raw_control,
+        "blocking_uncertain_count": blocking_count,
+        "reconciled_uncertain_count": reconciled_count,
+        "source_reconciliation_gate": gate,
+        "source_reconciliation_set_sha256": reconciliation_set_sha256,
+        "tenderplan_no_dispatch_admission_set_sha256": native_admission_set_sha256,
+        "tenderplan_store_file_sha256": native_file_sha256,
+        "retry_eligible": False,
+        "launch_allowed": False,
+        "authority_verified": False,
+        "authorizes_live": False,
+        "automatic_schedule_eligible": False,
+        "live_release_eligible": False,
+    }
+
+
+@contextmanager
+def _fenced_source_reconciliation_control(
+    path: Path,
+    wip_limit: int,
+    *,
+    tenderplan_store_path: str | Path | None,
+    expected_source_reconciliation_set_sha256: str | None = None,
+    expected_tenderplan_store_file_sha256: str | None = None,
+    _connection: sqlite3.Connection | None = None,
+    _lab_connection: sqlite3.Connection | None = None,
+    _allow_controller_transaction_journal: bool = False,
+) -> Iterator[tuple[dict[str, object], str]]:
+    """Bind mixed typed proofs under controller then native writer fences.
+
+    Only a caller supplying the resulting exact scope pin may use the projected
+    gate. The ordinary raw gate stays blocked, including for legacy callers.
+    """
+    from lead_factory.tenderplan_no_dispatch_evidence import (
+        TenderPlanNoDispatchEvidenceError,
+        no_dispatch_admission_set_sha256,
+    )
+    from lead_factory import tenderplan_read_only_store as native_store
+
+    own_connection = _connection is None
+    connection = _connection
+    try:
+        if _allow_controller_transaction_journal:
+            if (_connection is None or not _connection.in_transaction
+                    or str(_connection.execute("PRAGMA journal_mode").fetchone()[0]).lower() != "delete"
+                    or any(path.with_name(path.name + suffix).exists() for suffix in ("-wal", "-shm"))):
+                raise SourceDiscoveryControlError("CONTROL_STATE_INTEGRITY_FAILED")
+            journal_path = path.with_name(path.name + "-journal")
+            _assert_no_reparse_components(journal_path)
+            if journal_path.exists():
+                _regular_file_identity(journal_path)
+        else:
+            _assert_no_sqlite_sidecars(path)
+        controller_identity = _regular_file_identity(path)
+        if connection is None:
+            connection = _open_existing_local_fence(path)
+        if (
+            _regular_file_identity(path) != controller_identity
+            or _control_schema_version(connection) != 8
+            or str(connection.execute("PRAGMA journal_mode").fetchone()[0]).lower() != "delete"
+            or tenderplan_store_path is None
+        ):
+            raise SourceDiscoveryControlError("CONTROL_RECONCILIATION_REQUIRED")
+        rows = _rows(path, _connection=connection)
+        raw_control = _snapshot(
+            path, wip_limit, _connection=connection, _lab_connection=_lab_connection
+        )
+        failed_closed = {
+            str(row["attempt_id"]): dict(receipt)
+            for row in rows
+            if (receipt := row["tenderplan_failed_closed_reconciliation"]) is not None
+        }
+        no_dispatch = {
+            str(row["attempt_id"]): dict(receipt)
+            for row in rows
+            if (receipt := row["tenderplan_no_dispatch_reconciliation"]) is not None
+        }
+        native_receipts = tuple(dict(item["native_admission"]) for item in no_dispatch.values())
+        native_set_sha256 = no_dispatch_admission_set_sha256(native_receipts)
+        mixed_set_sha256 = source_reconciliation_set_sha256(
+            failed_closed, no_dispatch, native_set_sha256
+        )
+        if (expected_source_reconciliation_set_sha256 is not None
+                and expected_source_reconciliation_set_sha256 != mixed_set_sha256):
+            raise SourceDiscoveryControlError("CONTROL_RECONCILIATION_REQUIRED")
+        native_path = _state_path(tenderplan_store_path)
+        _assert_no_sqlite_sidecars(native_path)
+        native_identity = _regular_file_identity(native_path)
+        native_file_sha256 = _file_sha256(native_path)
+        if (expected_tenderplan_store_file_sha256 is not None
+                and expected_tenderplan_store_file_sha256 != native_file_sha256):
+            raise SourceDiscoveryControlError("CONTROL_RECONCILIATION_REQUIRED")
+        with native_store.fence_tenderplan_reconciled_bindings(
+            native_path,
+            failed_closed_run_ids=tuple(str(value["run_id"]) for value in failed_closed.values()),
+            expected_no_dispatch_admission_set_sha256=native_set_sha256,
+            expected_file_sha256=native_file_sha256,
+        ) as native:
+            if (native["no_dispatch_admission_set_sha256"] != native_set_sha256
+                    or native["native_file_sha256"] != native_file_sha256
+                    or _regular_file_identity(native_path) != native_identity):
+                raise SourceDiscoveryControlError("CONTROL_RECONCILIATION_REQUIRED")
+            actual_admissions = {item["run_id"]: item for item in native["no_dispatch_admissions"]}
+            if actual_admissions != {item["run_id"]: item for item in native_receipts}:
+                raise SourceDiscoveryControlError("CONTROL_RECONCILIATION_REQUIRED")
+            bindings = {item.run_id: item for item in native["failed_closed_bindings"]}
+            if set(bindings) != {item["run_id"] for item in failed_closed.values()}:
+                raise SourceDiscoveryControlError("CONTROL_RECONCILIATION_REQUIRED")
+            for receipt in failed_closed.values():
+                binding = bindings[str(receipt["run_id"])]
+                # V3 is an exact additive schema. Preserve historical V2 proof
+                # bytes while comparing every immutable operation/event field.
+                comparison = dict(receipt)
+                if (comparison["native_schema_fingerprint_sha256"]
+                        == native_store.TENDERPLAN_ACCOUNT_TRANSITION_SCHEMA_FINGERPRINT_SHA256
+                        and binding.schema_fingerprint_sha256
+                        == native_store.TENDERPLAN_NO_DISPATCH_SCHEMA_FINGERPRINT_SHA256):
+                    comparison["native_schema_fingerprint_sha256"] = binding.schema_fingerprint_sha256
+                if not _native_binding_matches_reconciliation(binding, comparison):
+                    raise SourceDiscoveryControlError("CONTROL_RECONCILIATION_REQUIRED")
+            scoped = _source_scoped_control(
+                raw_control,
+                reconciled_count=len(failed_closed) + len(no_dispatch),
+                reconciliation_set_sha256=mixed_set_sha256,
+                native_admission_set_sha256=native_set_sha256,
+                native_file_sha256=native_file_sha256,
+                wip_limit=wip_limit,
+            )
+            yield scoped, native_set_sha256
+            _assert_no_sqlite_sidecars(native_path)
+            if (_regular_file_identity(path) != controller_identity
+                    or _regular_file_identity(native_path) != native_identity
+                    or _file_sha256(native_path) != native_file_sha256):
+                raise SourceDiscoveryControlError("CONTROL_RECONCILIATION_REQUIRED")
+    except SourceDiscoveryControlError:
+        raise
+    except (TenderPlanReadOnlyStoreError, TenderPlanNoDispatchEvidenceError,
+            OSError, sqlite3.Error, TypeError, ValueError, KeyError, AttributeError):
+        raise SourceDiscoveryControlError("CONTROL_RECONCILIATION_REQUIRED") from None
+    finally:
+        if own_connection and connection is not None:
+            if connection.in_transaction:
+                connection.execute("ROLLBACK")
+            connection.close()
+
+
 def _tenderplan_reconciliation_report(
     *,
     state: str,
@@ -2302,7 +2490,7 @@ def _source_discovery_tenderplan_failed_closed_reconciliation_core(
             raise SourceDiscoveryControlError("CONTROL_STATE_INTEGRITY_FAILED")
         _assert_no_sqlite_sidecars(path)
         version = _control_schema_version(connection)
-        if version not in {5, 6, 7}:
+        if version not in {5, 6, 7, 8}:
             raise SourceDiscoveryControlError("CONTROL_RECONCILIATION_REQUIRED")
         current_controller_file_sha256 = _file_sha256(path)
         if current_controller_file_sha256 != expected_controller_file_sha256:
@@ -2449,7 +2637,7 @@ def _source_discovery_tenderplan_failed_closed_reconciliation_core(
                 version = 6
             if version == 6:
                 _install_tenderplan_failed_closed_reconciliation_schema(connection)
-            if _control_schema_version(connection) != 7:
+            if _control_schema_version(connection) not in {7, 8}:
                 raise SourceDiscoveryControlError("CONTROL_STATE_INTEGRITY_FAILED")
             columns = tuple(key for key in proof if key != "proof_version") + (
                 "proof_sha256",
@@ -2643,6 +2831,7 @@ def check_source_discovery(
     tenderplan_store_path: str | Path | None = None,
     tenderplan_profile_request: PreparedTenderPlanSearch | None = None,
     expected_tenderplan_reconciliation_set_sha256: str | None = None,
+    expected_source_reconciliation_set_sha256: str | None = None,
 ) -> dict[str, object]:
     """Check local configuration and backpressure only; never calls a provider."""
 
@@ -2653,6 +2842,25 @@ def check_source_discovery(
     tenderplan_reconciliation_set_sha256 = ""
     tenderplan_store_file_sha256 = ""
     exact_tenderplan_reconciliation = False
+    exact_source_reconciliation = False
+    native_admission_set_sha256 = ""
+    controller_file_sha256 = ""
+    if expected_source_reconciliation_set_sha256 is not None:
+        if (
+            expected_tenderplan_reconciliation_set_sha256 is not None
+            or selected not in _RUNNABLE_SOURCES
+            or type(expected_source_reconciliation_set_sha256) is not str
+            or _SHA256.fullmatch(expected_source_reconciliation_set_sha256) is None
+        ):
+            raise SourceDiscoveryControlError("CONTROL_RECONCILIATION_REQUIRED")
+        with _fenced_source_reconciliation_control(
+            path, limit, tenderplan_store_path=tenderplan_store_path,
+            expected_source_reconciliation_set_sha256=expected_source_reconciliation_set_sha256,
+        ) as (scoped_control, native_admission_set_sha256):
+            control = scoped_control
+            tenderplan_store_file_sha256 = str(control["tenderplan_store_file_sha256"])
+            controller_file_sha256 = _file_sha256(path)
+            exact_source_reconciliation = True
     if expected_tenderplan_reconciliation_set_sha256 is not None:
         if (
             selected is not SourceDiscoverySource.TENDERPLAN
@@ -2690,12 +2898,15 @@ def check_source_discovery(
             profile_valid = False
     if selected in _OFFLINE_CONTRACT_SOURCES:
         state = "BLOCKED_OFFLINE_CONTRACT"
+    elif (exact_source_reconciliation
+            and control["source_reconciliation_gate"] != "ELIGIBLE_FOR_NEW_PROPOSAL"):
+        state = str(control["source_reconciliation_gate"])
     elif (
         exact_tenderplan_reconciliation
         and control["tenderplan_reconciliation_gate"] != "ELIGIBLE_FOR_NEW_PROPOSAL"
     ):
         state = str(control["tenderplan_reconciliation_gate"])
-    elif not exact_tenderplan_reconciliation and control["gate"] != "READY":
+    elif not (exact_tenderplan_reconciliation or exact_source_reconciliation) and control["gate"] != "READY":
         state = str(control["gate"])
     elif selected is SourceDiscoverySource.YANDEX and (
         yandex_job_path is None or type(folder_id) is not str or not folder_id.strip()
@@ -2712,9 +2923,14 @@ def check_source_discovery(
     elif selected is SourceDiscoverySource.TENDERPLAN and not _tenderplan_schema_ready(path):
         state = "BLOCKED_SCHEMA_PREPARATION_REQUIRED"
     elif selected is SourceDiscoverySource.TENDERPLAN:
+        native_options = (
+            {"expected_no_dispatch_admission_set_sha256": native_admission_set_sha256}
+            if exact_source_reconciliation else {}
+        )
         native = check_tenderplan_read_only_intake(
             registration_path=tenderplan_registration_path,
             store_path=tenderplan_store_path,
+            **native_options,
         )
         state = str(native["state"])
     else:
@@ -2735,6 +2951,15 @@ def check_source_discovery(
         report["tenderplan_reconciliation_set_sha256"] = tenderplan_reconciliation_set_sha256
         if tenderplan_store_file_sha256:
             report["tenderplan_store_file_sha256"] = tenderplan_store_file_sha256
+    if exact_source_reconciliation:
+        report.update({
+            "source_reconciliation_set_sha256": expected_source_reconciliation_set_sha256,
+            "tenderplan_no_dispatch_admission_set_sha256": native_admission_set_sha256,
+            "tenderplan_store_file_sha256": tenderplan_store_file_sha256,
+            "controller_file_sha256": controller_file_sha256,
+            "controller_snapshot_sha256": _digest(control),
+            "scope": "FRESH_PROPOSAL_ONLY",
+        })
     return report
 
 
@@ -2818,6 +3043,7 @@ def _verify_source_discovery_authority_core(
     tenderplan_store_path: str | Path | None,
     tenderplan_profile_request: PreparedTenderPlanSearch | None = None,
     expected_tenderplan_reconciliation_set_sha256: str | None = None,
+    expected_source_reconciliation_set_sha256: str | None = None,
 ) -> dict[str, object]:
     report = check_source_discovery(
         source,
@@ -2831,6 +3057,9 @@ def _verify_source_discovery_authority_core(
         tenderplan_profile_request=tenderplan_profile_request,
         expected_tenderplan_reconciliation_set_sha256=(
             expected_tenderplan_reconciliation_set_sha256
+        ),
+        expected_source_reconciliation_set_sha256=(
+            expected_source_reconciliation_set_sha256
         ),
     )
     selected = _source(source)
@@ -2856,7 +3085,15 @@ def _verify_source_discovery_authority_core(
     accounting = _sanitized_yandex_preflight_accounting(native["accounting"])
     if native["cached"] != (accounting["attempts_reserved"] == 1):
         raise SourceDiscoveryControlError("YANDEX_ACCOUNTING_INCONSISTENT")
+    if expected_source_reconciliation_set_sha256 is not None and native["cached"]:
+        return {**report, "state": "BLOCKED_SOURCE_AUTHORITY_CONSUMED"}
     return {
+        **({key: report[key] for key in (
+            "source_reconciliation_set_sha256", "tenderplan_no_dispatch_admission_set_sha256",
+            "tenderplan_store_file_sha256", "controller_file_sha256",
+            "controller_snapshot_sha256", "scope", "retry_eligible", "launch_allowed",
+            "authorizes_live",
+        )} if expected_source_reconciliation_set_sha256 is not None else {}),
         "authority_verified": True,
         "cached": native["cached"],
         "control": report["control"],
@@ -2881,6 +3118,7 @@ def verify_source_discovery_authority(
     tenderplan_store_path: str | Path | None = None,
     tenderplan_profile_request: PreparedTenderPlanSearch | None = None,
     expected_tenderplan_reconciliation_set_sha256: str | None = None,
+    expected_source_reconciliation_set_sha256: str | None = None,
 ) -> dict[str, object]:
     """Run the supported local authority check without credentials or provider I/O."""
 
@@ -2898,6 +3136,9 @@ def verify_source_discovery_authority(
             expected_tenderplan_reconciliation_set_sha256=(
                 expected_tenderplan_reconciliation_set_sha256
             ),
+            expected_source_reconciliation_set_sha256=(
+                expected_source_reconciliation_set_sha256
+            ),
         )
     except SourceDiscoveryControlError as error:
         failure_code = _known_control_failure_code(
@@ -2909,6 +3150,7 @@ def verify_source_discovery_authority(
     del source, state_path, wip_limit, yandex_job_path, folder_id, tenderplan_query
     del tenderplan_registration_path, tenderplan_store_path, tenderplan_profile_request
     del expected_tenderplan_reconciliation_set_sha256
+    del expected_source_reconciliation_set_sha256
     _raise_detached_control_failure(failure_code)
 
 
@@ -2943,6 +3185,7 @@ def _reserve(
     expected_controller_snapshot_sha256: str | None = None,
     expected_tenderplan_store_file_sha256: str | None = None,
     expected_tenderplan_reconciliation_set_sha256: str | None = None,
+    expected_source_reconciliation_set_sha256: str | None = None,
 ) -> tuple[str | None, str | None]:
     controller_pins = (
         expected_controller_file_sha256,
@@ -2957,7 +3200,9 @@ def _reserve(
         raise SourceDiscoveryControlError("CONTROL_STATE_INTEGRITY_FAILED")
     tenderplan_pins = (
         expected_tenderplan_store_file_sha256,
-        expected_tenderplan_reconciliation_set_sha256,
+        expected_source_reconciliation_set_sha256
+        if expected_source_reconciliation_set_sha256 is not None
+        else expected_tenderplan_reconciliation_set_sha256,
     )
     if (
         any(value is None for value in tenderplan_pins)
@@ -2968,12 +3213,21 @@ def _reserve(
         )
         or (
             source is not SourceDiscoverySource.TENDERPLAN
+            and expected_source_reconciliation_set_sha256 is None
             and any(value is not None for value in tenderplan_pins)
         )
+        or (expected_source_reconciliation_set_sha256 is not None
+            and (expected_tenderplan_reconciliation_set_sha256 is not None
+                 or source not in _RUNNABLE_SOURCES
+                 or any(value is None for value in controller_pins)
+                 or tenderplan_store_path is None))
     ):
         raise SourceDiscoveryControlError("CONTROL_STATE_INTEGRITY_FAILED")
     connection = _open_for_write(
-        path, require_tenderplan=source is SourceDiscoverySource.TENDERPLAN
+        path,
+        require_tenderplan=(source is SourceDiscoverySource.TENDERPLAN
+                           or expected_source_reconciliation_set_sha256 is not None),
+        require_existing=expected_source_reconciliation_set_sha256 is not None,
     )
     lab_connection: sqlite3.Connection | None = None
     try:
@@ -2994,6 +3248,34 @@ def _reserve(
             for row in validated_rows
             if row["tenderplan_failed_closed_reconciliation"] is not None
         }
+        if expected_source_reconciliation_set_sha256 is not None:
+            with _fenced_source_reconciliation_control(
+                path, wip_limit,
+                tenderplan_store_path=tenderplan_store_path,
+                expected_source_reconciliation_set_sha256=expected_source_reconciliation_set_sha256,
+                expected_tenderplan_store_file_sha256=expected_tenderplan_store_file_sha256,
+                _connection=connection,
+                _lab_connection=lab_connection,
+            ) as (scoped_control, _native_set_sha256):
+                if (_file_sha256(path) != expected_controller_file_sha256
+                        or _digest(scoped_control) != expected_controller_snapshot_sha256):
+                    raise SourceDiscoveryControlError("CONTROL_RECONCILIATION_REQUIRED")
+                gate = str(scoped_control["source_reconciliation_gate"])
+                if gate != "ELIGIBLE_FOR_NEW_PROPOSAL":
+                    connection.execute("ROLLBACK")
+                    return None, gate
+                attempt_id = f"sd_{secrets.token_hex(16)}"
+                connection.execute(
+                    """INSERT INTO source_discovery_attempts(
+                        attempt_id,source,state,started_at_utc,review_count,
+                        tenderplan_binding_required
+                    ) VALUES(?,?,?,?,0,?)""",
+                    (attempt_id, source.value, "RUNNING", _now_utc(),
+                     int(source is SourceDiscoverySource.TENDERPLAN)),
+                )
+                _rows(path, _connection=connection)
+                connection.execute("COMMIT")
+                return attempt_id, None
         if source is SourceDiscoverySource.TENDERPLAN and reconciliations:
             if (
                 tenderplan_store_path is None
@@ -3459,7 +3741,7 @@ def _finish(
                 f"INSERT INTO source_discovery_tenderplan_bindings({','.join(columns)}) VALUES({','.join('?' for _ in columns)})",
                 tuple(persisted[key] for key in columns),
             )
-        if connection.execute("PRAGMA user_version").fetchone()[0] in {5, 6, 7}:
+        if connection.execute("PRAGMA user_version").fetchone()[0] in {5, 6, 7, 8}:
             _validate_tenderplan_bindings(connection)
         _rows(path, _connection=connection)
         connection.execute("COMMIT")
@@ -3691,7 +3973,7 @@ def _defer_source_discovery_review_core(
                 f"SELECT * FROM {_REVIEW_DEFERRALS} WHERE idempotency_key=?",
                 (idem,),
             ).fetchone()
-            if version in {6, 7}
+            if version in {6, 7, 8}
             else None
         )
         body = {
@@ -3733,7 +4015,7 @@ def _defer_source_discovery_review_core(
                 for operation in ("UPDATE", "DELETE"):
                     connection.execute(_append_only_trigger_sql(_REVIEW_DEFERRALS, operation))
                 connection.execute("PRAGMA user_version=6")
-            if _control_schema_version(connection) not in {6, 7}:
+            if _control_schema_version(connection) not in {6, 7, 8}:
                 raise SourceDiscoveryControlError("CONTROL_STATE_INTEGRITY_FAILED")
             connection.execute(
                 f"""INSERT INTO {_REVIEW_DEFERRALS}(
@@ -3792,7 +4074,7 @@ def _defer_source_discovery_review_core(
             snapshot,
             state="DEFERRED_LOCAL",
             created=created,
-            schema_version=7 if version == 7 else 6,
+            schema_version=version if version in {7, 8} else 6,
             command_sha256=command_sha256,
         ),
         "control": _snapshot(path, SOURCE_DISCOVERY_DEFAULT_WIP_LIMIT),
@@ -4031,6 +4313,7 @@ def _run_source_discovery_once_core(
     expected_controller_snapshot_sha256: str | None = None,
     expected_tenderplan_store_file_sha256: str | None = None,
     expected_tenderplan_reconciliation_set_sha256: str | None = None,
+    expected_source_reconciliation_set_sha256: str | None = None,
     expected_account_transition_sha256: str | None = None,
     expected_connection_profile_sha256: str | None = None,
     expected_connection_profile_record_sha256: str | None = None,
@@ -4068,6 +4351,9 @@ def _run_source_discovery_once_core(
         expected_tenderplan_reconciliation_set_sha256=(
             expected_tenderplan_reconciliation_set_sha256
         ),
+        expected_source_reconciliation_set_sha256=(
+            expected_source_reconciliation_set_sha256
+        ),
     )
     if check["state"] != "READY_FOR_SEPARATE_AUTHORITY_CHECK":
         return _blocked_run_report(selected, str(check["state"]), path=path, wip_limit=limit)
@@ -4078,6 +4364,16 @@ def _run_source_discovery_once_core(
             path=path,
             wip_limit=limit,
         )
+    if (expected_source_reconciliation_set_sha256 is not None
+            and selected is SourceDiscoverySource.YANDEX):
+        authority = verify_source_discovery_authority(
+            selected, state_path=path, wip_limit=limit,
+            yandex_job_path=yandex_job_path, folder_id=folder_id,
+            tenderplan_store_path=tenderplan_store_path,
+            expected_source_reconciliation_set_sha256=expected_source_reconciliation_set_sha256,
+        )
+        if authority["state"] != "READY_FOR_EXPLICIT_CONFIRMATION":
+            return _blocked_run_report(selected, str(authority["state"]), path=path, wip_limit=limit)
     lab_path = (
         _source_lab_path(control_path=path) if selected is SourceDiscoverySource.YANDEX else None
     )
@@ -4093,6 +4389,9 @@ def _run_source_discovery_once_core(
         expected_tenderplan_store_file_sha256=(expected_tenderplan_store_file_sha256),
         expected_tenderplan_reconciliation_set_sha256=(
             expected_tenderplan_reconciliation_set_sha256
+        ),
+        expected_source_reconciliation_set_sha256=(
+            expected_source_reconciliation_set_sha256
         ),
     )
     if attempt_id is None:
@@ -4190,6 +4489,10 @@ def _run_source_discovery_once_core(
                 tenderplan_options["registration_path"] = tenderplan_registration_path
             if tenderplan_store_path is not None:
                 tenderplan_options["store_path"] = tenderplan_store_path
+            if expected_source_reconciliation_set_sha256 is not None:
+                tenderplan_options["expected_no_dispatch_admission_set_sha256"] = (
+                    check["tenderplan_no_dispatch_admission_set_sha256"]
+                )
             tenderplan_options.update(
                 {
                     "expected_account_transition_sha256": (expected_account_transition_sha256),
@@ -4321,6 +4624,7 @@ def run_source_discovery_once(
     expected_controller_snapshot_sha256: str | None = None,
     expected_tenderplan_store_file_sha256: str | None = None,
     expected_tenderplan_reconciliation_set_sha256: str | None = None,
+    expected_source_reconciliation_set_sha256: str | None = None,
     expected_account_transition_sha256: str | None = None,
     expected_connection_profile_sha256: str | None = None,
     expected_connection_profile_record_sha256: str | None = None,
@@ -4346,6 +4650,9 @@ def run_source_discovery_once(
             expected_tenderplan_store_file_sha256=(expected_tenderplan_store_file_sha256),
             expected_tenderplan_reconciliation_set_sha256=(
                 expected_tenderplan_reconciliation_set_sha256
+            ),
+            expected_source_reconciliation_set_sha256=(
+                expected_source_reconciliation_set_sha256
             ),
             expected_account_transition_sha256=expected_account_transition_sha256,
             expected_connection_profile_sha256=expected_connection_profile_sha256,
@@ -4384,6 +4691,7 @@ def run_source_discovery_once(
         expected_controller_snapshot_sha256,
         expected_tenderplan_store_file_sha256,
         expected_tenderplan_reconciliation_set_sha256,
+        expected_source_reconciliation_set_sha256,
         expected_account_transition_sha256,
         expected_connection_profile_sha256,
         expected_connection_profile_record_sha256,

@@ -131,6 +131,39 @@ def _idempotency_key(value: str) -> str:
     return _validated(value, _IDEMPOTENCY_KEY, "invalid idempotency token")
 
 
+def _load_no_dispatch_provenance_paths(path: str) -> dict[str, str]:
+    def unique_object(pairs: list[tuple[str, object]]) -> dict[str, object]:
+        result: dict[str, object] = {}
+        for key, value in pairs:
+            if key in result:
+                raise ValueError
+            result[key] = value
+        return result
+
+    def reject_constant(_value: str) -> None:
+        raise ValueError
+
+    try:
+        with Path(path).open("rb") as stream:
+            payload = stream.read(65_537)
+        if len(payload) > 65_536:
+            raise ValueError
+        value = json.loads(
+            payload.decode("utf-8"),
+            object_pairs_hook=unique_object,
+            parse_constant=reject_constant,
+        )
+        if type(value) is not dict or not value or any(
+            type(key) is not str or not key
+            or type(item) is not str or not item.strip() or "\x00" in item
+            for key, item in value.items()
+        ):
+            raise ValueError
+        return value
+    except (OSError, UnicodeError, ValueError, TypeError, RecursionError):
+        raise SourceDiscoveryControlError("CONTROL_RECONCILIATION_REQUIRED") from None
+
+
 def _parse_review_decision(value: str) -> str:
     if value not in {"APPROVE", "REJECT", "NEEDS_RESEARCH"}:
         raise argparse.ArgumentTypeError("invalid review decision")
@@ -202,6 +235,21 @@ def _parser() -> argparse.ArgumentParser:
     reconcile.add_argument("--expected-proof-sha256", type=_sha256)
     reconcile.add_argument("--apply", action="store_true")
     reconcile.add_argument("--confirm-local-reconciliation", action="store_true")
+
+    no_dispatch = commands.add_parser(
+        "tenderplan-reconcile-no-dispatch",
+        help="preview or explicitly apply one pinned local no-dispatch reconciliation",
+    )
+    no_dispatch.add_argument("--tenderplan-store", required=True)
+    no_dispatch.add_argument("--acceptance-id", required=True, type=_idempotency_key)
+    no_dispatch.add_argument("--proof-path", required=True)
+    no_dispatch.add_argument("--provenance-paths-file", required=True)
+    no_dispatch.add_argument("--expected-controller-file-sha256", required=True, type=_sha256)
+    no_dispatch.add_argument("--expected-controller-snapshot-sha256", required=True, type=_sha256)
+    no_dispatch.add_argument("--expected-native-file-sha256", required=True, type=_sha256)
+    no_dispatch.add_argument("--expected-preview-sha256", type=_sha256)
+    no_dispatch.add_argument("--apply", action="store_true")
+    no_dispatch.add_argument("--confirm-local-reconciliation", action="store_true")
 
     yandex_status = commands.add_parser(
         "yandex-status",
@@ -293,6 +341,10 @@ def _parser() -> argparse.ArgumentParser:
             "--expected-tenderplan-reconciliation-set-sha256",
             type=_sha256,
         )
+        command.add_argument(
+            "--expected-source-reconciliation-set-sha256",
+            type=_sha256,
+        )
         if name == "run-one":
             command.add_argument(
                 "--expected-controller-file-sha256",
@@ -380,6 +432,10 @@ def main(argv: list[str] | None = None) -> int:
     try:
         profile_options = {}
         if arguments.command in {"check", "run-one"}:
+            if arguments.expected_source_reconciliation_set_sha256 is not None:
+                profile_options["expected_source_reconciliation_set_sha256"] = (
+                    arguments.expected_source_reconciliation_set_sha256
+                )
             from lead_factory.tenderplan_profile_request import (
                 TenderPlanProfileRequestError,
                 load_tenderplan_profile_request,
@@ -446,6 +502,39 @@ def main(argv: list[str] | None = None) -> int:
             else:
                 result = preview_source_discovery_tenderplan_failed_closed_reconciliation(
                     **reconciliation_options,
+                )
+        elif arguments.command == "tenderplan-reconcile-no-dispatch":
+            if arguments.apply and (
+                arguments.expected_preview_sha256 is None
+                or not arguments.confirm_local_reconciliation
+            ):
+                raise SourceDiscoveryControlError("CONTROL_RECONCILIATION_REQUIRED")
+            provenance_paths = _load_no_dispatch_provenance_paths(arguments.provenance_paths_file)
+            from lead_factory.source_discovery_no_dispatch import (
+                SOURCE_NO_DISPATCH_CONFIRMATION,
+                apply_source_discovery_tenderplan_no_dispatch_reconciliation,
+                preview_source_discovery_tenderplan_no_dispatch_reconciliation,
+            )
+
+            no_dispatch_options = {
+                "state_path": SOURCE_DISCOVERY_STATE_PATH,
+                "tenderplan_store_path": arguments.tenderplan_store,
+                "acceptance_id": arguments.acceptance_id,
+                "proof_path": arguments.proof_path,
+                "provenance_paths": provenance_paths,
+                "expected_controller_file_sha256": arguments.expected_controller_file_sha256,
+                "expected_controller_snapshot_sha256": arguments.expected_controller_snapshot_sha256,
+                "expected_native_file_sha256": arguments.expected_native_file_sha256,
+            }
+            if arguments.apply:
+                result = apply_source_discovery_tenderplan_no_dispatch_reconciliation(
+                    **no_dispatch_options,
+                    expected_preview_sha256=arguments.expected_preview_sha256,
+                    confirmation=SOURCE_NO_DISPATCH_CONFIRMATION,
+                )
+            else:
+                result = preview_source_discovery_tenderplan_no_dispatch_reconciliation(
+                    **no_dispatch_options,
                 )
         elif arguments.command == "check":
             result = verify_source_discovery_authority(
@@ -610,6 +699,7 @@ def main(argv: list[str] | None = None) -> int:
                                 "status",
                                 "prepare-tenderplan-bindings",
                                 "tenderplan-reconcile-failed-closed",
+                                "tenderplan-reconcile-no-dispatch",
                             }
                         )
                     ),

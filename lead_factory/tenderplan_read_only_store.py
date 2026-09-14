@@ -33,6 +33,15 @@ from lead_factory.tenderplan_read_only_crypto import (
     EncryptedTenderPlanCardV1,
     encrypted_card_material,
 )
+from lead_factory.tenderplan_no_dispatch_evidence import (
+    TENDERPLAN_NO_DISPATCH_ADMISSION_CONFIRMATION,
+    TenderPlanNoDispatchEvidenceError,
+    admission_from_accepted_proof,
+    no_dispatch_admission_set_sha256,
+    no_dispatch_digest,
+    validate_no_dispatch_admission,
+    verify_accepted_execution_provenance,
+)
 
 
 TENDERPLAN_READ_ONLY_STORE_SCHEMA_VERSION: Final = 1
@@ -427,6 +436,26 @@ _ACCOUNT_TRANSITION_SQL: Final = (
 )
 TENDERPLAN_ACCOUNT_TRANSITION_SCHEMA_FINGERPRINT_SHA256: Final = (
     "86cb0add0af37777dc8d62533728d0df776cd415236fa1672472ba7ed781e945"
+)
+_NO_DISPATCH_ADMISSION_TABLE = "tenderplan_read_only_no_dispatch_admissions"
+_NO_DISPATCH_ADMISSION_SQL = (
+    """CREATE TABLE tenderplan_read_only_no_dispatch_admissions (
+        run_id TEXT PRIMARY KEY,
+        acceptance_id TEXT NOT NULL UNIQUE,
+        record_json TEXT NOT NULL,
+        record_sha256 TEXT NOT NULL UNIQUE
+    )""",
+    """CREATE TRIGGER trg_tenderplan_no_dispatch_no_update
+    BEFORE UPDATE ON tenderplan_read_only_no_dispatch_admissions BEGIN
+        SELECT RAISE(ABORT,'TenderPlan no-dispatch admissions are immutable');
+    END""",
+    """CREATE TRIGGER trg_tenderplan_no_dispatch_no_delete
+    BEFORE DELETE ON tenderplan_read_only_no_dispatch_admissions BEGIN
+        SELECT RAISE(ABORT,'TenderPlan no-dispatch admissions are immutable');
+    END""",
+)
+TENDERPLAN_NO_DISPATCH_SCHEMA_FINGERPRINT_SHA256: Final = (
+    "c7051cf12feb815ad2fb2ccd76a5fd5bf59ceccbdb6ab0005bccb0eb24d91a4a"
 )
 _ACCOUNT_CONNECTION_KEYS: Final = frozenset(
     {
@@ -1266,6 +1295,7 @@ class TenderPlanReadOnlyStore:
             expected_fingerprint = {
                 1: TENDERPLAN_READ_ONLY_STORE_SCHEMA_FINGERPRINT_SHA256,
                 2: TENDERPLAN_ACCOUNT_TRANSITION_SCHEMA_FINGERPRINT_SHA256,
+                3: TENDERPLAN_NO_DISPATCH_SCHEMA_FINGERPRINT_SHA256,
             }.get(user_version)
             if (
                 quick.casefold() != "ok"
@@ -1275,7 +1305,7 @@ class TenderPlanReadOnlyStore:
             ):
                 raise TenderPlanReadOnlyStoreIntegrityError
             transition = (
-                _read_account_transition(connection, self.path) if user_version == 2 else None
+                _read_account_transition(connection, self.path) if user_version in {2, 3} else None
             )
             if self._account_binding_initialized:
                 previous = self._account_transition
@@ -1562,6 +1592,8 @@ class TenderPlanReadOnlyStore:
                     ):
                         raise TenderPlanReadOnlyStoreIntegrityError
                     previous_decision = digest
+            if user_version == 3:
+                _validated_no_dispatch_admissions_locked(connection, self)
             self._account_binding_initialized = True
         except TenderPlanReadOnlyStoreIntegrityError:
             raise
@@ -1683,6 +1715,7 @@ class TenderPlanReadOnlyStore:
         expected_connection_profile_sha256: str | None = None,
         expected_connection_profile_record_sha256: str | None = None,
         expected_credential_target_sha256: str | None = None,
+        expected_no_dispatch_admission_set_sha256: str | None = None,
     ) -> TenderPlanReadOnlyOperationReceipt:
         exact_account_pins = (
             expected_account_transition_sha256,
@@ -1733,21 +1766,25 @@ class TenderPlanReadOnlyStore:
                 if self._account_transition is not None
                 else ""
             )
+            admitted = _pinned_no_dispatch_runs_locked(
+                connection, self, expected_no_dispatch_admission_set_sha256)
+            if run_id in admitted:
+                raise TenderPlanReadOnlyStoreReconciliationRequired
             unresolved = connection.execute(
-                """SELECT e.state FROM tenderplan_read_only_events e
+                """SELECT e.run_id,e.state FROM tenderplan_read_only_events e
                    WHERE e.sequence=(
                        SELECT MAX(x.sequence) FROM tenderplan_read_only_events x
                        WHERE x.run_id=e.run_id
                    ) AND e.run_id<>? AND e.state IN (
                        'INTENT','DISPATCH_CLAIMED','UNCERTAIN'
-                   ) LIMIT 1""",
+                   )""",
                 (frozen_run,),
-            ).fetchone()
+            ).fetchall()
             existing = connection.execute(
                 "SELECT * FROM tenderplan_read_only_operations WHERE run_id=?",
                 (run_id,),
             ).fetchone()
-            if unresolved:
+            if any(str(row["run_id"]) not in admitted for row in unresolved):
                 raise TenderPlanReadOnlyStoreReconciliationRequired
             if existing:
                 if str(existing["intent_json"]) != intent_json:
@@ -1843,10 +1880,12 @@ class TenderPlanReadOnlyStore:
         run_ids: tuple[str, ...],
         *,
         expected_file_sha256: str,
+        expected_no_dispatch_admission_set_sha256: str | None = None,
     ) -> Iterator[tuple[TenderPlanReadOnlyFailedClosedBinding, ...]]:
         """Hold one native fence while proving an exact set of stopped runs."""
 
-        if type(run_ids) is not tuple or not run_ids or len(set(run_ids)) != len(run_ids):
+        if (type(run_ids) is not tuple or len(set(run_ids)) != len(run_ids)
+                or (not run_ids and expected_no_dispatch_admission_set_sha256 is None)):
             raise TenderPlanReadOnlyStoreValidationError
         runs = tuple(_safe_id(run_id) for run_id in run_ids)
         if (
@@ -1890,7 +1929,11 @@ class TenderPlanReadOnlyStore:
                        WHERE x.run_id=e.run_id
                    ) AND e.state IN ('INTENT','DISPATCH_CLAIMED','UNCERTAIN')"""
             ).fetchall()
-            active_unresolved = [row for row in unresolved if str(row["run_id"]) != legacy_run]
+            admitted = _pinned_no_dispatch_runs_locked(
+                connection, self, expected_no_dispatch_admission_set_sha256)
+            active_unresolved = [row for row in unresolved
+                                 if str(row["run_id"]) != legacy_run
+                                 and str(row["run_id"]) not in admitted]
             if active_unresolved:
                 raise TenderPlanReadOnlyStoreReconciliationRequired
             bindings: list[TenderPlanReadOnlyFailedClosedBinding] = []
@@ -2586,7 +2629,9 @@ def verify_worker_intent(
         )
 
 
-def validate_tenderplan_read_only_store(path: str | Path) -> dict[str, object]:
+def validate_tenderplan_read_only_store(
+    path: str | Path, *, expected_no_dispatch_admission_set_sha256: str | None = None,
+) -> dict[str, object]:
     """Validate the complete store without writing or repairing it."""
 
     store = _existing_store(path)
@@ -2636,6 +2681,15 @@ def validate_tenderplan_read_only_store(path: str | Path) -> dict[str, object]:
             active_states = dict(states)
             active_states[TenderPlanReadOnlyRunState.UNCERTAIN.value] -= 1
             result["active_states"] = active_states
+        if expected_no_dispatch_admission_set_sha256 is not None:
+            admitted = _pinned_no_dispatch_runs_locked(
+                connection, store, expected_no_dispatch_admission_set_sha256)
+            scoped_states = dict(result.get("active_states", states))
+            scoped_states[TenderPlanReadOnlyRunState.UNCERTAIN.value] -= len(admitted)
+            if scoped_states[TenderPlanReadOnlyRunState.UNCERTAIN.value] < 0:
+                raise TenderPlanReadOnlyStoreIntegrityError
+            result["no_dispatch_admission_states"] = scoped_states
+            result["no_dispatch_admission_set_sha256"] = expected_no_dispatch_admission_set_sha256
         return result
 
 
@@ -2676,7 +2730,279 @@ def fence_tenderplan_failed_closed_bindings(
         yield bindings
 
 
+def _match_no_dispatch_native_locked(
+    connection: sqlite3.Connection, store: TenderPlanReadOnlyStore,
+    admission: Mapping[str, object],
+) -> None:
+    """Check immutable per-run material; whole-file historical pins stay historical."""
+    run_id = str(admission["run_id"])
+    if (store._account_transition is None
+            or run_id == store._account_transition["legacy_run_id"]
+            or admission["native_store_identity_sha256"] != store.store_identity_sha256
+            or admission["native_path_sha256"] != _path_sha256(store.path)):
+        raise TenderPlanReadOnlyStoreReconciliationRequired
+    operation = connection.execute(
+        "SELECT * FROM tenderplan_read_only_operations WHERE run_id=?", (run_id,)
+    ).fetchone()
+    events = connection.execute(
+        "SELECT * FROM tenderplan_read_only_events WHERE run_id=? ORDER BY sequence", (run_id,)
+    ).fetchall()
+    if operation is None or len(events) != 2:
+        raise TenderPlanReadOnlyStoreReconciliationRequired
+    intent = _normalize_intent(_strict_json_object(operation["intent_json"]))
+    first, last = events
+    card_count = connection.execute(
+        "SELECT COUNT(*) FROM tenderplan_read_only_cards WHERE run_id=?", (run_id,)
+    ).fetchone()[0]
+    decision_count = connection.execute(
+        """SELECT COUNT(*) FROM tenderplan_read_only_decisions d
+        JOIN tenderplan_read_only_cards c ON c.item_id=d.item_id WHERE c.run_id=?""", (run_id,)
+    ).fetchone()[0]
+    proof_native = admission["accepted_proof"]["native"]
+    if (
+        operation["operation_sha256"] != admission["operation_sha256"]
+        or operation["intent_record_sha256"] != admission["intent_record_sha256"]
+        or any(intent[key] != admission[key] for key in (
+            "intent_record_sha256", "request_sha256", "query_policy_sha256"))
+        or any(intent[key] != proof_native[key] for key in (
+            "maximum_records", "maximum_response_bytes", "request_count", "write_count", "spend_minor"))
+        or first["event_type"] != "INTENT_COMMITTED" or first["state"] != "INTENT"
+        or first["event_sha256"] != admission["intent_event_sha256"]
+        or last["event_type"] != "UNCERTAIN_COMMITTED" or last["state"] != "UNCERTAIN"
+        or last["event_sha256"] != admission["uncertain_event_sha256"]
+        or card_count != 0 or decision_count != 0
+    ):
+        raise TenderPlanReadOnlyStoreReconciliationRequired
+
+
+def _validated_no_dispatch_admissions_locked(
+    connection: sqlite3.Connection, store: TenderPlanReadOnlyStore,
+) -> tuple[dict[str, object], ...]:
+    if connection.execute("PRAGMA user_version").fetchone()[0] != 3:
+        return ()
+    try:
+        records = []
+        for row in connection.execute(
+            "SELECT * FROM tenderplan_read_only_no_dispatch_admissions ORDER BY run_id"
+        ):
+            admission = validate_no_dispatch_admission(_strict_json_object(row["record_json"]))
+            if (row["run_id"] != admission["run_id"]
+                    or row["acceptance_id"] != admission["acceptance_id"]
+                    or row["record_sha256"] != admission["record_sha256"]
+                    or row["record_json"] != _canonical_json(admission)):
+                raise TenderPlanReadOnlyStoreIntegrityError
+            _match_no_dispatch_native_locked(connection, store, admission)
+            records.append(admission)
+        if not records:
+            raise TenderPlanReadOnlyStoreIntegrityError
+        return tuple(records)
+    except (TenderPlanNoDispatchEvidenceError, KeyError, TypeError, ValueError):
+        raise TenderPlanReadOnlyStoreIntegrityError from None
+
+
+def _pinned_no_dispatch_runs_locked(
+    connection: sqlite3.Connection, store: TenderPlanReadOnlyStore,
+    expected_no_dispatch_admission_set_sha256: str | None,
+) -> frozenset[str]:
+    if expected_no_dispatch_admission_set_sha256 is None:
+        return frozenset()
+    _hex64(expected_no_dispatch_admission_set_sha256)
+    admissions = _validated_no_dispatch_admissions_locked(connection, store)
+    if (not admissions or no_dispatch_admission_set_sha256(admissions)
+            != expected_no_dispatch_admission_set_sha256):
+        raise TenderPlanReadOnlyStoreReconciliationRequired
+    return frozenset(str(record["run_id"]) for record in admissions)
+
+
+def _before_no_dispatch_admission_commit() -> None:
+    """Test fault seam; never runs a worker or repairs an operational history."""
+
+
+@contextmanager
+def _existing_no_dispatch_transaction(
+    store: TenderPlanReadOnlyStore,
+) -> Iterator[sqlite3.Connection]:
+    """Fence admission against an existing ledger without any create fallback."""
+    connection = sqlite3.connect(
+        store.path.as_uri() + "?mode=rw",
+        uri=True,
+        timeout=30,
+        isolation_level=None,
+    )
+    try:
+        connection.row_factory = sqlite3.Row
+        connection.execute("PRAGMA foreign_keys=ON")
+        connection.execute("PRAGMA busy_timeout=30000")
+        connection.execute("PRAGMA trusted_schema=OFF")
+        connection.execute("PRAGMA synchronous=FULL")
+        connection.execute("BEGIN IMMEDIATE")
+        store._verify_locked(connection)
+        yield connection
+        store._verify_locked(connection)
+        connection.commit()
+    except BaseException:
+        if connection.in_transaction:
+            connection.rollback()
+        raise
+    finally:
+        connection.close()
+
+
+def _no_dispatch_admission_core(
+    *, store_path: str | Path, acceptance_id: str, proof_path: str | Path,
+    provenance_paths: Mapping[str, str | Path], expected_native_file_sha256: str,
+    apply: bool, expected_preview_sha256: str | None = None,
+) -> dict[str, object]:
+    _hex64(expected_native_file_sha256)
+    if apply:
+        _hex64(expected_preview_sha256)
+    try:
+        proof = verify_accepted_execution_provenance(
+            acceptance_id=acceptance_id, proof_path=proof_path, provenance_paths=provenance_paths)
+        admission = admission_from_accepted_proof(proof, acceptance_id=acceptance_id)
+        store = _existing_store(store_path)
+        _transition_plain_file(store.path)
+        _assert_transition_no_sidecars(store.path)
+        before = store.path.lstat()
+        created = False
+        with _existing_no_dispatch_transaction(store) as connection:
+            opened = store.path.lstat()
+            if ((opened.st_dev, opened.st_ino) != (before.st_dev, before.st_ino)
+                    or str(connection.execute("PRAGMA journal_mode").fetchone()[0]).lower() != "delete"
+                    or _transition_file_sha256(store.path) != expected_native_file_sha256):
+                raise TenderPlanReadOnlyStoreReconciliationRequired
+            _assert_transition_no_sidecars(store.path)
+            version = connection.execute("PRAGMA user_version").fetchone()[0]
+            if version not in {2, 3}:
+                raise TenderPlanReadOnlyStoreReconciliationRequired
+            admissions = _validated_no_dispatch_admissions_locked(connection, store)
+            existing = next((item for item in admissions if item["run_id"] == admission["run_id"]), None)
+            _match_no_dispatch_native_locked(connection, store, admission)
+            if existing is None:
+                if (version != 2
+                        or expected_native_file_sha256 != admission["native_file_sha256"]
+                        or _schema_fingerprint(connection) != admission["native_schema_fingerprint_sha256"]):
+                    raise TenderPlanReadOnlyStoreReconciliationRequired
+                # No third unresolved history may be hidden by this admission.
+                allowed = {admission["run_id"], store._account_transition["legacy_run_id"]}
+                unresolved = connection.execute(
+                    """SELECT e.run_id FROM tenderplan_read_only_events e WHERE e.sequence=(
+                    SELECT MAX(x.sequence) FROM tenderplan_read_only_events x WHERE x.run_id=e.run_id)
+                    AND e.state IN ('INTENT','DISPATCH_CLAIMED','UNCERTAIN')"""
+                ).fetchall()
+                if any(row["run_id"] not in allowed for row in unresolved):
+                    raise TenderPlanReadOnlyStoreReconciliationRequired
+                prospective = (*admissions, admission)
+            else:
+                if existing != admission:
+                    raise TenderPlanReadOnlyStoreReconciliationRequired
+                prospective = admissions
+            set_sha256 = no_dispatch_admission_set_sha256(prospective)
+            preview_sha256 = no_dispatch_digest({
+                "protocol": "tenderplan-no-dispatch-admission-preview-v1",
+                "admission": admission, "no_dispatch_admission_set_sha256": set_sha256,
+            })
+            if apply and expected_preview_sha256 != preview_sha256:
+                raise TenderPlanReadOnlyStoreReconciliationRequired
+            if apply and existing is None:
+                for statement in _NO_DISPATCH_ADMISSION_SQL:
+                    connection.execute(statement)
+                connection.execute("PRAGMA user_version=3")
+                connection.execute(
+                    """INSERT INTO tenderplan_read_only_no_dispatch_admissions
+                    (run_id,acceptance_id,record_json,record_sha256) VALUES(?,?,?,?)""",
+                    (admission["run_id"], admission["acceptance_id"],
+                     _canonical_json(admission), admission["record_sha256"]),
+                )
+                store._verify_locked(connection)
+                _before_no_dispatch_admission_commit()
+                created = True
+            finished = store.path.lstat()
+            if (finished.st_dev, finished.st_ino) != (before.st_dev, before.st_ino):
+                raise TenderPlanReadOnlyStoreReconciliationRequired
+        _assert_transition_no_sidecars(store.path)
+        current_native_sha256 = _transition_file_sha256(store.path)
+        if not created and current_native_sha256 != expected_native_file_sha256:
+            raise TenderPlanReadOnlyStoreReconciliationRequired
+        return {
+            "state": "APPLIED" if created else "ALREADY_APPLIED" if apply else "READY_TO_APPLY",
+            "admission": admission, "preview_sha256": preview_sha256,
+            "no_dispatch_admission_set_sha256": set_sha256,
+            "native_file_sha256": current_native_sha256,
+            "created": created, "native_store_write_count": int(created),
+            "credential_read_count": 0, "provider_request_count": 0,
+            "retry_eligible": False, "launch_allowed": False, "authorizes_live": False,
+        }
+    except (TenderPlanNoDispatchEvidenceError, OSError, sqlite3.Error, KeyError, TypeError, ValueError):
+        raise TenderPlanReadOnlyStoreReconciliationRequired from None
+
+
+def preview_tenderplan_no_dispatch_admission(
+    *, store_path: str | Path, acceptance_id: str, proof_path: str | Path,
+    provenance_paths: Mapping[str, str | Path], expected_native_file_sha256: str,
+) -> dict[str, object]:
+    return _no_dispatch_admission_core(
+        store_path=store_path, acceptance_id=acceptance_id, proof_path=proof_path,
+        provenance_paths=provenance_paths, expected_native_file_sha256=expected_native_file_sha256,
+        apply=False,
+    )
+
+
+def apply_tenderplan_no_dispatch_admission(
+    *, store_path: str | Path, acceptance_id: str, proof_path: str | Path,
+    provenance_paths: Mapping[str, str | Path], expected_native_file_sha256: str,
+    expected_preview_sha256: str, confirmation: str,
+) -> dict[str, object]:
+    if confirmation != TENDERPLAN_NO_DISPATCH_ADMISSION_CONFIRMATION:
+        raise TenderPlanReadOnlyStoreValidationError
+    return _no_dispatch_admission_core(
+        store_path=store_path, acceptance_id=acceptance_id, proof_path=proof_path,
+        provenance_paths=provenance_paths, expected_native_file_sha256=expected_native_file_sha256,
+        expected_preview_sha256=expected_preview_sha256, apply=True,
+    )
+
+
+def read_tenderplan_no_dispatch_admissions(path: str | Path) -> dict[str, object]:
+    store = _existing_store(path)
+    _assert_transition_no_sidecars(store.path)
+    with store._transaction(write=False) as connection:
+        admissions = _validated_no_dispatch_admissions_locked(connection, store)
+        return {
+            "no_dispatch_admissions": admissions,
+            "no_dispatch_admission_set_sha256": no_dispatch_admission_set_sha256(admissions),
+            "native_file_sha256": _transition_file_sha256(store.path),
+            "launch_allowed": False,
+        }
+
+
+@contextmanager
+def fence_tenderplan_reconciled_bindings(
+    path: str | Path, *, failed_closed_run_ids: tuple[str, ...],
+    expected_no_dispatch_admission_set_sha256: str, expected_file_sha256: str,
+) -> Iterator[dict[str, object]]:
+    store = _existing_store(path)
+    with store.fence_failed_closed_bindings(
+        failed_closed_run_ids, expected_file_sha256=expected_file_sha256,
+        expected_no_dispatch_admission_set_sha256=expected_no_dispatch_admission_set_sha256,
+    ) as failed_closed:
+        # The outer BEGIN IMMEDIATE prevents all writers throughout this read and yield.
+        with store._transaction(write=False) as connection:
+            admissions = _validated_no_dispatch_admissions_locked(connection, store)
+            yield {
+                "failed_closed_bindings": failed_closed,
+                "no_dispatch_admissions": admissions,
+                "no_dispatch_admission_set_sha256": no_dispatch_admission_set_sha256(admissions),
+                "native_file_sha256": expected_file_sha256,
+            }
+
+
 __all__ = [
+    "TENDERPLAN_NO_DISPATCH_SCHEMA_FINGERPRINT_SHA256",
+    "TENDERPLAN_NO_DISPATCH_ADMISSION_CONFIRMATION",
+    "preview_tenderplan_no_dispatch_admission",
+    "apply_tenderplan_no_dispatch_admission",
+    "read_tenderplan_no_dispatch_admissions",
+    "fence_tenderplan_reconciled_bindings",
     "TENDERPLAN_ACCOUNT_TRANSITION_CONFIRMATION",
     "TENDERPLAN_ACCOUNT_TRANSITION_SCHEMA_FINGERPRINT_SHA256",
     "TENDERPLAN_READ_ONLY_INTENT_VERSION",
