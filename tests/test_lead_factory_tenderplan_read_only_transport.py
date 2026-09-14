@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import hashlib
 import http.client
 import io
@@ -28,6 +28,13 @@ from lead_factory.tenderplan_isolated_transport import (
 from lead_factory.tenderplan_read_only_crypto import encrypt_tenderplan_card
 from lead_factory.tenderplan_read_only_projection import (
     project_tenderplan_read_only_response,
+)
+from lead_factory.tenderplan_read_only_store import (
+    TENDERPLAN_READ_ONLY_INTENT_VERSION,
+    TenderPlanReadOnlyRunState,
+    TenderPlanReadOnlyStore,
+    seal_tenderplan_read_only_intent,
+    validate_tenderplan_read_only_store,
 )
 from tests.test_lead_factory_tenderplan_profile_request import (
     _prepare as _prepared_profile,
@@ -1034,6 +1041,211 @@ def test_sealed_worker_bootstrap_imports_divergent_bundle_before_live_source(
         "protocol": sealed_protocol.decode("ascii"),
     }
     assert completed.stderr == b""
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows sealed worker contract")
+def test_sealed_worker_allows_exact_read_only_queue_uri_before_claim(
+    tmp_path: Path,
+    sealed_python_runtime: _SealedPythonRuntime,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = Path(transport._ROOT)  # noqa: SLF001
+    scratch = root / "outputs" / (
+        ".sealed-worker-uri-"
+        + hashlib.sha256(str(tmp_path).encode("utf-8", "strict")).hexdigest()[:16]
+    )
+    scratch.mkdir(parents=True)
+    try:
+        queue_path = scratch / "queue.sqlite3"
+        connection_profile_path = root / "lead_factory" / "__init__.py"
+        now = datetime.now(timezone.utc).replace(microsecond=0)
+        requested_at_utc = now.isoformat(timespec="microseconds").replace(
+            "+00:00", "Z"
+        )
+        expires_at_utc = (now + timedelta(hours=1)).isoformat(
+            timespec="microseconds"
+        ).replace("+00:00", "Z")
+        query = "sealed uri probe"
+        auth_reference_id = "authref_" + "7" * 32
+        run_id = "tpri_" + "8" * 32
+        nonce_sha256 = "9" * 64
+        auth_reference_id_sha256 = transport._sha256_bytes(  # noqa: SLF001
+            auth_reference_id.encode("ascii", "strict")
+        )
+        credential_target_sha256 = transport._credential_target_sha256(  # noqa: SLF001
+            auth_reference_id
+        )
+        query_policy_sha256 = transport.tenderplan_read_only_query_policy_sha256(
+            query,
+            maximum_records=5,
+        )
+        request_sha256 = transport.tenderplan_read_only_request_sha256(
+            run_id=run_id,
+            auth_reference_id_sha256=auth_reference_id_sha256,
+            credential_target_sha256=credential_target_sha256,
+            nonce_sha256=nonce_sha256,
+            query_policy_sha256=query_policy_sha256,
+            expires_at_utc=expires_at_utc,
+            maximum_response_bytes=65_536,
+            maximum_records=5,
+        )
+        intent = seal_tenderplan_read_only_intent(
+            {
+                "automatic_schedule_eligible": False,
+                "auth_reference_id_sha256": auth_reference_id_sha256,
+                "contact_count": 0,
+                "credential_target_sha256": credential_target_sha256,
+                "expires_at_utc": expires_at_utc,
+                "live_release_eligible": False,
+                "maximum_records": 5,
+                "maximum_response_bytes": 65_536,
+                "nonce_sha256": nonce_sha256,
+                "protocol": TENDERPLAN_READ_ONLY_INTENT_VERSION,
+                "query_policy_sha256": query_policy_sha256,
+                "request_count": 1,
+                "request_sha256": request_sha256,
+                "requested_at_utc": requested_at_utc,
+                "run_id": run_id,
+                "spend_minor": 0,
+                "write_count": 0,
+            }
+        )
+        store = TenderPlanReadOnlyStore(queue_path, clock=lambda: now)
+        store.reserve_intent(intent)
+
+        bundle = _sealed_bundle_bytes(root)
+        bundle_path = tmp_path / "worker.pyz"
+        bundle_path.write_bytes(bundle)
+        sealed = _sealed_worker(
+            bundle_path=bundle_path,
+            expected_bundle=bundle,
+            logical_root=root,
+            runtime=sealed_python_runtime,
+            queue_path=queue_path,
+            connection_profile_path=connection_profile_path,
+        )
+        monkeypatch.setattr(
+            transport._WindowsSealedWorkerLease,  # noqa: SLF001
+            "_require_runtime_read_only",
+            lambda _lease, _entries, _directories: None,
+        )
+        monkeypatch.setattr(
+            transport._WindowsSealedWorkerLease,  # noqa: SLF001
+            "_require_immutable_volume",
+            lambda _lease, _runtime: None,
+        )
+        boundary = transport.TenderPlanReadOnlyTransport(sealed_worker=sealed)
+
+        with pytest.raises(transport.TenderPlanReadOnlyDiagnosticUncertain) as caught:
+            boundary.post_registered_search(
+                query,
+                auth_reference_id,
+                run_id=run_id,
+                nonce_sha256=nonce_sha256,
+                intent_record_sha256=str(intent["intent_record_sha256"]),
+                query_policy_sha256=query_policy_sha256,
+                request_sha256=request_sha256,
+                credential_target_sha256=credential_target_sha256,
+                expires_at_utc=expires_at_utc,
+                maximum_response_bytes=65_536,
+                maximum_records=5,
+            )
+
+        assert caught.value.diagnostic_code is (
+            transport.TenderPlanReadOnlyDiagnosticCode.WORKER_CREDENTIAL_UNAVAILABLE
+        )
+        assert caught.value.observation_stage is (
+            transport.TenderPlanReadOnlyObservationStage.WORKER_PRE_PROVIDER
+        )
+        report = validate_tenderplan_read_only_store(queue_path)
+        assert report["states"][TenderPlanReadOnlyRunState.DISPATCH_CLAIMED.value] == 1
+        assert report["event_count"] == 2
+        assert report["card_count"] == report["decision_count"] == 0
+        assert report["write_count"] == report["contact_count"] == 0
+        assert report["spend_minor"] == 0
+        assert not Path(str(queue_path) + "-journal").exists()
+        assert not Path(str(queue_path) + "-wal").exists()
+        assert not Path(str(queue_path) + "-shm").exists()
+    finally:
+        shutil.rmtree(scratch)
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows sealed worker contract")
+@pytest.mark.parametrize(
+    "database_expression",
+    [
+        "TENDERPLAN_READ_ONLY_QUEUE_PATH.as_uri() + '?mode=rw'",
+        "TENDERPLAN_READ_ONLY_QUEUE_PATH.as_uri() + '?mode=ro&cache=shared'",
+        "(TENDERPLAN_READ_ONLY_QUEUE_PATH.parent / 'other.sqlite3').as_uri() "
+        "+ '?mode=ro'",
+        "TENDERPLAN_READ_ONLY_QUEUE_PATH",
+    ],
+)
+def test_sealed_worker_rejects_every_other_sqlite_target(
+    tmp_path: Path,
+    sealed_python_runtime: _SealedPythonRuntime,
+    database_expression: str,
+) -> None:
+    root = Path(transport._ROOT)  # noqa: SLF001
+    scratch = root / "outputs" / (
+        ".sealed-worker-target-"
+        + hashlib.sha256(
+            (str(tmp_path) + database_expression).encode("utf-8", "strict")
+        ).hexdigest()[:16]
+    )
+    scratch.mkdir(parents=True)
+    try:
+        queue_path = scratch / "queue.sqlite3"
+        queue_path.write_bytes(b"")
+        (scratch / "other.sqlite3").write_bytes(b"")
+        connection_profile_path = root / "lead_factory" / "__init__.py"
+        minimal_worker = (
+            "from pathlib import Path\n"
+            "import sqlite3\n"
+            f"TENDERPLAN_READ_ONLY_WORKER_SWITCH = "
+            f"{transport.TENDERPLAN_READ_ONLY_WORKER_SWITCH!r}\n"
+            "TENDERPLAN_READ_ONLY_QUEUE_PATH = Path('.')\n"
+            "_SEALED_CONNECTION_PROFILE_PATH = None\n"
+            "_SEALED_CONNECTION_PROFILE_SHA256 = None\n"
+            "def _worker_main():\n"
+            f"    database = {database_expression}\n"
+            "    connection = sqlite3.connect(database, uri=True)\n"
+            "    connection.close()\n"
+            "    return 0\n"
+        ).encode("ascii", "strict")
+        relative = "lead_factory/tenderplan_read_only_transport.py"
+        bundle = _sealed_bundle_bytes(
+            root,
+            replacements={relative: minimal_worker},
+        )
+        bundle_path = tmp_path / "worker.pyz"
+        bundle_path.write_bytes(bundle)
+        sealed = _sealed_worker(
+            bundle_path=bundle_path,
+            expected_bundle=bundle,
+            logical_root=root,
+            runtime=sealed_python_runtime,
+            queue_path=queue_path,
+            connection_profile_path=connection_profile_path,
+        )
+        command, payload = transport._sealed_worker_material(  # noqa: SLF001
+            sealed,
+            b"{}",
+        )
+
+        completed = subprocess.run(
+            command,
+            input=payload,
+            capture_output=True,
+            check=False,
+            timeout=30,
+        )
+
+        assert completed.returncode == 65
+        assert completed.stdout == b""
+        assert completed.stderr == b""
+    finally:
+        shutil.rmtree(scratch)
 
 
 @pytest.mark.skipif(os.name != "nt", reason="Windows sealed worker contract")

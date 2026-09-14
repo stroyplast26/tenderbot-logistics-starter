@@ -1431,6 +1431,8 @@ import re
 import ssl
 import stat
 import sys
+# ``datetime.strptime`` imports this lazily; load it before ``RuntimeFence``.
+import _strptime
 import urllib.parse
 import zipfile
 
@@ -1728,6 +1730,7 @@ if worker_switch != worker.TENDERPLAN_READ_ONLY_WORKER_SWITCH:
 worker.TENDERPLAN_READ_ONLY_QUEUE_PATH = queue_path
 worker._SEALED_CONNECTION_PROFILE_PATH = str(connection_profile_path)
 worker._SEALED_CONNECTION_PROFILE_SHA256 = expected_connection_profile_sha256
+queue_read_only_uri = queue_path.as_uri() + "?mode=ro"
 
 # Load every file-backed standard-library dependency before the final inventory.
 # No new file-backed import is permitted after this point.
@@ -1902,11 +1905,10 @@ def audit(event, arguments):
         stop()
     if event == "sqlite3.connect":
         database = arguments[0] if arguments else None
-        try:
-            database_path = Path(database).resolve(strict=True)
-        except (OSError, RuntimeError, TypeError, ValueError):
-            stop()
-        if os.path.normcase(str(database_path)) != os.path.normcase(str(queue_path)):
+        if type(database) is not str or database not in {
+            str(queue_path),
+            queue_read_only_uri,
+        }:
             stop()
 
 
