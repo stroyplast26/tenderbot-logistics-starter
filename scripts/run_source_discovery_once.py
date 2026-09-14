@@ -329,6 +329,7 @@ def _parser() -> argparse.ArgumentParser:
             choices=("YANDEX", "TENDERPLAN", "SABY", "DOMRF", "KONTUR"),
         )
         command.add_argument("--wip-limit", type=int, default=1)
+        command.add_argument("--controller-state-path")
         command.add_argument("--yandex-job")
         command.add_argument("--folder-id")
         selection = command.add_mutually_exclusive_group()
@@ -431,7 +432,26 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     try:
         profile_options = {}
+        controller_state_path = SOURCE_DISCOVERY_STATE_PATH
         if arguments.command in {"check", "run-one"}:
+            if arguments.controller_state_path is not None:
+                if (
+                    arguments.expected_source_reconciliation_set_sha256 is None
+                    or arguments.expected_tenderplan_reconciliation_set_sha256 is not None
+                    or arguments.tenderplan_store is None
+                    or not Path(arguments.controller_state_path).is_absolute()
+                    or not Path(arguments.tenderplan_store).is_absolute()
+                    or (
+                        arguments.command == "run-one"
+                        and any(value is None for value in (
+                            arguments.expected_controller_file_sha256,
+                            arguments.expected_controller_snapshot_sha256,
+                            arguments.expected_tenderplan_store_file_sha256,
+                        ))
+                    )
+                ):
+                    raise SourceDiscoveryControlError("CONTROL_RECONCILIATION_REQUIRED")
+                controller_state_path = Path(arguments.controller_state_path)
             if arguments.expected_source_reconciliation_set_sha256 is not None:
                 profile_options["expected_source_reconciliation_set_sha256"] = (
                     arguments.expected_source_reconciliation_set_sha256
@@ -539,7 +559,7 @@ def main(argv: list[str] | None = None) -> int:
         elif arguments.command == "check":
             result = verify_source_discovery_authority(
                 arguments.source,
-                state_path=SOURCE_DISCOVERY_STATE_PATH,
+                state_path=controller_state_path,
                 wip_limit=arguments.wip_limit,
                 yandex_job_path=arguments.yandex_job,
                 folder_id=arguments.folder_id,
@@ -603,7 +623,7 @@ def main(argv: list[str] | None = None) -> int:
                     if arguments.confirm_one_authorized_read
                     else None
                 ),
-                state_path=SOURCE_DISCOVERY_STATE_PATH,
+                state_path=controller_state_path,
                 wip_limit=arguments.wip_limit,
                 yandex_job_path=arguments.yandex_job,
                 folder_id=arguments.folder_id,
