@@ -26,6 +26,7 @@ import os
 from pathlib import Path
 import re
 import sqlite3
+import stat
 from typing import Final
 
 from lead_factory.tenderplan_read_only_crypto import (
@@ -35,9 +36,7 @@ from lead_factory.tenderplan_read_only_crypto import (
 
 
 TENDERPLAN_READ_ONLY_STORE_SCHEMA_VERSION: Final = 1
-TENDERPLAN_ACCOUNT_TRANSITION_CONFIRMATION: Final = (
-    "PREPARE_LOCAL_TENDERPLAN_ACCOUNT_TRANSITION"
-)
+TENDERPLAN_ACCOUNT_TRANSITION_CONFIRMATION: Final = "PREPARE_LOCAL_TENDERPLAN_ACCOUNT_TRANSITION"
 TENDERPLAN_READ_ONLY_STORE_APPLICATION_ID: Final = 0x54505231  # ``TPR1``
 TENDERPLAN_READ_ONLY_STORE_CONTRACT_ID: Final = "tenderplan-read-only-store-v1"
 TENDERPLAN_READ_ONLY_INTENT_VERSION: Final = "tenderplan-read-only-intent-v1"
@@ -192,6 +191,42 @@ class TenderPlanReadOnlyUncertainBinding:
             "TenderPlanReadOnlyUncertainBinding(content=<digest-only>, "
             "state='UNCERTAIN', retry_eligible=False, "
             "automatic_schedule_eligible=False, live_release_eligible=False)"
+        )
+
+
+@dataclass(frozen=True, slots=True, repr=False)
+class TenderPlanReadOnlyFailedClosedBinding:
+    """Digest-only proof that one native run stopped before dispatch."""
+
+    run_id: str
+    store_identity_sha256: str
+    native_path_sha256: str
+    native_file_sha256: str
+    schema_fingerprint_sha256: str
+    operation_sha256: str
+    intent_record_sha256: str
+    request_sha256: str
+    query_policy_sha256: str
+    intent_event_sha256: str
+    failed_closed_event_sha256: str
+    state: TenderPlanReadOnlyRunState = TenderPlanReadOnlyRunState.FAILED_CLOSED
+    event_count: int = 2
+    dispatch_claim_count: int = 0
+    credential_read_count: int = 0
+    provider_request_count: int = 0
+    card_count: int = 0
+    decision_count: int = 0
+    retry_eligible: bool = False
+    launch_allowed: bool = False
+    automatic_schedule_eligible: bool = False
+    live_release_eligible: bool = False
+
+    def __repr__(self) -> str:
+        return (
+            "TenderPlanReadOnlyFailedClosedBinding(content=<digest-only>, "
+            "state='FAILED_CLOSED', dispatch_claim_count=0, "
+            "credential_read_count=0, provider_request_count=0, "
+            "retry_eligible=False, launch_allowed=False)"
         )
 
 
@@ -393,17 +428,33 @@ _ACCOUNT_TRANSITION_SQL: Final = (
 TENDERPLAN_ACCOUNT_TRANSITION_SCHEMA_FINGERPRINT_SHA256: Final = (
     "86cb0add0af37777dc8d62533728d0df776cd415236fa1672472ba7ed781e945"
 )
-_ACCOUNT_CONNECTION_KEYS: Final = frozenset({
-    "firm_id", "auth_reference_id", "credential_target_sha256", "profile_path",
-    "profile_sha256", "profile_record_sha256", "verified_at_utc",
-    "credential_created_at_utc",
-})
-_ACCOUNT_TRANSITION_KEYS: Final = frozenset({
-    "protocol", "origin_path_sha256", "store_identity_sha256",
-    "current_path_sha256", "legacy_run_id", "active_connection",
-    "owner_confirmation_sha256", "original_store_sha256", "frozen_manifest",
-    "prepared_at_utc", "record_sha256",
-})
+_ACCOUNT_CONNECTION_KEYS: Final = frozenset(
+    {
+        "firm_id",
+        "auth_reference_id",
+        "credential_target_sha256",
+        "profile_path",
+        "profile_sha256",
+        "profile_record_sha256",
+        "verified_at_utc",
+        "credential_created_at_utc",
+    }
+)
+_ACCOUNT_TRANSITION_KEYS: Final = frozenset(
+    {
+        "protocol",
+        "origin_path_sha256",
+        "store_identity_sha256",
+        "current_path_sha256",
+        "legacy_run_id",
+        "active_connection",
+        "owner_confirmation_sha256",
+        "original_store_sha256",
+        "frozen_manifest",
+        "prepared_at_utc",
+        "record_sha256",
+    }
+)
 
 
 def _canonical_json(value: object) -> str:
@@ -487,9 +538,7 @@ def _timestamp(value: object, *, integrity: bool = False) -> str:
 
 
 def _plain_resolved_path(path: str | Path, *, must_exist: bool = False) -> Path:
-    if not isinstance(path, (str, Path)) or (
-        isinstance(path, str) and not path.strip()
-    ):
+    if not isinstance(path, (str, Path)) or (isinstance(path, str) and not path.strip()):
         raise TenderPlanReadOnlyStoreValidationError
     if str(path) == ":memory:":
         raise TenderPlanReadOnlyStoreValidationError
@@ -568,14 +617,16 @@ def _account_connection(value: object) -> dict[str, str]:
     for key in ("credential_target_sha256", "profile_sha256", "profile_record_sha256"):
         _hex64(result[key])
     expected_target = _sha256_bytes(
-        ("TenderBot/TenderPlan/PAT/resources-personal/v1/" + result["auth_reference_id"])
-        .encode("ascii", "strict")
+        ("TenderBot/TenderPlan/PAT/resources-personal/v1/" + result["auth_reference_id"]).encode(
+            "ascii", "strict"
+        )
     )
     if result["credential_target_sha256"] != expected_target:
         raise TenderPlanReadOnlyStoreValidationError
     profile = result["profile_path"]
     if (
-        len(profile) > 4096 or any(ord(char) < 32 for char in profile)
+        len(profile) > 4096
+        or any(ord(char) < 32 for char in profile)
         or not Path(profile).is_absolute()
         or os.path.normcase(os.path.abspath(profile)) != os.path.normcase(profile)
     ):
@@ -583,7 +634,10 @@ def _account_connection(value: object) -> dict[str, str]:
     parsed_times = []
     for key in ("verified_at_utc", "credential_created_at_utc"):
         value = result[key]
-        if re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|\+00:00)", value) is None:
+        if (
+            re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|\+00:00)", value)
+            is None
+        ):
             raise TenderPlanReadOnlyStoreValidationError
         try:
             parsed_times.append(datetime.fromisoformat(value.replace("Z", "+00:00")))
@@ -596,11 +650,13 @@ def _account_connection(value: object) -> dict[str, str]:
 
 
 def _origin_identity(path_sha256: str) -> str:
-    return _sha256_json({
-        "contract_id": TENDERPLAN_READ_ONLY_STORE_CONTRACT_ID,
-        "path_sha256": path_sha256,
-        "schema_version": TENDERPLAN_READ_ONLY_STORE_SCHEMA_VERSION,
-    })
+    return _sha256_json(
+        {
+            "contract_id": TENDERPLAN_READ_ONLY_STORE_CONTRACT_ID,
+            "path_sha256": path_sha256,
+            "schema_version": TENDERPLAN_READ_ONLY_STORE_SCHEMA_VERSION,
+        }
+    )
 
 
 def _initialize_store_binding(
@@ -628,41 +684,66 @@ def _initialize_store_binding(
 
 
 def _frozen_transition_manifest(
-    connection: sqlite3.Connection, legacy_run_id: str,
+    connection: sqlite3.Connection,
+    legacy_run_id: str,
 ) -> dict[str, object]:
     rows = {
-        "metadata": [dict(row) for row in connection.execute(
-            "SELECT * FROM tenderplan_read_only_meta ORDER BY key")],
-        "operations": [dict(row) for row in connection.execute(
-            "SELECT * FROM tenderplan_read_only_operations WHERE run_id=? ORDER BY run_id",
-            (legacy_run_id,))],
-        "events": [dict(row) for row in connection.execute(
-            "SELECT * FROM tenderplan_read_only_events WHERE run_id=? ORDER BY sequence",
-            (legacy_run_id,))],
-        "cards": [dict(row) for row in connection.execute(
-            "SELECT * FROM tenderplan_read_only_cards WHERE run_id=? ORDER BY ordinal",
-            (legacy_run_id,))],
-        "decisions": [dict(row) for row in connection.execute(
-            """SELECT d.* FROM tenderplan_read_only_decisions d
+        "metadata": [
+            dict(row)
+            for row in connection.execute("SELECT * FROM tenderplan_read_only_meta ORDER BY key")
+        ],
+        "operations": [
+            dict(row)
+            for row in connection.execute(
+                "SELECT * FROM tenderplan_read_only_operations WHERE run_id=? ORDER BY run_id",
+                (legacy_run_id,),
+            )
+        ],
+        "events": [
+            dict(row)
+            for row in connection.execute(
+                "SELECT * FROM tenderplan_read_only_events WHERE run_id=? ORDER BY sequence",
+                (legacy_run_id,),
+            )
+        ],
+        "cards": [
+            dict(row)
+            for row in connection.execute(
+                "SELECT * FROM tenderplan_read_only_cards WHERE run_id=? ORDER BY ordinal",
+                (legacy_run_id,),
+            )
+        ],
+        "decisions": [
+            dict(row)
+            for row in connection.execute(
+                """SELECT d.* FROM tenderplan_read_only_decisions d
             JOIN tenderplan_read_only_cards c ON c.item_id=d.item_id
-            WHERE c.run_id=? ORDER BY d.item_id,d.sequence""", (legacy_run_id,))],
+            WHERE c.run_id=? ORDER BY d.item_id,d.sequence""",
+                (legacy_run_id,),
+            )
+        ],
     }
     if (
-        len(rows["operations"]) != 1 or rows["cards"] or rows["decisions"]
+        len(rows["operations"]) != 1
+        or rows["cards"]
+        or rows["decisions"]
         or len(rows["events"]) not in {2, 3}
         or rows["events"][-1]["state"] != TenderPlanReadOnlyRunState.UNCERTAIN.value
         or [row["sequence"] for row in rows["events"]] != list(range(1, len(rows["events"]) + 1))
     ):
         raise TenderPlanReadOnlyStoreIntegrityError
     return {
-        "operation_count": 1, "event_count": len(rows["events"]),
-        "card_count": 0, "decision_count": 0,
+        "operation_count": 1,
+        "event_count": len(rows["events"]),
+        "card_count": 0,
+        "decision_count": 0,
         "history_sha256": _sha256_json(rows),
     }
 
 
 def _read_account_transition(
-    connection: sqlite3.Connection, current_path: Path,
+    connection: sqlite3.Connection,
+    current_path: Path,
 ) -> dict[str, object]:
     rows = connection.execute(
         "SELECT * FROM tenderplan_read_only_account_transition ORDER BY singleton"
@@ -674,8 +755,12 @@ def _read_account_transition(
     if set(record) != _ACCOUNT_TRANSITION_KEYS:
         raise TenderPlanReadOnlyStoreIntegrityError
     for key in (
-        "origin_path_sha256", "store_identity_sha256", "current_path_sha256",
-        "owner_confirmation_sha256", "original_store_sha256", "record_sha256",
+        "origin_path_sha256",
+        "store_identity_sha256",
+        "current_path_sha256",
+        "owner_confirmation_sha256",
+        "original_store_sha256",
+        "record_sha256",
     ):
         _hex64(record[key])
     _timestamp(record["prepared_at_utc"], integrity=True)
@@ -687,12 +772,11 @@ def _read_account_transition(
         or record["current_path_sha256"] != _path_sha256(current_path)
         or record["store_identity_sha256"] != _origin_identity(str(record["origin_path_sha256"]))
         or row["record_sha256"] != record["record_sha256"]
-        or record["record_sha256"] != _sha256_json({
-            key: value for key, value in record.items() if key != "record_sha256"
-        })
+        or record["record_sha256"]
+        != _sha256_json({key: value for key, value in record.items() if key != "record_sha256"})
         or row["record_json"] != _canonical_json(record)
-        or _canonical_json(record["frozen_manifest"]) != _canonical_json(
-            _frozen_transition_manifest(connection, str(record["legacy_run_id"])))
+        or _canonical_json(record["frozen_manifest"])
+        != _canonical_json(_frozen_transition_manifest(connection, str(record["legacy_run_id"])))
     ):
         raise TenderPlanReadOnlyStoreIntegrityError
     old = connection.execute(
@@ -701,7 +785,8 @@ def _read_account_transition(
     ).fetchone()
     old_intent = _normalize_intent(_strict_json_object(old["intent_json"]))
     if (
-        old_intent["auth_reference_id_sha256"] == _sha256_bytes(active["auth_reference_id"].encode("ascii"))
+        old_intent["auth_reference_id_sha256"]
+        == _sha256_bytes(active["auth_reference_id"].encode("ascii"))
         or old_intent["credential_target_sha256"] == active["credential_target_sha256"]
     ):
         raise TenderPlanReadOnlyStoreIntegrityError
@@ -709,14 +794,16 @@ def _read_account_transition(
 
 
 def _require_active_account(
-    transition: dict[str, object] | None, intent: Mapping[str, object],
+    transition: dict[str, object] | None,
+    intent: Mapping[str, object],
 ) -> None:
     if transition is None:
         return
     active = transition["active_connection"]
     if (
         intent["run_id"] == transition["legacy_run_id"]
-        or intent["auth_reference_id_sha256"] != _sha256_bytes(active["auth_reference_id"].encode("ascii"))
+        or intent["auth_reference_id_sha256"]
+        != _sha256_bytes(active["auth_reference_id"].encode("ascii"))
         or intent["credential_target_sha256"] != active["credential_target_sha256"]
     ):
         raise TenderPlanReadOnlyStoreReconciliationRequired
@@ -745,11 +832,7 @@ def _normalize_intent(value: object) -> dict[str, object]:
     expires_text = _timestamp(intent["expires_at_utc"])
     requested = datetime.fromisoformat(requested_text.replace("Z", "+00:00"))
     expires = datetime.fromisoformat(expires_text.replace("Z", "+00:00"))
-    if (
-        not requested
-        < expires
-        <= requested + timedelta(days=TENDERPLAN_READ_ONLY_RETENTION_DAYS)
-    ):
+    if not requested < expires <= requested + timedelta(days=TENDERPLAN_READ_ONLY_RETENTION_DAYS):
         raise TenderPlanReadOnlyStoreValidationError
     for key in _INTENT_HASH_KEYS:
         _hex64(intent[key])
@@ -799,9 +882,7 @@ def _card_materials(
             material = encrypted_card_material(value)
         except Exception:
             raise TenderPlanReadOnlyStoreValidationError from None
-        if type(material) is not dict or material.get("envelope_sha256") != (
-            value.envelope_sha256
-        ):
+        if type(material) is not dict or material.get("envelope_sha256") != (value.envelope_sha256):
             raise TenderPlanReadOnlyStoreValidationError
         if value.identity_sha256 in seen:
             raise TenderPlanReadOnlyStoreConflict
@@ -854,12 +935,8 @@ def _normalize_receipt(
     _safe_id(receipt["run_id"])
     captured_text = _timestamp(receipt["captured_at_utc"])
     captured = datetime.fromisoformat(captured_text.replace("Z", "+00:00"))
-    requested = datetime.fromisoformat(
-        str(intent["requested_at_utc"]).replace("Z", "+00:00")
-    )
-    expires = datetime.fromisoformat(
-        str(intent["expires_at_utc"]).replace("Z", "+00:00")
-    )
+    requested = datetime.fromisoformat(str(intent["requested_at_utc"]).replace("Z", "+00:00"))
+    expires = datetime.fromisoformat(str(intent["expires_at_utc"]).replace("Z", "+00:00"))
     card_count = receipt["card_count"]
     returned_count = receipt["returned_count"]
     provider_count = receipt["provider_reported_count"]
@@ -1084,9 +1161,7 @@ class TenderPlanReadOnlyStore:
                     uri=True,
                 )
             else:
-                connection = sqlite3.connect(
-                    str(self.path), timeout=30, isolation_level=None
-                )
+                connection = sqlite3.connect(str(self.path), timeout=30, isolation_level=None)
             connection.row_factory = sqlite3.Row
             connection.execute("PRAGMA foreign_keys=ON")
             connection.execute("PRAGMA busy_timeout=30000")
@@ -1132,9 +1207,7 @@ class TenderPlanReadOnlyStore:
             "path_sha256": self._path_sha256,
             "provider_write_count": "0",
             "retention_days": str(TENDERPLAN_READ_ONLY_RETENTION_DAYS),
-            "schema_fingerprint_sha256": (
-                TENDERPLAN_READ_ONLY_STORE_SCHEMA_FINGERPRINT_SHA256
-            ),
+            "schema_fingerprint_sha256": (TENDERPLAN_READ_ONLY_STORE_SCHEMA_FINGERPRINT_SHA256),
             "schema_version": str(TENDERPLAN_READ_ONLY_STORE_SCHEMA_VERSION),
             "spend_minor": "0",
             "store_identity_sha256": self._store_identity_sha256,
@@ -1188,9 +1261,7 @@ class TenderPlanReadOnlyStore:
     def _verify_locked(self, connection: sqlite3.Connection) -> None:
         try:
             quick = str(connection.execute("PRAGMA quick_check").fetchone()[0])
-            application_id = int(
-                connection.execute("PRAGMA application_id").fetchone()[0]
-            )
+            application_id = int(connection.execute("PRAGMA application_id").fetchone()[0])
             user_version = int(connection.execute("PRAGMA user_version").fetchone()[0])
             expected_fingerprint = {
                 1: TENDERPLAN_READ_ONLY_STORE_SCHEMA_FINGERPRINT_SHA256,
@@ -1204,15 +1275,14 @@ class TenderPlanReadOnlyStore:
             ):
                 raise TenderPlanReadOnlyStoreIntegrityError
             transition = (
-                _read_account_transition(connection, self.path)
-                if user_version == 2 else None
+                _read_account_transition(connection, self.path) if user_version == 2 else None
             )
             if self._account_binding_initialized:
                 previous = self._account_transition
-                if (
-                    (previous is None) != (transition is None)
-                    or (previous is not None and transition is not None
-                        and previous["record_sha256"] != transition["record_sha256"])
+                if (previous is None) != (transition is None) or (
+                    previous is not None
+                    and transition is not None
+                    and previous["record_sha256"] != transition["record_sha256"]
                 ):
                     raise TenderPlanReadOnlyStoreIntegrityError
             if transition is not None:
@@ -1251,7 +1321,10 @@ class TenderPlanReadOnlyStore:
                 ):
                     raise TenderPlanReadOnlyStoreIntegrityError
                 operation_by_run[run_id] = (row, intent)
-                if self._account_transition is not None and run_id != self._account_transition["legacy_run_id"]:
+                if (
+                    self._account_transition is not None
+                    and run_id != self._account_transition["legacy_run_id"]
+                ):
                     _require_active_account(self._account_transition, intent)
             if len(operation_by_run) != len(operations):
                 raise TenderPlanReadOnlyStoreIntegrityError
@@ -1361,8 +1434,7 @@ class TenderPlanReadOnlyStore:
                 if (
                     first["event_type"] != "INTENT_COMMITTED"
                     or first["state"] != TenderPlanReadOnlyRunState.INTENT.value
-                    or first["occurred_at_utc"]
-                    != operation_by_run[run_id][0]["reserved_at_utc"]
+                    or first["occurred_at_utc"] != operation_by_run[run_id][0]["reserved_at_utc"]
                     or first["payload_sha256"] != intent["intent_record_sha256"]
                     or first["payload_json"] is not None
                     or first["card_count"] != 0
@@ -1375,15 +1447,12 @@ class TenderPlanReadOnlyStore:
                 second = history[1]
                 if datetime.fromisoformat(
                     str(second["occurred_at_utc"]).replace("Z", "+00:00")
-                ) < datetime.fromisoformat(
-                    str(first["occurred_at_utc"]).replace("Z", "+00:00")
-                ):
+                ) < datetime.fromisoformat(str(first["occurred_at_utc"]).replace("Z", "+00:00")):
                     raise TenderPlanReadOnlyStoreIntegrityError
                 if second["state"] == TenderPlanReadOnlyRunState.DISPATCH_CLAIMED.value:
                     if (
                         second["event_type"] != "DISPATCH_CLAIMED_COMMITTED"
-                        or second["payload_sha256"]
-                        != _dispatch_claim_payload_sha256(intent)
+                        or second["payload_sha256"] != _dispatch_claim_payload_sha256(intent)
                         or second["payload_json"] is not None
                         or second["card_count"] != 0
                     ):
@@ -1409,15 +1478,13 @@ class TenderPlanReadOnlyStore:
                     TenderPlanReadOnlyRunState.UNCERTAIN.value,
                 }:
                     if (
-                        second["state"]
-                        == TenderPlanReadOnlyRunState.DISPATCH_CLAIMED.value
+                        second["state"] == TenderPlanReadOnlyRunState.DISPATCH_CLAIMED.value
                         and state != TenderPlanReadOnlyRunState.UNCERTAIN.value
                     ):
                         raise TenderPlanReadOnlyStoreIntegrityError
                     if (
                         terminal["event_type"] != f"{state}_COMMITTED"
-                        or terminal["payload_sha256"]
-                        != _terminal_payload_sha256(run_id, state)
+                        or terminal["payload_sha256"] != _terminal_payload_sha256(run_id, state)
                         or terminal["payload_json"] is not None
                         or terminal["card_count"] != 0
                         or run_cards
@@ -1473,8 +1540,7 @@ class TenderPlanReadOnlyStore:
                     if (
                         type(sequence) is not int
                         or sequence != expected_sequence
-                        or decision
-                        not in {item.value for item in TenderPlanReadOnlyDecision}
+                        or decision not in {item.value for item in TenderPlanReadOnlyDecision}
                         or _REASON_CODE.fullmatch(reason) is None
                         or datetime.fromisoformat(decided_at.replace("Z", "+00:00"))
                         < datetime.fromisoformat(card_created.replace("Z", "+00:00"))
@@ -1624,22 +1690,16 @@ class TenderPlanReadOnlyStore:
             expected_connection_profile_record_sha256,
             expected_credential_target_sha256,
         )
-        exact_account_binding_required = any(
-            value is not None for value in exact_account_pins[1:]
-        )
+        exact_account_binding_required = any(value is not None for value in exact_account_pins[1:])
         for value in exact_account_pins:
             if value is not None:
                 _hex64(value)
         intent = _normalize_intent(intent_mapping)
         now = self._now()
         if not (
-            datetime.fromisoformat(
-                str(intent["requested_at_utc"]).replace("Z", "+00:00")
-            )
+            datetime.fromisoformat(str(intent["requested_at_utc"]).replace("Z", "+00:00"))
             <= datetime.fromisoformat(now.replace("Z", "+00:00"))
-            < datetime.fromisoformat(
-                str(intent["expires_at_utc"]).replace("Z", "+00:00")
-            )
+            < datetime.fromisoformat(str(intent["expires_at_utc"]).replace("Z", "+00:00"))
         ):
             raise TenderPlanReadOnlyStoreValidationError
         intent_json = _canonical_json(intent)
@@ -1662,18 +1722,16 @@ class TenderPlanReadOnlyStore:
                     raise TenderPlanReadOnlyStoreReconciliationRequired
                 active = self._account_transition["active_connection"]
                 if (
-                    active["profile_sha256"]
-                    != expected_connection_profile_sha256
-                    or active["profile_record_sha256"]
-                    != expected_connection_profile_record_sha256
-                    or active["credential_target_sha256"]
-                    != expected_credential_target_sha256
+                    active["profile_sha256"] != expected_connection_profile_sha256
+                    or active["profile_record_sha256"] != expected_connection_profile_record_sha256
+                    or active["credential_target_sha256"] != expected_credential_target_sha256
                 ):
                     raise TenderPlanReadOnlyStoreReconciliationRequired
             _require_active_account(self._account_transition, intent)
             frozen_run = (
                 str(self._account_transition["legacy_run_id"])
-                if self._account_transition is not None else ""
+                if self._account_transition is not None
+                else ""
             )
             unresolved = connection.execute(
                 """SELECT e.state FROM tenderplan_read_only_events e
@@ -1682,7 +1740,8 @@ class TenderPlanReadOnlyStore:
                        WHERE x.run_id=e.run_id
                    ) AND e.run_id<>? AND e.state IN (
                        'INTENT','DISPATCH_CLAIMED','UNCERTAIN'
-                   ) LIMIT 1""", (frozen_run,)
+                   ) LIMIT 1""",
+                (frozen_run,),
             ).fetchone()
             existing = connection.execute(
                 "SELECT * FROM tenderplan_read_only_operations WHERE run_id=?",
@@ -1749,15 +1808,12 @@ class TenderPlanReadOnlyStore:
             if operation is None:
                 raise TenderPlanReadOnlyStoreConflict
             event = self._latest_event(connection, run)
-            if (
-                event is None
-                or self._state(event) is not TenderPlanReadOnlyRunState.UNCERTAIN
-            ):
+            if event is None or self._state(event) is not TenderPlanReadOnlyRunState.UNCERTAIN:
                 raise TenderPlanReadOnlyStoreConflict
             intent = _normalize_intent(_strict_json_object(operation["intent_json"]))
-            if str(intent["run_id"]) != run or str(
-                intent["intent_record_sha256"]
-            ) != str(operation["intent_record_sha256"]):
+            if str(intent["run_id"]) != run or str(intent["intent_record_sha256"]) != str(
+                operation["intent_record_sha256"]
+            ):
                 raise TenderPlanReadOnlyStoreIntegrityError
             return TenderPlanReadOnlyUncertainBinding(
                 run_id=run,
@@ -1766,6 +1822,144 @@ class TenderPlanReadOnlyStore:
                 intent_record_sha256=str(intent["intent_record_sha256"]),
                 request_sha256=str(intent["request_sha256"]),
             )
+
+    @contextmanager
+    def fence_failed_closed_binding(
+        self,
+        run_id: str,
+        *,
+        expected_file_sha256: str,
+    ) -> Iterator[TenderPlanReadOnlyFailedClosedBinding]:
+        """Hold the native writer fence around one exact pre-dispatch proof."""
+
+        with self.fence_failed_closed_bindings(
+            (run_id,), expected_file_sha256=expected_file_sha256
+        ) as bindings:
+            yield bindings[0]
+
+    @contextmanager
+    def fence_failed_closed_bindings(
+        self,
+        run_ids: tuple[str, ...],
+        *,
+        expected_file_sha256: str,
+    ) -> Iterator[tuple[TenderPlanReadOnlyFailedClosedBinding, ...]]:
+        """Hold one native fence while proving an exact set of stopped runs."""
+
+        if type(run_ids) is not tuple or not run_ids or len(set(run_ids)) != len(run_ids):
+            raise TenderPlanReadOnlyStoreValidationError
+        runs = tuple(_safe_id(run_id) for run_id in run_ids)
+        if (
+            type(expected_file_sha256) is not str
+            or re.fullmatch(r"[0-9a-f]{64}", expected_file_sha256) is None
+        ):
+            raise TenderPlanReadOnlyStoreValidationError
+        _transition_plain_file(self.path)
+        _assert_transition_no_sidecars(self.path)
+        try:
+            before = self.path.lstat()
+        except OSError:
+            raise TenderPlanReadOnlyStoreIntegrityError from None
+        with self._transaction(write=True) as connection:
+            _transition_plain_file(self.path)
+            _assert_transition_no_sidecars(self.path)
+            try:
+                opened = self.path.lstat()
+            except OSError:
+                raise TenderPlanReadOnlyStoreIntegrityError from None
+            if (
+                not stat.S_ISREG(opened.st_mode)
+                or opened.st_nlink != 1
+                or (opened.st_dev, opened.st_ino) != (before.st_dev, before.st_ino)
+            ):
+                raise TenderPlanReadOnlyStoreIntegrityError
+            if str(connection.execute("PRAGMA journal_mode").fetchone()[0]).lower() != "delete":
+                raise TenderPlanReadOnlyStoreIntegrityError
+            native_file_sha256 = _transition_file_sha256(self.path)
+            if native_file_sha256 != expected_file_sha256:
+                raise TenderPlanReadOnlyStoreReconciliationRequired
+            legacy_run = (
+                str(self._account_transition["legacy_run_id"])
+                if self._account_transition is not None
+                else None
+            )
+            unresolved = connection.execute(
+                """SELECT e.run_id,e.state FROM tenderplan_read_only_events e
+                   WHERE e.sequence=(
+                       SELECT MAX(x.sequence) FROM tenderplan_read_only_events x
+                       WHERE x.run_id=e.run_id
+                   ) AND e.state IN ('INTENT','DISPATCH_CLAIMED','UNCERTAIN')"""
+            ).fetchall()
+            active_unresolved = [row for row in unresolved if str(row["run_id"]) != legacy_run]
+            if active_unresolved:
+                raise TenderPlanReadOnlyStoreReconciliationRequired
+            bindings: list[TenderPlanReadOnlyFailedClosedBinding] = []
+            for run in runs:
+                operation = connection.execute(
+                    "SELECT * FROM tenderplan_read_only_operations WHERE run_id=?",
+                    (run,),
+                ).fetchone()
+                events = connection.execute(
+                    "SELECT * FROM tenderplan_read_only_events WHERE run_id=? ORDER BY sequence",
+                    (run,),
+                ).fetchall()
+                if operation is None or len(events) != 2:
+                    raise TenderPlanReadOnlyStoreReconciliationRequired
+                intent = _normalize_intent(_strict_json_object(operation["intent_json"]))
+                first, second = events
+                card_count = int(
+                    connection.execute(
+                        "SELECT COUNT(*) FROM tenderplan_read_only_cards WHERE run_id=?",
+                        (run,),
+                    ).fetchone()[0]
+                )
+                decision_count = int(
+                    connection.execute(
+                        """SELECT COUNT(*) FROM tenderplan_read_only_decisions d
+                           INNER JOIN tenderplan_read_only_cards c ON c.item_id=d.item_id
+                           WHERE c.run_id=?""",
+                        (run,),
+                    ).fetchone()[0]
+                )
+                if (
+                    intent["run_id"] != run
+                    or intent["intent_record_sha256"] != operation["intent_record_sha256"]
+                    or first["event_type"] != "INTENT_COMMITTED"
+                    or first["state"] != TenderPlanReadOnlyRunState.INTENT.value
+                    or first["payload_sha256"] != intent["intent_record_sha256"]
+                    or second["event_type"] != "FAILED_CLOSED_COMMITTED"
+                    or second["state"] != TenderPlanReadOnlyRunState.FAILED_CLOSED.value
+                    or card_count != 0
+                    or decision_count != 0
+                ):
+                    raise TenderPlanReadOnlyStoreReconciliationRequired
+                bindings.append(
+                    TenderPlanReadOnlyFailedClosedBinding(
+                        run_id=run,
+                        store_identity_sha256=self.store_identity_sha256,
+                        native_path_sha256=_path_sha256(self.path),
+                        native_file_sha256=native_file_sha256,
+                        schema_fingerprint_sha256=_schema_fingerprint(connection),
+                        operation_sha256=str(operation["operation_sha256"]),
+                        intent_record_sha256=str(intent["intent_record_sha256"]),
+                        request_sha256=str(intent["request_sha256"]),
+                        query_policy_sha256=str(intent["query_policy_sha256"]),
+                        intent_event_sha256=str(first["event_sha256"]),
+                        failed_closed_event_sha256=str(second["event_sha256"]),
+                    )
+                )
+            yield tuple(bindings)
+            _transition_plain_file(self.path)
+            _assert_transition_no_sidecars(self.path)
+            try:
+                finished = self.path.lstat()
+            except OSError:
+                raise TenderPlanReadOnlyStoreIntegrityError from None
+            if (finished.st_dev, finished.st_ino) != (
+                before.st_dev,
+                before.st_ino,
+            ) or _transition_file_sha256(self.path) != native_file_sha256:
+                raise TenderPlanReadOnlyStoreReconciliationRequired
 
     def record_terminal(
         self,
@@ -1821,9 +2015,7 @@ class TenderPlanReadOnlyStore:
         run_id: str,
     ) -> TenderPlanReadOnlyReadyReceipt:
         event = self._latest_event(connection, run_id)
-        if event is None or self._state(event) is not (
-            TenderPlanReadOnlyRunState.READY_FOR_REVIEW
-        ):
+        if event is None or self._state(event) is not (TenderPlanReadOnlyRunState.READY_FOR_REVIEW):
             raise TenderPlanReadOnlyStoreIntegrityError
         receipt = _strict_json_object(event["payload_json"])
         cards = connection.execute(
@@ -1880,9 +2072,7 @@ class TenderPlanReadOnlyStore:
                 raise TenderPlanReadOnlyStoreIntegrityError
             current = self._state(latest)
             if current is TenderPlanReadOnlyRunState.READY_FOR_REVIEW:
-                if str(
-                    latest["payload_json"]
-                ) != receipt_json or self._stored_card_materials(
+                if str(latest["payload_json"]) != receipt_json or self._stored_card_materials(
                     connection, run
                 ) != tuple(material for _card, material in normalized_cards):
                     raise TenderPlanReadOnlyStoreConflict
@@ -1977,14 +2167,10 @@ class TenderPlanReadOnlyStore:
                     ),
                     encrypted_card_sha256=str(row["encrypted_card_sha256"]),
                     latest_decision_id=(
-                        ""
-                        if row["latest_decision_id"] is None
-                        else str(row["latest_decision_id"])
+                        "" if row["latest_decision_id"] is None else str(row["latest_decision_id"])
                     ),
                     latest_reason_code=(
-                        ""
-                        if row["latest_reason_code"] is None
-                        else str(row["latest_reason_code"])
+                        "" if row["latest_reason_code"] is None else str(row["latest_reason_code"])
                     ),
                     created_at_utc=str(row["created_at_utc"]),
                 )
@@ -2034,9 +2220,7 @@ class TenderPlanReadOnlyStore:
                 (item,),
             ).fetchone()
             sequence = int(previous["sequence"]) + 1 if previous else 1
-            previous_sha256 = (
-                str(previous["decision_sha256"]) if previous else _GENESIS_SHA256
-            )
+            previous_sha256 = str(previous["decision_sha256"]) if previous else _GENESIS_SHA256
             material = _decision_material(
                 item_id=item,
                 sequence=sequence,
@@ -2092,6 +2276,18 @@ def _transition_file_sha256(path: Path) -> str:
         raise TenderPlanReadOnlyStoreIntegrityError from None
 
 
+def _assert_transition_no_sidecars(path: Path) -> None:
+    """Reject journals before SQLite can recover or merge them implicitly."""
+
+    try:
+        if any(
+            path.with_name(path.name + suffix).exists() for suffix in ("-wal", "-shm", "-journal")
+        ):
+            raise TenderPlanReadOnlyStoreIntegrityError
+    except OSError:
+        raise TenderPlanReadOnlyStoreIntegrityError from None
+
+
 def _transition_plain_file(path: Path) -> None:
     _plain_resolved_path(path, must_exist=True)
     try:
@@ -2124,11 +2320,14 @@ def _transition_candidate(
     ):
         raise TenderPlanReadOnlyStoreIntegrityError
     store._verify_locked(connection)
-    counts = [connection.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
-              for table in (
-                  "tenderplan_read_only_operations", "tenderplan_read_only_cards",
-                  "tenderplan_read_only_decisions",
-              )]
+    counts = [
+        connection.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
+        for table in (
+            "tenderplan_read_only_operations",
+            "tenderplan_read_only_cards",
+            "tenderplan_read_only_decisions",
+        )
+    ]
     if counts != [1, 0, 0]:
         raise TenderPlanReadOnlyStoreReconciliationRequired
     manifest = _frozen_transition_manifest(connection, legacy_run_id)
@@ -2138,7 +2337,8 @@ def _transition_candidate(
     ).fetchone()
     old_intent = _normalize_intent(_strict_json_object(old_row["intent_json"]))
     if (
-        old_intent["auth_reference_id_sha256"] == _sha256_bytes(active_connection["auth_reference_id"].encode("ascii"))
+        old_intent["auth_reference_id_sha256"]
+        == _sha256_bytes(active_connection["auth_reference_id"].encode("ascii"))
         or old_intent["credential_target_sha256"] == active_connection["credential_target_sha256"]
     ):
         raise TenderPlanReadOnlyStoreValidationError
@@ -2179,8 +2379,10 @@ def prepare_tenderplan_account_transition(
     if confirmation != TENDERPLAN_ACCOUNT_TRANSITION_CONFIRMATION or type(apply) is not bool:
         raise TenderPlanReadOnlyStoreValidationError
     for value in (
-        expected_store_sha256, expected_origin_path_sha256,
-        expected_store_identity_sha256, owner_confirmation_sha256,
+        expected_store_sha256,
+        expected_origin_path_sha256,
+        expected_store_identity_sha256,
+        owner_confirmation_sha256,
     ):
         _hex64(value)
     if (
@@ -2219,8 +2421,10 @@ def prepare_tenderplan_account_transition(
             # mode=rw forbids accidentally creating a replacement history if
             # the file disappears after the read-only preflight.
             connection = sqlite3.connect(
-                resolved.as_uri() + "?mode=rw", uri=True,
-                timeout=30.0, isolation_level=None,
+                resolved.as_uri() + "?mode=rw",
+                uri=True,
+                timeout=30.0,
+                isolation_level=None,
             )
             connection.row_factory = sqlite3.Row
             connection.execute("PRAGMA foreign_keys=ON")
@@ -2314,9 +2518,7 @@ def verify_worker_intent(
     expires = _timestamp(expires_at_utc)
     if (
         type(maximum_response_bytes) is not int
-        or not 1_024
-        <= maximum_response_bytes
-        <= TENDERPLAN_READ_ONLY_MAXIMUM_RESPONSE_BYTES
+        or not 1_024 <= maximum_response_bytes <= TENDERPLAN_READ_ONLY_MAXIMUM_RESPONSE_BYTES
         or type(maximum_records) is not int
         or not 1 <= maximum_records <= TENDERPLAN_READ_ONLY_MAXIMUM_CARDS
     ):
@@ -2378,7 +2580,8 @@ def verify_worker_intent(
             maximum_records=maximum_records,
             account_connection=(
                 dict(store._account_transition["active_connection"])
-                if store._account_transition is not None else None
+                if store._account_transition is not None
+                else None
             ),
         )
 
@@ -2401,9 +2604,7 @@ def validate_tenderplan_read_only_store(path: str | Path) -> dict[str, object]:
         result = {
             "automatic_schedule_eligible": False,
             "card_count": int(
-                connection.execute(
-                    "SELECT COUNT(*) FROM tenderplan_read_only_cards"
-                ).fetchone()[0]
+                connection.execute("SELECT COUNT(*) FROM tenderplan_read_only_cards").fetchone()[0]
             ),
             "contact_count": 0,
             "decision_count": int(
@@ -2412,9 +2613,7 @@ def validate_tenderplan_read_only_store(path: str | Path) -> dict[str, object]:
                 ).fetchone()[0]
             ),
             "event_count": int(
-                connection.execute(
-                    "SELECT COUNT(*) FROM tenderplan_read_only_events"
-                ).fetchone()[0]
+                connection.execute("SELECT COUNT(*) FROM tenderplan_read_only_events").fetchone()[0]
             ),
             "live_release_eligible": False,
             "operation_count": int(
@@ -2423,9 +2622,7 @@ def validate_tenderplan_read_only_store(path: str | Path) -> dict[str, object]:
                 ).fetchone()[0]
             ),
             "retention_days": TENDERPLAN_READ_ONLY_RETENTION_DAYS,
-            "schema_fingerprint_sha256": (
-                _schema_fingerprint(connection)
-            ),
+            "schema_fingerprint_sha256": (_schema_fingerprint(connection)),
             "spend_minor": 0,
             "states": states,
             "store_identity_sha256": store.store_identity_sha256,
@@ -2440,6 +2637,43 @@ def validate_tenderplan_read_only_store(path: str | Path) -> dict[str, object]:
             active_states[TenderPlanReadOnlyRunState.UNCERTAIN.value] -= 1
             result["active_states"] = active_states
         return result
+
+
+@contextmanager
+def fence_tenderplan_failed_closed_binding(
+    path: str | Path,
+    *,
+    run_id: str,
+    expected_file_sha256: str,
+) -> Iterator[TenderPlanReadOnlyFailedClosedBinding]:
+    """Expose a read-only proof while holding the native store writer fence."""
+
+    with fence_tenderplan_failed_closed_bindings(
+        path,
+        run_ids=(run_id,),
+        expected_file_sha256=expected_file_sha256,
+    ) as bindings:
+        yield bindings[0]
+
+
+@contextmanager
+def fence_tenderplan_failed_closed_bindings(
+    path: str | Path,
+    *,
+    run_ids: tuple[str, ...],
+    expected_file_sha256: str,
+) -> Iterator[tuple[TenderPlanReadOnlyFailedClosedBinding, ...]]:
+    """Expose an exact proof set while holding one native writer fence."""
+
+    resolved = _plain_resolved_path(path, must_exist=True)
+    _transition_plain_file(resolved)
+    _assert_transition_no_sidecars(resolved)
+    store = _existing_store(resolved)
+    with store.fence_failed_closed_bindings(
+        run_ids,
+        expected_file_sha256=expected_file_sha256,
+    ) as bindings:
+        yield bindings
 
 
 __all__ = [
@@ -2457,6 +2691,7 @@ __all__ = [
     "TENDERPLAN_READ_ONLY_STORE_SCHEMA_VERSION",
     "TenderPlanReadOnlyDecision",
     "TenderPlanReadOnlyDecisionReceipt",
+    "TenderPlanReadOnlyFailedClosedBinding",
     "TenderPlanReadOnlyItem",
     "TenderPlanReadOnlyOperationReceipt",
     "TenderPlanReadOnlyReadyReceipt",
@@ -2469,6 +2704,8 @@ __all__ = [
     "TenderPlanReadOnlyStoreValidationError",
     "TenderPlanReadOnlyUncertainBinding",
     "VerifiedTenderPlanWorkerIntent",
+    "fence_tenderplan_failed_closed_binding",
+    "fence_tenderplan_failed_closed_bindings",
     "seal_tenderplan_read_only_intent",
     "prepare_tenderplan_account_transition",
     "seal_tenderplan_read_only_receipt",

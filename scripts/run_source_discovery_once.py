@@ -18,10 +18,13 @@ from lead_factory.source_discovery_control import (  # noqa: E402
     SOURCE_DISCOVERY_LOCAL_CLOSE_CONFIRMATION,
     SOURCE_DISCOVERY_PREPARE_CONFIRMATION,
     SOURCE_DISCOVERY_ONE_SHOT_CONFIRMATION,
+    SOURCE_DISCOVERY_TENDERPLAN_RECONCILIATION_CONFIRMATION,
     SOURCE_DISCOVERY_STATE_PATH,
     SourceDiscoveryControlError,
     close_source_discovery_review,
     prepare_source_discovery_tenderplan_bindings,
+    preview_source_discovery_tenderplan_failed_closed_reconciliation,
+    reconcile_source_discovery_tenderplan_failed_closed_reconciliation,
     run_source_discovery_once,
     source_discovery_plan,
     source_discovery_status,
@@ -81,8 +84,11 @@ _EVIDENCE_URI = re.compile(
 _LOCAL_REVIEW_COMMANDS = frozenset({"review-list", "review-decide", "review-close"})
 _LOCAL_YANDEX_COMMANDS = frozenset(
     {
-        "yandex-activate", "yandex-prepare", "yandex-publish-evidence",
-        "yandex-status", "yandex-purge",
+        "yandex-activate",
+        "yandex-prepare",
+        "yandex-publish-evidence",
+        "yandex-status",
+        "yandex-purge",
     }
 )
 
@@ -179,8 +185,23 @@ def _parser() -> argparse.ArgumentParser:
 
     status = commands.add_parser("status", help="read durable local status")
     status.add_argument("--wip-limit", type=int, default=1)
-    prepare = commands.add_parser("prepare-tenderplan-bindings", help="explicitly prepare local controller receipt storage; no provider access")
+    prepare = commands.add_parser(
+        "prepare-tenderplan-bindings",
+        help="explicitly prepare local controller receipt storage; no provider access",
+    )
     prepare.add_argument("--confirm-local-prepare", action="store_true")
+    reconcile = commands.add_parser(
+        "tenderplan-reconcile-failed-closed",
+        help="reconcile one exact local pre-provider Tenderplan failure",
+    )
+    reconcile.add_argument("--attempt-id", required=True, type=_attempt_id)
+    reconcile.add_argument("--tenderplan-store", required=True)
+    reconcile.add_argument("--expected-controller-file-sha256", required=True, type=_sha256)
+    reconcile.add_argument("--expected-controller-snapshot-sha256", required=True, type=_sha256)
+    reconcile.add_argument("--expected-native-file-sha256", required=True, type=_sha256)
+    reconcile.add_argument("--expected-proof-sha256", type=_sha256)
+    reconcile.add_argument("--apply", action="store_true")
+    reconcile.add_argument("--confirm-local-reconciliation", action="store_true")
 
     yandex_status = commands.add_parser(
         "yandex-status",
@@ -268,7 +289,23 @@ def _parser() -> argparse.ArgumentParser:
         command.add_argument("--expected-tenderplan-profile-sha256", type=_sha256)
         command.add_argument("--tenderplan-registration")
         command.add_argument("--tenderplan-store")
+        command.add_argument(
+            "--expected-tenderplan-reconciliation-set-sha256",
+            type=_sha256,
+        )
         if name == "run-one":
+            command.add_argument(
+                "--expected-controller-file-sha256",
+                type=_sha256,
+            )
+            command.add_argument(
+                "--expected-controller-snapshot-sha256",
+                type=_sha256,
+            )
+            command.add_argument(
+                "--expected-tenderplan-store-file-sha256",
+                type=_sha256,
+            )
             command.add_argument(
                 "--confirm-one-authorized-read",
                 action="store_true",
@@ -326,11 +363,11 @@ def _emit(value: dict[str, object], *, error: bool = False) -> None:
 def main(argv: list[str] | None = None) -> int:
     arguments = _parser().parse_args(argv)
     if arguments.command in {
-        "run-one", "yandex-activate", "yandex-prepare", "yandex-publish-evidence",
-    } and (
-        os.environ.get(SAFE_LEAD_FLOW_LAUNCH_MARKER_NAME)
-        != SAFE_LEAD_FLOW_LAUNCH_MARKER_VALUE
-    ):
+        "run-one",
+        "yandex-activate",
+        "yandex-prepare",
+        "yandex-publish-evidence",
+    } and (os.environ.get(SAFE_LEAD_FLOW_LAUNCH_MARKER_NAME) != SAFE_LEAD_FLOW_LAUNCH_MARKER_VALUE):
         _emit(
             {
                 "effects": _local_review_effects(),
@@ -358,11 +395,17 @@ def main(argv: list[str] | None = None) -> int:
                 try:
                     prepared = load_tenderplan_profile_request(binding, expected_sha256=pin)
                 except TenderPlanProfileRequestError:
-                    raise SourceDiscoveryControlError("TENDERPLAN_PROFILE_REQUEST_INVALID") from None
+                    raise SourceDiscoveryControlError(
+                        "TENDERPLAN_PROFILE_REQUEST_INVALID"
+                    ) from None
                 profile_options["tenderplan_profile_request"] = prepared
                 query = ""
             else:
-                query = arguments.query if arguments.query is not None else TENDERPLAN_READ_ONLY_DEFAULT_QUERY
+                query = (
+                    arguments.query
+                    if arguments.query is not None
+                    else TENDERPLAN_READ_ONLY_DEFAULT_QUERY
+                )
         if arguments.command == "plan":
             result = source_discovery_plan()
         elif arguments.command == "status":
@@ -373,8 +416,37 @@ def main(argv: list[str] | None = None) -> int:
         elif arguments.command == "prepare-tenderplan-bindings":
             result = prepare_source_discovery_tenderplan_bindings(
                 state_path=SOURCE_DISCOVERY_STATE_PATH,
-                confirmation=SOURCE_DISCOVERY_PREPARE_CONFIRMATION if arguments.confirm_local_prepare else None,
+                confirmation=SOURCE_DISCOVERY_PREPARE_CONFIRMATION
+                if arguments.confirm_local_prepare
+                else None,
             )
+        elif arguments.command == "tenderplan-reconcile-failed-closed":
+            reconciliation_options = {
+                "attempt_id": arguments.attempt_id,
+                "state_path": SOURCE_DISCOVERY_STATE_PATH,
+                "tenderplan_store_path": arguments.tenderplan_store,
+                "expected_controller_file_sha256": (arguments.expected_controller_file_sha256),
+                "expected_controller_snapshot_sha256": (
+                    arguments.expected_controller_snapshot_sha256
+                ),
+                "expected_native_file_sha256": (arguments.expected_native_file_sha256),
+            }
+            if arguments.apply:
+                if arguments.expected_proof_sha256 is None:
+                    raise SourceDiscoveryControlError("CONTROL_RECONCILIATION_REQUIRED")
+                result = reconcile_source_discovery_tenderplan_failed_closed_reconciliation(
+                    **reconciliation_options,
+                    expected_proof_sha256=arguments.expected_proof_sha256,
+                    confirmation=(
+                        SOURCE_DISCOVERY_TENDERPLAN_RECONCILIATION_CONFIRMATION
+                        if arguments.confirm_local_reconciliation
+                        else None
+                    ),
+                )
+            else:
+                result = preview_source_discovery_tenderplan_failed_closed_reconciliation(
+                    **reconciliation_options,
+                )
         elif arguments.command == "check":
             result = verify_source_discovery_authority(
                 arguments.source,
@@ -385,6 +457,9 @@ def main(argv: list[str] | None = None) -> int:
                 tenderplan_query=query,
                 tenderplan_registration_path=arguments.tenderplan_registration,
                 tenderplan_store_path=arguments.tenderplan_store,
+                expected_tenderplan_reconciliation_set_sha256=(
+                    arguments.expected_tenderplan_reconciliation_set_sha256
+                ),
                 **profile_options,
             )
         elif arguments.command == "yandex-status":
@@ -393,9 +468,7 @@ def main(argv: list[str] | None = None) -> int:
             result = purge_yandex_journal(
                 arguments.job_id,
                 confirmation=(
-                    YANDEX_RAW_PURGE_CONFIRMATION
-                    if arguments.confirm_expired_raw_purge
-                    else None
+                    YANDEX_RAW_PURGE_CONFIRMATION if arguments.confirm_expired_raw_purge else None
                 ),
             )
         elif arguments.command == "yandex-prepare":
@@ -448,6 +521,14 @@ def main(argv: list[str] | None = None) -> int:
                 tenderplan_query=query,
                 tenderplan_registration_path=arguments.tenderplan_registration,
                 tenderplan_store_path=arguments.tenderplan_store,
+                expected_controller_file_sha256=(arguments.expected_controller_file_sha256),
+                expected_controller_snapshot_sha256=(arguments.expected_controller_snapshot_sha256),
+                expected_tenderplan_store_file_sha256=(
+                    arguments.expected_tenderplan_store_file_sha256
+                ),
+                expected_tenderplan_reconciliation_set_sha256=(
+                    arguments.expected_tenderplan_reconciliation_set_sha256
+                ),
                 **profile_options,
             )
         elif arguments.command == "review-list":
@@ -523,7 +604,13 @@ def main(argv: list[str] | None = None) -> int:
                         not in (
                             _LOCAL_REVIEW_COMMANDS
                             | _LOCAL_YANDEX_COMMANDS
-                            | {"check", "plan", "status", "prepare-tenderplan-bindings"}
+                            | {
+                                "check",
+                                "plan",
+                                "status",
+                                "prepare-tenderplan-bindings",
+                                "tenderplan-reconcile-failed-closed",
+                            }
                         )
                     ),
                 },

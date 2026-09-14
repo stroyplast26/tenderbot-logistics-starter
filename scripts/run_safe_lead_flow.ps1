@@ -11,6 +11,7 @@ param(
         'status',
         'check',
         'run-one',
+        'tenderplan-reconcile-failed-closed',
         'review-list',
         'review-decide',
         'review-close',
@@ -64,6 +65,10 @@ try {
         'source|status' = @('run_source_discovery_once.py', 'status')
         'source|check' = @('run_source_discovery_once.py', 'check')
         'source|run-one' = @('run_source_discovery_once.py', 'run-one')
+        'source|tenderplan-reconcile-failed-closed' = @(
+            'run_source_discovery_once.py',
+            'tenderplan-reconcile-failed-closed'
+        )
         'source|review-list' = @('run_source_discovery_once.py', 'review-list')
         'source|review-decide' = @('run_source_discovery_once.py', 'review-decide')
         'source|review-close' = @('run_source_discovery_once.py', 'review-close')

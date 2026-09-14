@@ -98,6 +98,7 @@ def test_launcher_source_is_an_exact_fail_closed_allowlist() -> None:
         "source|status",
         "source|check",
         "source|run-one",
+        "source|tenderplan-reconcile-failed-closed",
         "source|review-list",
         "source|review-decide",
         "source|review-close",
@@ -113,7 +114,8 @@ def test_launcher_source_is_an_exact_fail_closed_allowlist() -> None:
     }
     for route in expected_routes:
         assert source.count(f"'{route}'") == 1
-    assert source.count(" = @('run_source_discovery_once.py',") == 12
+    assert source.count("'tenderplan-reconcile-failed-closed'") == 2
+    assert source.count("'run_source_discovery_once.py'") == 13
     assert source.count(" = @('run_gold_acceptance.py',") == 4
 
     forbidden = (
