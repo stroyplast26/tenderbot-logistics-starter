@@ -70,7 +70,7 @@ def _reconcile(
         identity = control._regular_file_identity(path)
         connection = control._open_existing_local_fence(path)
         version = control._control_schema_version(connection)
-        if (version not in {7, 8}
+        if (version not in {7, 8, 9}
                 or control._regular_file_identity(path) != identity
                 or str(connection.execute("PRAGMA journal_mode").fetchone()[0]).lower() != "delete"
                 or control._file_sha256(path) != expected_controller_file_sha256):

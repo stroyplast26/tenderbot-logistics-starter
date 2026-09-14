@@ -15,6 +15,7 @@ from uuid import UUID
 from . import radar_yandex_connection_authority as authority
 from . import radar_yandex_job_preparer as preparer
 from . import radar_yandex_pilot_authority as common
+from . import radar_yandex_owner_delegation as delegation
 from .radar_yandex_search import SearchRequest
 
 
@@ -284,17 +285,28 @@ def _validate_evidence(
         _fail()
     common._sha(evidence["draft_sha256"])
     common._sha(evidence["scope_sha256"])
-    owner = common._object(
-        evidence["owner_receipt"],
-        {
-            "kind",
-            "owner_id",
-            "source_thread_id",
-            "instruction_sha256",
-            "captured_at_utc",
-            "scope_sha256",
-        },
-    )
+    delegated_owner = (type(evidence["owner_receipt"]) is dict
+                       and evidence["owner_receipt"].get("kind") == delegation.OWNER_KIND)
+    if delegated_owner:
+        try:
+            owner = delegation.validate_yandex_owner_delegation(
+                evidence["owner_receipt"], job=draft, scope_sha256=draft["scope_sha256"],
+                expected_draft_sha256=draft_sha256, activated_at_utc=activated_at_utc,
+            )
+        except delegation.YandexOwnerDelegationError:
+            _fail()
+    else:
+        owner = common._object(
+            evidence["owner_receipt"],
+            {
+                "kind",
+                "owner_id",
+                "source_thread_id",
+                "instruction_sha256",
+                "captured_at_utc",
+                "scope_sha256",
+            },
+        )
     review = common._object(
         evidence["independent_acceptance"],
         {
@@ -343,7 +355,7 @@ def _validate_evidence(
         connection["folder_id"].encode("utf-8", "strict")
     ).hexdigest()
     if (
-        owner["kind"] != "CAPTURED_OWNER_INSTRUCTION"
+        (not delegated_owner and owner["kind"] != "CAPTURED_OWNER_INSTRUCTION")
         or owner["scope_sha256"] != draft["scope_sha256"]
         or review["kind"] != "INDEPENDENT_CODE_ACCEPTANCE"
         or review["verdict"] != "ACCEPT"
@@ -362,7 +374,7 @@ def _validate_evidence(
     activated = common._utc(activated_at_utc)
     if common._utc(connection["registered_at_utc"]) > created:
         _fail()
-    owner_time = common._utc(owner["captured_at_utc"])
+    owner_time = common._utc(owner["issued_at_utc"] if delegated_owner else owner["captured_at_utc"])
     review_time = common._utc(review["reviewed_at_utc"])
     readiness_time = common._utc(readiness["observed_at_utc"])
     if (

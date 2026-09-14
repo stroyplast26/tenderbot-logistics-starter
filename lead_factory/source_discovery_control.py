@@ -566,6 +566,8 @@ def _control_schema_digest(connection: sqlite3.Connection) -> str:
 
 
 def _control_schema_version(connection: sqlite3.Connection) -> int:
+    from lead_factory.tenderplan_review_closure import CONTROL_V9_SCHEMA_SHA256
+
     version = connection.execute("PRAGMA user_version").fetchone()[0]
     digest = _control_schema_digest(connection)
     if version == 0 and digest == _CONTROL_V4_SCHEMA_SHA256:
@@ -578,6 +580,8 @@ def _control_schema_version(connection: sqlite3.Connection) -> int:
         return 7
     if version == 8 and digest == CONTROL_V8_SCHEMA_SHA256:
         return 8
+    if version == 9 and digest == CONTROL_V9_SCHEMA_SHA256:
+        return 9
     raise SourceDiscoveryControlError("CONTROL_STATE_INTEGRITY_FAILED")
 
 
@@ -623,7 +627,7 @@ def _tenderplan_schema_ready(path: Path) -> bool:
         return False
     connection = _open_read_only(path)
     try:
-        return _control_schema_version(connection) in {5, 6, 7, 8}
+        return _control_schema_version(connection) in {5, 6, 7, 8, 9}
     finally:
         connection.close()
 
@@ -767,7 +771,7 @@ def _tenderplan_binding_body(row: sqlite3.Row) -> dict[str, object]:
 
 def _validate_tenderplan_bindings(connection: sqlite3.Connection) -> dict[str, dict[str, object]]:
     try:
-        if _control_schema_version(connection) not in {5, 6, 7, 8}:
+        if _control_schema_version(connection) not in {5, 6, 7, 8, 9}:
             raise ValueError
         attempts = {
             row["attempt_id"]: row
@@ -1001,7 +1005,7 @@ def _validate_tenderplan_failed_closed_reconciliations(
     native_bindings: Mapping[str, Mapping[str, object]],
 ) -> dict[str, dict[str, object]]:
     try:
-        if _control_schema_version(connection) not in {7, 8}:
+        if _control_schema_version(connection) not in {7, 8, 9}:
             raise ValueError
         _validate_tenderplan_reconciliation_triggers(connection)
         attempts = {
@@ -1160,7 +1164,7 @@ def _open_for_write(
                 journal_mode = str(probe.execute("PRAGMA journal_mode").fetchone()[0]).lower()
                 if journal_mode != "delete":
                     raise SourceDiscoveryControlError("CONTROL_STATE_INTEGRITY_FAILED")
-                if require_tenderplan and version not in {5, 6, 7, 8}:
+                if require_tenderplan and version not in {5, 6, 7, 8, 9}:
                     raise SourceDiscoveryControlError("CONTROL_SCHEMA_PREPARATION_REQUIRED")
             finally:
                 probe.close()
@@ -1204,7 +1208,7 @@ def _open_for_write(
         )
         if actual_schema_present:
             version = _control_schema_version(connection)
-            if require_tenderplan and version not in {5, 6, 7, 8}:
+            if require_tenderplan and version not in {5, 6, 7, 8, 9}:
                 raise SourceDiscoveryControlError("CONTROL_SCHEMA_PREPARATION_REQUIRED")
             _rows(
                 path,
@@ -1525,7 +1529,7 @@ def _validate_review_deferrals_tx(
         is None
     ):
         return {}
-    if _control_schema_version(connection) not in {6, 7, 8}:
+    if _control_schema_version(connection) not in {6, 7, 8, 9}:
         raise SourceDiscoveryControlError("CONTROL_STATE_INTEGRITY_FAILED")
     try:
         by_attempt = {str(row["attempt_id"]): row for row in rows}
@@ -1832,6 +1836,8 @@ def _rows(
                     if connection.execute("PRAGMA foreign_key_check").fetchone() is not None:
                         raise SourceDiscoveryControlError("CONTROL_STATE_INTEGRITY_FAILED")
                 deferrals = _validate_review_deferrals_tx(connection, rows)
+                from lead_factory.tenderplan_review_closure import validate_closures
+                tenderplan_closures = validate_closures(connection, native_bindings)
                 return tuple(
                     {
                         **dict(row),
@@ -1843,6 +1849,7 @@ def _rows(
                             row["attempt_id"]
                         ),
                         "deferred_review": deferrals.get(row["attempt_id"]),
+                        "tenderplan_review_closure": tenderplan_closures.get(row["attempt_id"]),
                     }
                     for row in rows
                 )
@@ -1961,10 +1968,14 @@ def _snapshot(
     open_review_batches = sum(
         str(row["state"]) == "READY_FOR_REVIEW"
         and row["closed_at_utc"] is None
+        and row.get("tenderplan_review_closure") is None
         and row["deferred_review"] is None
         for row in rows
     )
-    closed_review_batches = sum(row["closed_at_utc"] is not None for row in rows)
+    closed_review_batches = sum(
+        row["closed_at_utc"] is not None or row.get("tenderplan_review_closure") is not None
+        for row in rows
+    )
     deferred_review_batches = sum(row["deferred_review"] is not None for row in rows)
     reconciled_uncertain_count = sum(
         row["tenderplan_failed_closed_reconciliation"] is not None for row in rows
@@ -1986,7 +1997,7 @@ def _snapshot(
             "source": str(row["source"]),
             "state": (
                 "CLOSED_LOCAL"
-                if row["closed_at_utc"] is not None
+                if row["closed_at_utc"] is not None or row.get("tenderplan_review_closure") is not None
                 else "DEFERRED_LOCAL"
                 if row["deferred_review"] is not None
                 else str(row["state"])
@@ -2226,6 +2237,15 @@ def _fenced_tenderplan_control(
                     reconciliation,
                 ):
                     raise SourceDiscoveryControlError("CONTROL_RECONCILIATION_REQUIRED")
+            # A decision can change before the native writer fence is acquired.
+            # Validate closure-derived WIP again while that fence is held.
+            if any(
+                _state_path(receipt["native_path"]) != native_path
+                for row in _rows(path, _connection=connection)
+                if (receipt := row.get("tenderplan_review_closure")) is not None
+            ):
+                raise SourceDiscoveryControlError("CONTROL_RECONCILIATION_REQUIRED")
+            raw_control = _snapshot(path, wip_limit, _connection=connection)
             control = (
                 _tenderplan_scoped_control(
                     raw_control,
@@ -2349,7 +2369,7 @@ def _fenced_source_reconciliation_control(
             connection = _open_existing_local_fence(path)
         if (
             _regular_file_identity(path) != controller_identity
-            or _control_schema_version(connection) != 8
+            or _control_schema_version(connection) not in {8, 9}
             or str(connection.execute("PRAGMA journal_mode").fetchone()[0]).lower() != "delete"
             or tenderplan_store_path is None
         ):
@@ -2445,6 +2465,17 @@ def _fenced_source_reconciliation_control(
                             set(failed_closed) | set(no_dispatch))):
                     raise SourceDiscoveryControlError("CONTROL_RECONCILIATION_REQUIRED")
                 acknowledged_count = len(actual_refs)
+            # The initial snapshot precedes the native fence. It must not admit
+            # stale closure-derived WIP if a review decision changed meanwhile.
+            if any(
+                _state_path(receipt["native_path"]) != native_path
+                for row in _rows(path, _connection=connection)
+                if (receipt := row.get("tenderplan_review_closure")) is not None
+            ):
+                raise SourceDiscoveryControlError("CONTROL_RECONCILIATION_REQUIRED")
+            raw_control = _snapshot(
+                path, wip_limit, _connection=connection, _lab_connection=_lab_connection
+            )
             scoped = _source_scoped_control(
                 raw_control,
                 reconciled_count=len(failed_closed) + len(no_dispatch),
@@ -2543,7 +2574,7 @@ def _source_discovery_tenderplan_failed_closed_reconciliation_core(
             raise SourceDiscoveryControlError("CONTROL_STATE_INTEGRITY_FAILED")
         _assert_no_sqlite_sidecars(path)
         version = _control_schema_version(connection)
-        if version not in {5, 6, 7, 8}:
+        if version not in {5, 6, 7, 8, 9}:
             raise SourceDiscoveryControlError("CONTROL_RECONCILIATION_REQUIRED")
         current_controller_file_sha256 = _file_sha256(path)
         if current_controller_file_sha256 != expected_controller_file_sha256:
@@ -2690,7 +2721,7 @@ def _source_discovery_tenderplan_failed_closed_reconciliation_core(
                 version = 6
             if version == 6:
                 _install_tenderplan_failed_closed_reconciliation_schema(connection)
-            if _control_schema_version(connection) not in {7, 8}:
+            if _control_schema_version(connection) not in {7, 8, 9}:
                 raise SourceDiscoveryControlError("CONTROL_STATE_INTEGRITY_FAILED")
             columns = tuple(key for key in proof if key != "proof_version") + (
                 "proof_sha256",
@@ -3289,6 +3320,7 @@ def _reserve(
         require_existing=expected_source_reconciliation_set_sha256 is not None,
     )
     lab_connection: sqlite3.Connection | None = None
+    closure_fences = ExitStack()
     try:
         connection.execute("BEGIN IMMEDIATE")
         validated_rows = _rows(path, _connection=connection)
@@ -3307,6 +3339,11 @@ def _reserve(
             for row in validated_rows
             if row["tenderplan_failed_closed_reconciliation"] is not None
         }
+        if (expected_source_reconciliation_set_sha256 is None
+                and not (source is SourceDiscoverySource.TENDERPLAN and reconciliations)):
+            from lead_factory.tenderplan_review_closure import fence_closed_native_stores
+            closure_fences.enter_context(fence_closed_native_stores(connection))
+            validated_rows = _rows(path, _connection=connection)
         if expected_source_reconciliation_set_sha256 is not None:
             with _fenced_source_reconciliation_control(
                 path, wip_limit,
@@ -3416,6 +3453,7 @@ def _reserve(
             sum(
                 str(row["state"]) == "READY_FOR_REVIEW"
                 and row["closed_at_utc"] is None
+                and row.get("tenderplan_review_closure") is None
                 and str(row["attempt_id"]) not in deferred_attempts
                 for row in rows
             )
@@ -3453,6 +3491,7 @@ def _reserve(
             pass
         raise SourceDiscoveryControlError("CONTROL_STATE_UNAVAILABLE") from None
     finally:
+        closure_fences.close()
         if lab_connection is not None:
             lab_connection.close()
         connection.close()
@@ -3800,7 +3839,7 @@ def _finish(
                 f"INSERT INTO source_discovery_tenderplan_bindings({','.join(columns)}) VALUES({','.join('?' for _ in columns)})",
                 tuple(persisted[key] for key in columns),
             )
-        if connection.execute("PRAGMA user_version").fetchone()[0] in {5, 6, 7, 8}:
+        if connection.execute("PRAGMA user_version").fetchone()[0] in {5, 6, 7, 8, 9}:
             _validate_tenderplan_bindings(connection)
         _rows(path, _connection=connection)
         connection.execute("COMMIT")
@@ -4032,7 +4071,7 @@ def _defer_source_discovery_review_core(
                 f"SELECT * FROM {_REVIEW_DEFERRALS} WHERE idempotency_key=?",
                 (idem,),
             ).fetchone()
-            if version in {6, 7, 8}
+            if version in {6, 7, 8, 9}
             else None
         )
         body = {
@@ -4074,7 +4113,7 @@ def _defer_source_discovery_review_core(
                 for operation in ("UPDATE", "DELETE"):
                     connection.execute(_append_only_trigger_sql(_REVIEW_DEFERRALS, operation))
                 connection.execute("PRAGMA user_version=6")
-            if _control_schema_version(connection) not in {6, 7, 8}:
+            if _control_schema_version(connection) not in {6, 7, 8, 9}:
                 raise SourceDiscoveryControlError("CONTROL_STATE_INTEGRITY_FAILED")
             connection.execute(
                 f"""INSERT INTO {_REVIEW_DEFERRALS}(
@@ -4133,7 +4172,7 @@ def _defer_source_discovery_review_core(
             snapshot,
             state="DEFERRED_LOCAL",
             created=created,
-            schema_version=version if version in {7, 8} else 6,
+            schema_version=version if version in {7, 8, 9} else 6,
             command_sha256=command_sha256,
         ),
         "control": _snapshot(path, SOURCE_DISCOVERY_DEFAULT_WIP_LIMIT),
@@ -4191,8 +4230,10 @@ def close_source_discovery_review(
     actor: str,
     evidence_ref: str,
     idempotency_key: str,
+    tenderplan_store_path: str | Path | None = None,
+    expected_tenderplan_preview_sha256: str | None = None,
 ) -> dict[str, object]:
-    """Close one fully decided Yandex link batch; performs local I/O only."""
+    """Close one fully classified source batch; performs local I/O only."""
 
     if confirmation != SOURCE_DISCOVERY_LOCAL_CLOSE_CONFIRMATION:
         raise SourceDiscoveryControlError("LOCAL_CLOSE_CONFIRMATION_REQUIRED")
@@ -4209,6 +4250,18 @@ def close_source_discovery_review(
     lab_path_sha256 = _source_lab_path_sha256(lab_path)
     rows = _rows(path)
     selected = next((row for row in rows if str(row["attempt_id"]) == attempt), None)
+    if selected is not None and selected["source"] == SourceDiscoverySource.TENDERPLAN.value:
+        if tenderplan_store_path is None or expected_tenderplan_preview_sha256 is None:
+            raise SourceDiscoveryControlError("LOCAL_REVIEW_PIN_MISMATCH")
+        from lead_factory.tenderplan_review_closure import close_batch
+        return close_batch(
+            attempt_id=attempt, state_path=path, native_path=tenderplan_store_path,
+            expected_preview_sha256=expected_tenderplan_preview_sha256,
+            actor=operator, evidence_ref=evidence, idempotency_key=idem,
+            confirmation=confirmation,
+        )
+    if tenderplan_store_path is not None or expected_tenderplan_preview_sha256 is not None:
+        raise SourceDiscoveryControlError("LOCAL_REVIEW_PIN_MISMATCH")
     if (
         selected is None
         or str(selected["source"]) != SourceDiscoverySource.YANDEX.value
