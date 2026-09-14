@@ -49,7 +49,7 @@ from lead_factory.tenderplan_read_only_diagnostics import (
     TenderPlanReadOnlyObservationStage,
     append_tenderplan_read_only_diagnostic_best_effort,
 )
-from lead_factory.tenderplan_response_failure_detail import ResponseFailureDetailV1
+from lead_factory.tenderplan_response_failure_detail import ResponseFailureDetailV1, ResponseFailureDetailV2
 from lead_factory.tenderplan_response_failure_store import (
     append_tenderplan_response_failure_best_effort,
 )
@@ -384,7 +384,7 @@ def _record_uncertain_diagnostic_best_effort(
     observation_stage: TenderPlanReadOnlyObservationStage,
     enabled: bool,
     clock: Callable[[], datetime],
-    response_failure_detail: ResponseFailureDetailV1 | None = None,
+    response_failure_detail: ResponseFailureDetailV1 | ResponseFailureDetailV2 | None = None,
 ) -> None:
     # The main queue must commit UNCERTAIN first.  This separate sidecar is
     # best-effort evidence only and can never change the public outcome or
@@ -411,7 +411,7 @@ def _record_uncertain_diagnostic_best_effort(
     if response_failure_detail is not None:
         try:
             if (
-                type(response_failure_detail) is ResponseFailureDetailV1
+                type(response_failure_detail) in (ResponseFailureDetailV1, ResponseFailureDetailV2)
                 and response_failure_detail.run_id == run_id
                 and diagnostic_code is TenderPlanReadOnlyDiagnosticCode.WORKER_RESPONSE_VALIDATION
                 and observation_stage is TenderPlanReadOnlyObservationStage.WORKER_POST_RESPONSE

@@ -23,6 +23,7 @@ from lead_factory import tenderplan_account_connection as account
 from lead_factory import tenderplan_read_only_intake as intake
 from lead_factory import tenderplan_read_only_store as native
 from lead_factory import tenderplan_read_only_transport as transport
+from tests.test_lead_factory_tenderplan_read_only_projection import _tender
 from tests.test_lead_factory_tenderplan_account_connection import _write as write_profile
 from tests.test_lead_factory_tenderplan_account_transition_store import make_transition_fixture
 from tests.test_lead_factory_tenderplan_read_only_transport import (
@@ -33,7 +34,9 @@ from tests.test_lead_factory_tenderplan_read_only_transport import (
 
 
 @pytest.mark.skipif(os.name != "nt", reason="Windows sealed worker contract")
-@pytest.mark.parametrize("failure", ["unknown_outer_field", "batch_failure"])
+@pytest.mark.parametrize("failure", [
+    "unknown_outer_field", "batch_failure", "unknown_tender_field", "invalid_tender_field",
+])
 def test_response_detail_survives_actual_worker_ipc_and_intake(
     tmp_path, monkeypatch, sealed_python_runtime, failure,  # noqa: F811
 ):
@@ -69,6 +72,11 @@ def test_response_detail_survives_actual_worker_ipc_and_intake(
     response = {"count": 0, "tenders": []}
     if failure == "unknown_outer_field":
         response[body_sentinel] = "SYNTHETIC PRIVATE CUSTOMER SENTINEL"
+    elif failure in {"unknown_tender_field", "invalid_tender_field"}:
+        key = "providerMetadata" if failure == "unknown_tender_field" else "private-invalid-key"
+        response = {"count": 2, "tenders": [_tender(0), _tender(1, **{
+            key: {"hidden": body_sentinel},
+        })]}
     response_body = json.dumps(response, separators=(",", ":")).encode("ascii")
 
     # The unmodified child still verifies the native INTENT, commits CLAIM,
@@ -162,20 +170,33 @@ _build_batch = _synthetic_batch_failure
     detail = result["detail"]
     assert detail is not None
     assert wire["detail"] == detail
-    assert set(detail) == {
+    detail_fields = {
         "schema", "run_id", "intent_record_sha256", "request_sha256", "stage", "rule", "field",
         "http_status", "body_bytes", "provider_reported_count", "returned_count", "projected_count",
     }
+    if failure in {"unknown_tender_field", "invalid_tender_field"}:
+        detail_fields.add("unsupported_tender_fields")
+        assert detail["schema"] == "tenderplan-response-failure-detail-v2"
+        assert detail["unsupported_tender_fields"] == {
+            "tender_index": 1, "extra_field_count": 1,
+            "names_status": "COMPLETE" if failure == "unknown_tender_field" else "IDENTIFIER_INVALID",
+            "names": ["providerMetadata"] if failure == "unknown_tender_field" else [],
+        }
+    else:
+        assert detail["schema"] == "tenderplan-response-failure-detail-v1"
+    assert set(detail) == detail_fields
     assert detail["run_id"] == run_id
     assert detail["http_status"] == 200
     assert detail["body_bytes"] == len(response_body)
-    assert detail["provider_reported_count"] == detail["returned_count"] == 0
-    assert (detail["stage"], detail["rule"], detail["field"]) == (
-        ("PROJECTION", "ROOT_FIELD_UNSUPPORTED", "ROOT")
-        if failure == "unknown_outer_field"
-        else ("BATCH", "UNCLASSIFIED_INTERNAL_FAILURE", "NONE")
-    )
-    assert detail["projected_count"] == (None if failure == "unknown_outer_field" else 0)
+    assert detail["provider_reported_count"] == detail["returned_count"] == response["count"]
+    expected_rule = {
+        "unknown_outer_field": ("PROJECTION", "ROOT_FIELD_UNSUPPORTED", "ROOT"),
+        "batch_failure": ("BATCH", "UNCLASSIFIED_INTERNAL_FAILURE", "NONE"),
+        "unknown_tender_field": ("PROJECTION", "TENDER_FIELD_UNSUPPORTED", "TENDERS"),
+        "invalid_tender_field": ("PROJECTION", "TENDER_FIELD_UNSUPPORTED", "TENDERS"),
+    }[failure]
+    assert (detail["stage"], detail["rule"], detail["field"]) == expected_rule
+    assert detail["projected_count"] == (0 if failure == "batch_failure" else None)
     for gate in (
         "retry_eligible", "automatic_schedule_eligible", "live_release_eligible",
         "authorizes_reconciliation",
@@ -229,7 +250,8 @@ _build_batch = _synthetic_batch_failure
         + (str(caught.value) + repr(caught.value)).encode("utf-8")
         + "".join(traceback.format_exception(caught.type, caught.value, caught.tb)).encode("utf-8")
     )
-    for sentinel in (query, body_sentinel, credential_sentinel, exception_sentinel, "SYNTHETIC PRIVATE CUSTOMER SENTINEL"):
+    for sentinel in (query, body_sentinel, credential_sentinel, exception_sentinel,
+                     "SYNTHETIC PRIVATE CUSTOMER SENTINEL", "private-invalid-key"):
         encoded = sentinel.encode("ascii")
         for representation in (encoded, base64.b64encode(encoded), encoded.hex().encode("ascii")):
             assert representation not in public_material

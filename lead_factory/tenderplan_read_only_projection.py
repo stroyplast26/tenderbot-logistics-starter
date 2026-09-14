@@ -619,10 +619,18 @@ def _customer_names(value: object) -> tuple[str, ...]:
     return tuple(names)
 
 
-def _build_card(tender: dict[str, object]) -> TenderPlanReadOnlyCard:
+def _build_card(
+    tender: dict[str, object], *, diagnostic_context: ProjectionFailureContext | None = None,
+    tender_index: int | None = None,
+) -> TenderPlanReadOnlyCard:
     if not _REQUIRED_TENDER_FIELDS <= set(tender):
         raise TenderPlanReadOnlyProjectionValidationError(rule=FailureRule.TENDER_REQUIRED_FIELD_MISSING, field=FailureField.TENDERS)
     if not set(tender) <= TENDERPLAN_READ_ONLY_OFFICIAL_TENDER_FIELDS:
+        if diagnostic_context is not None and tender_index is not None:
+            diagnostic_context.observe_unsupported_tender_fields(
+                tender_index=tender_index,
+                extra_names=set(tender) - TENDERPLAN_READ_ONLY_OFFICIAL_TENDER_FIELDS,
+            )
         raise TenderPlanReadOnlyProjectionValidationError(rule=FailureRule.TENDER_FIELD_UNSUPPORTED, field=FailureField.TENDERS)
     tender_id_value = tender["_id"]
     if (
@@ -768,10 +776,10 @@ def project_tenderplan_read_only_response(
         raise TenderPlanReadOnlyProjectionValidationError(rule=FailureRule.PROVIDER_COUNT_INCONSISTENT, field=FailureField.COUNT)
     cards: list[TenderPlanReadOnlyCard] = []
     identities: set[str] = set()
-    for tender in tenders:
+    for tender_index, tender in enumerate(tenders):
         if type(tender) is not dict:
             raise TenderPlanReadOnlyProjectionValidationError(rule=FailureRule.TENDER_TYPE_INVALID, field=FailureField.TENDERS)
-        card = _build_card(tender)
+        card = _build_card(tender, diagnostic_context=diagnostic_context, tender_index=tender_index)
         if card.identity_sha256 in identities:
             raise TenderPlanReadOnlyProjectionValidationError(rule=FailureRule.DUPLICATE_IDENTITY, field=FailureField.TENDERS)
         identities.add(card.identity_sha256)

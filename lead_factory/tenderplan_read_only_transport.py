@@ -89,10 +89,13 @@ from lead_factory.tenderplan_read_only_projection import (  # noqa: E402
 from lead_factory.tenderplan_response_failure_detail import (  # noqa: E402
     ProjectionFailureContext,
     ResponseFailureDetailV1,
+    ResponseFailureDetailV2,
+    RESPONSE_FAILURE_DETAIL_VERSION_V2,
     ResponseFailureDetailValidationError,
     ResponseFailureField,
     ResponseFailureRule,
     ResponseFailureStage,
+    parse_response_failure_detail,
 )
 from lead_factory.tenderplan_read_only_store import (  # noqa: E402
     TENDERPLAN_READ_ONLY_QUEUE_PATH,
@@ -184,7 +187,7 @@ class _WorkerDiagnosticFailure(TenderPlanIsolatedValidationError):
 
     def __init__(
         self, worker_code: str,
-        *, response_failure_detail: ResponseFailureDetailV1 | None = None,
+        *, response_failure_detail: ResponseFailureDetailV1 | ResponseFailureDetailV2 | None = None,
     ) -> None:
         if type(worker_code) is not str or worker_code not in _WORKER_ERROR_CODES:
             raise TenderPlanIsolatedValidationError(
@@ -192,7 +195,7 @@ class _WorkerDiagnosticFailure(TenderPlanIsolatedValidationError):
             )
         self.worker_code = worker_code
         if response_failure_detail is not None:
-            if worker_code != "response_validation" or type(response_failure_detail) is not ResponseFailureDetailV1:
+            if worker_code != "response_validation" or type(response_failure_detail) not in (ResponseFailureDetailV1, ResponseFailureDetailV2):
                 raise TenderPlanIsolatedValidationError("TenderPlan worker detail is invalid")
             response_failure_detail.to_mapping()
         self.response_failure_detail = response_failure_detail
@@ -206,7 +209,7 @@ class TenderPlanReadOnlyDiagnosticUncertain(TenderPlanIsolatedUncertain):
         self,
         diagnostic_code: TenderPlanReadOnlyDiagnosticCode,
         observation_stage: TenderPlanReadOnlyObservationStage,
-        *, response_failure_detail: ResponseFailureDetailV1 | None = None,
+        *, response_failure_detail: ResponseFailureDetailV1 | ResponseFailureDetailV2 | None = None,
     ) -> None:
         if type(diagnostic_code) is not TenderPlanReadOnlyDiagnosticCode:
             raise TenderPlanIsolatedValidationError(
@@ -220,7 +223,7 @@ class TenderPlanReadOnlyDiagnosticUncertain(TenderPlanIsolatedUncertain):
         self.observation_stage = observation_stage
         if response_failure_detail is not None:
             if (
-                type(response_failure_detail) is not ResponseFailureDetailV1
+                type(response_failure_detail) not in (ResponseFailureDetailV1, ResponseFailureDetailV2)
                 or diagnostic_code is not TenderPlanReadOnlyDiagnosticCode.WORKER_RESPONSE_VALIDATION
                 or observation_stage is not TenderPlanReadOnlyObservationStage.WORKER_POST_RESPONSE
             ):
@@ -733,14 +736,14 @@ def _strict_object(raw: bytes) -> dict[str, object]:
 
 
 def _worker_error(
-    code: str, *, response_failure_detail: ResponseFailureDetailV1 | None = None,
+    code: str, *, response_failure_detail: ResponseFailureDetailV1 | ResponseFailureDetailV2 | None = None,
 ) -> bytes:
     if type(code) is not str or code not in _WORKER_ERROR_CODES:
         raise TenderPlanIsolatedValidationError(
             "TenderPlan read-only worker diagnostic is invalid"
         )
     if response_failure_detail is not None:
-        if code != "response_validation" or type(response_failure_detail) is not ResponseFailureDetailV1:
+        if code != "response_validation" or type(response_failure_detail) not in (ResponseFailureDetailV1, ResponseFailureDetailV2):
             raise TenderPlanIsolatedValidationError("TenderPlan worker detail is invalid")
         return _canonical_bytes({
             "error": code, "ok": False,
@@ -1085,13 +1088,13 @@ def _response_failure_detail(
     stage: ResponseFailureStage,
     rule: ResponseFailureRule,
     field: ResponseFailureField = ResponseFailureField.NONE,
-) -> ResponseFailureDetailV1 | None:
+) -> ResponseFailureDetailV1 | ResponseFailureDetailV2 | None:
     # Evidence collection must never replace the original coarse uncertainty.
     # Do not inspect arbitrary objects, exception text, headers, or body content.
     try:
         status = response.status_code if type(response) is TenderPlanIsolatedResponse else None
         body = response.body if type(response) is TenderPlanIsolatedResponse else None
-        return ResponseFailureDetailV1(
+        detail = ResponseFailureDetailV1(
             run_id=values["run_id"],
             intent_record_sha256=values["intent_record_sha256"],
             request_sha256=values["request_sha256"],
@@ -1100,6 +1103,16 @@ def _response_failure_detail(
             body_bytes=len(body) if type(body) is bytes and len(body) <= TENDERPLAN_READ_ONLY_MAX_RESPONSE_BYTES else None,
             **context.snapshot(),
         )
+        if (stage is ResponseFailureStage.PROJECTION
+                and rule is ResponseFailureRule.TENDER_FIELD_UNSUPPORTED
+                and field is ResponseFailureField.TENDERS):
+            unsupported = context.unsupported_tender_fields()
+            if unsupported is not None:
+                return ResponseFailureDetailV2.from_mapping({
+                    **detail.to_mapping(), "schema": RESPONSE_FAILURE_DETAIL_VERSION_V2,
+                    "unsupported_tender_fields": unsupported.to_mapping(),
+                })
+        return detail
     except BaseException:
         return None
 
@@ -1410,7 +1423,7 @@ def _decode_worker_response(
                 or envelope["error"] != "response_validation"
             ):
                 raise ResponseFailureDetailValidationError
-            detail = ResponseFailureDetailV1.from_mapping(envelope["detail"])
+            detail = parse_response_failure_detail(envelope["detail"])
             if any(
                 getattr(detail, name) != expected.get(name)
                 for name in ("run_id", "intent_record_sha256", "request_sha256")

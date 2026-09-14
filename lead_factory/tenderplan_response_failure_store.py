@@ -19,7 +19,9 @@ import sqlite3
 import stat
 
 from lead_factory import tenderplan_read_only_store as native
-from lead_factory.tenderplan_response_failure_detail import ResponseFailureDetailV1
+from lead_factory.tenderplan_response_failure_detail import (
+    ResponseFailureDetailV1, ResponseFailureDetailV2, parse_response_failure_detail,
+)
 
 
 _PROTOCOL = "tenderplan-response-failure-store-v1"
@@ -162,7 +164,7 @@ def _records(connection: sqlite3.Connection, metadata: dict[str, str]) -> list[d
                          "detail", "binding"} | set(_FLAGS)
         if type(value) is not dict or set(value) != expected_keys:
             raise TenderPlanResponseFailureStoreError
-        detail = ResponseFailureDetailV1.from_mapping(value["detail"]).to_mapping()
+        detail = parse_response_failure_detail(value["detail"]).to_mapping()
         binding = value["binding"]
         if type(binding) is not dict or set(binding) != {
             "main_store_identity_sha256", "main_uncertain_event_sha256",
@@ -195,14 +197,14 @@ def _records(connection: sqlite3.Connection, metadata: dict[str, str]) -> list[d
 
 
 def append_tenderplan_response_failure_best_effort(
-    *, detail: ResponseFailureDetailV1, main_store_path: str | Path,
+    *, detail: ResponseFailureDetailV1 | ResponseFailureDetailV2, main_store_path: str | Path,
     clock: Callable[[], datetime] | None = None,
 ) -> bool:
     """Append after native UNCERTAIN; exact replay succeeds, every failure is inert."""
     try:
-        if type(detail) is not ResponseFailureDetailV1:
+        if type(detail) not in (ResponseFailureDetailV1, ResponseFailureDetailV2):
             return False
-        payload = ResponseFailureDetailV1.from_mapping(detail.to_mapping()).to_mapping()
+        payload = parse_response_failure_detail(detail.to_mapping()).to_mapping()
         main = _plain(main_store_path, existing=True)
         binding = _binding(main, payload["run_id"])
         if any(payload[key] != binding[key] for key in ("intent_record_sha256", "request_sha256")):

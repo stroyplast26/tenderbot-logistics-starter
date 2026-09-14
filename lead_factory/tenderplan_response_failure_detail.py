@@ -1,17 +1,19 @@
 """Strict zero-authority metadata for response-validation diagnostics.
 
-Only fixed enum values, existing request digests and bounded observations may
-cross this boundary. Provider text, bodies and exception objects have no field.
+Only fixed enums, existing request digests, bounded observations and validated
+schema field identifiers may cross this boundary. Field values, response bodies
+and exception text or objects have no field.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field as dataclass_field
+from dataclasses import dataclass, field as dataclass_field, fields as dataclass_fields
 from enum import Enum
 import re
 from typing import Final
 
 
 RESPONSE_FAILURE_DETAIL_VERSION: Final = "tenderplan-response-failure-detail-v1"
+RESPONSE_FAILURE_DETAIL_VERSION_V2: Final = "tenderplan-response-failure-detail-v2"
 
 
 class ResponseFailureStage(str, Enum):
@@ -180,14 +182,16 @@ class ResponseFailureDetailV1:
 
 @dataclass(slots=True, repr=False)
 class ProjectionFailureContext:
-    """One invocation's typed observations; contains no input or exception."""
+    """One invocation's counts and schema identifiers; no field values or exceptions."""
 
     _provider_reported_count: int | None = dataclass_field(default=None, init=False)
     _returned_count: int | None = dataclass_field(default=None, init=False)
     _projected_count: int | None = dataclass_field(default=None, init=False)
+    _unsupported_tender_fields: UnsupportedTenderFields | None = dataclass_field(default=None, init=False)
 
     def reset(self) -> None:
         self._provider_reported_count = self._returned_count = self._projected_count = None
+        self._unsupported_tender_fields = None
 
     def observe_provider_count(self, value: int) -> None:
         self._provider_reported_count = _observation("provider_reported_count", value)
@@ -201,12 +205,139 @@ class ProjectionFailureContext:
     def snapshot(self) -> dict[str, int | None]:
         return {name: _observation(name, getattr(self, "_" + name)) for name in _COUNT_BOUNDS}
 
+    def observe_unsupported_tender_fields(self, *, tender_index: int, extra_names: set[str]) -> None:
+        # Only the first rejected tender is described. No input value is retained.
+        if self._unsupported_tender_fields is None:
+            self._unsupported_tender_fields = UnsupportedTenderFields.from_names(
+                tender_index=tender_index, extra_names=extra_names)
+
+    def unsupported_tender_fields(self) -> UnsupportedTenderFields | None:
+        value = self._unsupported_tender_fields
+        if value is not None:
+            if type(value) is not UnsupportedTenderFields:
+                raise ResponseFailureDetailValidationError
+            value.to_mapping()
+        return value
+
     def __repr__(self) -> str:
         return "ProjectionFailureContext(observations=<bounded-counts>)"
+
+
+class UnsupportedFieldNamesStatus(str, Enum):
+    COMPLETE = "COMPLETE"
+    IDENTIFIER_INVALID = "IDENTIFIER_INVALID"
+    LIMIT_EXCEEDED = "LIMIT_EXCEEDED"
+
+
+@dataclass(frozen=True, slots=True, kw_only=True, repr=False)
+class UnsupportedTenderFields:
+    """The first rejected tender's bounded field names, never their values."""
+
+    tender_index: int
+    extra_field_count: int
+    names_status: UnsupportedFieldNamesStatus
+    names: tuple[str, ...] = ()
+
+    def __post_init__(self) -> None:
+        if (type(self.tender_index) is not int or not 0 <= self.tender_index < 500
+                or type(self.extra_field_count) is not int or not 1 <= self.extra_field_count <= 50_000
+                or type(self.names_status) is not UnsupportedFieldNamesStatus
+                or type(self.names) is not tuple):
+            raise ResponseFailureDetailValidationError
+        if self.names_status is UnsupportedFieldNamesStatus.COMPLETE:
+            if (not 1 <= len(self.names) <= 16 or len(self.names) != self.extra_field_count
+                    or any(type(name) is not str or re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]{0,63}", name) is None for name in self.names)
+                    or tuple(sorted(set(self.names))) != self.names
+                    or sum(len(name) for name in self.names) > 1024):
+                raise ResponseFailureDetailValidationError
+        elif self.names or ((self.names_status is UnsupportedFieldNamesStatus.LIMIT_EXCEEDED)
+                            != (self.extra_field_count > 16)):
+            raise ResponseFailureDetailValidationError
+
+    @classmethod
+    def from_names(cls, *, tender_index: int, extra_names: set[str]) -> UnsupportedTenderFields:
+        if type(extra_names) is not set or not extra_names:
+            raise ResponseFailureDetailValidationError
+        count = len(extra_names)
+        if count > 16:
+            status, names = UnsupportedFieldNamesStatus.LIMIT_EXCEEDED, ()
+        elif any(type(name) is not str or re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]{0,63}", name) is None for name in extra_names):
+            status, names = UnsupportedFieldNamesStatus.IDENTIFIER_INVALID, ()
+        else:
+            status, names = UnsupportedFieldNamesStatus.COMPLETE, tuple(sorted(extra_names))
+        return cls(tender_index=tender_index, extra_field_count=count, names_status=status, names=names)
+
+    def to_mapping(self) -> dict[str, object]:
+        self.__post_init__()
+        return {"tender_index": self.tender_index, "extra_field_count": self.extra_field_count,
+                "names_status": self.names_status.value, "names": list(self.names)}
+
+    @classmethod
+    def from_mapping(cls, value: object) -> UnsupportedTenderFields:
+        if (type(value) is not dict or set(value) != {"tender_index", "extra_field_count", "names_status", "names"}
+                or type(value["names_status"]) is not str or type(value["names"]) is not list):
+            raise ResponseFailureDetailValidationError
+        try:
+            status = UnsupportedFieldNamesStatus(value["names_status"])
+        except ValueError:
+            raise ResponseFailureDetailValidationError from None
+        return cls(tender_index=value["tender_index"], extra_field_count=value["extra_field_count"],
+                   names_status=status, names=tuple(value["names"]))
+
+    def __repr__(self) -> str:
+        return "UnsupportedTenderFields(metadata=<bounded-field-names>)"
+
+
+@dataclass(frozen=True, slots=True, kw_only=True, repr=False)
+class ResponseFailureDetailV2(ResponseFailureDetailV1):
+    unsupported_tender_fields: UnsupportedTenderFields
+
+    def __post_init__(self) -> None:
+        ResponseFailureDetailV1.__post_init__(self)
+        if (self.stage is not ResponseFailureStage.PROJECTION
+                or self.rule is not ResponseFailureRule.TENDER_FIELD_UNSUPPORTED
+                or self.field is not ResponseFailureField.TENDERS
+                or type(self.unsupported_tender_fields) is not UnsupportedTenderFields
+                or self.returned_count is None or self.returned_count > 500
+                or self.projected_count is not None):
+            raise ResponseFailureDetailValidationError
+        self.unsupported_tender_fields.to_mapping()
+        if self.unsupported_tender_fields.tender_index >= self.returned_count:
+            raise ResponseFailureDetailValidationError
+
+    def to_mapping(self) -> dict[str, object]:
+        return {**ResponseFailureDetailV1.to_mapping(self), "schema": RESPONSE_FAILURE_DETAIL_VERSION_V2,
+                "unsupported_tender_fields": self.unsupported_tender_fields.to_mapping()}
+
+    @classmethod
+    def from_mapping(cls, value: object) -> ResponseFailureDetailV2:
+        if (type(value) is not dict or set(value) != _FIELDS | {"unsupported_tender_fields"}
+                or value.get("schema") != RESPONSE_FAILURE_DETAIL_VERSION_V2):
+            raise ResponseFailureDetailValidationError
+        base = ResponseFailureDetailV1.from_mapping({
+            **{key: value[key] for key in _FIELDS}, "schema": RESPONSE_FAILURE_DETAIL_VERSION})
+        return cls(**{field.name: getattr(base, field.name) for field in dataclass_fields(ResponseFailureDetailV1)},
+                   unsupported_tender_fields=UnsupportedTenderFields.from_mapping(value["unsupported_tender_fields"]))
+
+    def __repr__(self) -> str:
+        return "ResponseFailureDetailV2(metadata=<validated-field-names-and-counts>, authority=False)"
+
+
+def parse_response_failure_detail(value: object) -> ResponseFailureDetailV1 | ResponseFailureDetailV2:
+    """Dispatch exact versioned shapes without changing the V1 reader contract."""
+    if type(value) is not dict:
+        raise ResponseFailureDetailValidationError
+    if value.get("schema") == RESPONSE_FAILURE_DETAIL_VERSION:
+        return ResponseFailureDetailV1.from_mapping(value)
+    if value.get("schema") == RESPONSE_FAILURE_DETAIL_VERSION_V2:
+        return ResponseFailureDetailV2.from_mapping(value)
+    raise ResponseFailureDetailValidationError
 
 
 __all__ = [
     "RESPONSE_FAILURE_DETAIL_VERSION", "ResponseFailureStage", "ResponseFailureRule",
     "ResponseFailureField", "ResponseFailureDetailValidationError", "ResponseFailureDetailV1",
     "ProjectionFailureContext",
+    "RESPONSE_FAILURE_DETAIL_VERSION_V2", "ResponseFailureDetailV2",
+    "UnsupportedFieldNamesStatus", "UnsupportedTenderFields", "parse_response_failure_detail",
 ]
