@@ -9,7 +9,7 @@ outbox, contact, advertising-spend, or scheduler integration.
 from __future__ import annotations
 
 from collections.abc import Iterator
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager
 from datetime import datetime, timezone
 from enum import Enum
 import hashlib
@@ -1665,8 +1665,13 @@ def _rows(
                         row["state"] == "UNCERTAIN" and row["attempt_id"] not in reconciled_ids
                         for row in attempts
                     )
-                    if (running_count > 1 or active_uncertain_count > 1
-                            or (running_count and active_uncertain_count)):
+                    # V8 can retain explicitly acknowledged historical read
+                    # failures beside a fresh attempt. Raw snapshots still block
+                    # on every UNCERTAIN; only the exact fenced context admits.
+                    if (running_count > 1 or (
+                            NO_DISPATCH_TABLE not in tables
+                            and (active_uncertain_count > 1
+                                 or (running_count and active_uncertain_count)))):
                         raise SourceDiscoveryControlError("CONTROL_STATE_INTEGRITY_FAILED")
                 append_only_tables = set(_APPEND_ONLY_TABLES).intersection(tables)
                 if append_only_tables and append_only_tables != set(_APPEND_ONLY_TABLES):
@@ -2261,8 +2266,11 @@ def _source_scoped_control(
     native_admission_set_sha256: str,
     native_file_sha256: str,
     wip_limit: int,
+    acknowledged_read_failure_count: int = 0,
+    native_read_failure_ack_set_sha256: str | None = None,
 ) -> dict[str, object]:
-    blocking_count = int(raw_control["uncertain_count"]) - reconciled_count
+    blocking_count = (int(raw_control["uncertain_count"]) - reconciled_count
+                      - acknowledged_read_failure_count)
     if blocking_count < 0:
         raise SourceDiscoveryControlError("CONTROL_STATE_INTEGRITY_FAILED")
     if blocking_count:
@@ -2273,7 +2281,7 @@ def _source_scoped_control(
         gate = "BLOCKED_BACKPRESSURE"
     else:
         gate = "ELIGIBLE_FOR_NEW_PROPOSAL"
-    return {
+    scoped = {
         **raw_control,
         "blocking_uncertain_count": blocking_count,
         "reconciled_uncertain_count": reconciled_count,
@@ -2288,6 +2296,12 @@ def _source_scoped_control(
         "automatic_schedule_eligible": False,
         "live_release_eligible": False,
     }
+    if native_read_failure_ack_set_sha256 is not None:
+        scoped.update({
+            "acknowledged_read_failure_count": acknowledged_read_failure_count,
+            "tenderplan_read_failure_ack_set_sha256": native_read_failure_ack_set_sha256,
+        })
+    return scoped
 
 
 @contextmanager
@@ -2312,6 +2326,9 @@ def _fenced_source_reconciliation_control(
         no_dispatch_admission_set_sha256,
     )
     from lead_factory import tenderplan_read_only_store as native_store
+    from lead_factory.source_discovery_read_failure_context import (
+        SourceReadFailureContextError, fence_source_read_failure_context,
+    )
 
     own_connection = _connection is None
     connection = _connection
@@ -2356,9 +2373,6 @@ def _fenced_source_reconciliation_control(
         mixed_set_sha256 = source_reconciliation_set_sha256(
             failed_closed, no_dispatch, native_set_sha256
         )
-        if (expected_source_reconciliation_set_sha256 is not None
-                and expected_source_reconciliation_set_sha256 != mixed_set_sha256):
-            raise SourceDiscoveryControlError("CONTROL_RECONCILIATION_REQUIRED")
         native_path = _state_path(tenderplan_store_path)
         _assert_no_sqlite_sidecars(native_path)
         native_identity = _regular_file_identity(native_path)
@@ -2366,12 +2380,32 @@ def _fenced_source_reconciliation_control(
         if (expected_tenderplan_store_file_sha256 is not None
                 and expected_tenderplan_store_file_sha256 != native_file_sha256):
             raise SourceDiscoveryControlError("CONTROL_RECONCILIATION_REQUIRED")
-        with native_store.fence_tenderplan_reconciled_bindings(
-            native_path,
-            failed_closed_run_ids=tuple(str(value["run_id"]) for value in failed_closed.values()),
-            expected_no_dispatch_admission_set_sha256=native_set_sha256,
-            expected_file_sha256=native_file_sha256,
-        ) as native:
+        with ExitStack() as fences:
+            context = fences.enter_context(fence_source_read_failure_context(
+                controller_path=path, native_store_path=native_path,
+                expected_source_reconciliation_set_sha256=expected_source_reconciliation_set_sha256,
+                controller_attempts=connection.execute(
+                    "SELECT * FROM source_discovery_attempts ORDER BY sequence"
+                ).fetchall(),
+            ))
+            ack_pin = None
+            scope_pin = mixed_set_sha256
+            if context is None:
+                if (expected_source_reconciliation_set_sha256 is not None
+                        and expected_source_reconciliation_set_sha256 != mixed_set_sha256):
+                    raise SourceDiscoveryControlError("CONTROL_RECONCILIATION_REQUIRED")
+            else:
+                if context["legacy_source_reconciliation_set_sha256"] != mixed_set_sha256:
+                    raise SourceDiscoveryControlError("CONTROL_RECONCILIATION_REQUIRED")
+                ack_pin = context["native_ack_set_sha256"]
+                scope_pin = expected_source_reconciliation_set_sha256
+            native = fences.enter_context(native_store.fence_tenderplan_reconciled_bindings(
+                native_path,
+                failed_closed_run_ids=tuple(str(value["run_id"]) for value in failed_closed.values()),
+                expected_no_dispatch_admission_set_sha256=native_set_sha256,
+                expected_file_sha256=native_file_sha256,
+                **({"expected_read_failure_ack_set_sha256": ack_pin} if ack_pin is not None else {}),
+            ))
             if (native["no_dispatch_admission_set_sha256"] != native_set_sha256
                     or native["native_file_sha256"] != native_file_sha256
                     or _regular_file_identity(native_path) != native_identity):
@@ -2394,13 +2428,32 @@ def _fenced_source_reconciliation_control(
                     comparison["native_schema_fingerprint_sha256"] = binding.schema_fingerprint_sha256
                 if not _native_binding_matches_reconciliation(binding, comparison):
                     raise SourceDiscoveryControlError("CONTROL_RECONCILIATION_REQUIRED")
+            acknowledged_count = 0
+            if context is not None:
+                acknowledgements = native["read_failure_acknowledgements"]
+                actual_refs = sorted([{
+                    "attempt_id": item["attempt_id"], "run_id": item["run_id"],
+                    "controller_attempt_sha256": item["controller_attempt_sha256"],
+                    "native_ack_record_sha256": item["record_sha256"],
+                    "proof_sha256": item["accepted_execution_evidence_sha256"],
+                } for item in acknowledgements], key=lambda item: item["attempt_id"])
+                if (native["read_failure_ack_set_sha256"] != ack_pin
+                        or actual_refs != context["acknowledgements"]
+                        or any(item["native_store_identity_sha256"]
+                               != context["native_store_identity_sha256"] for item in acknowledgements)
+                        or {item["attempt_id"] for item in actual_refs}.intersection(
+                            set(failed_closed) | set(no_dispatch))):
+                    raise SourceDiscoveryControlError("CONTROL_RECONCILIATION_REQUIRED")
+                acknowledged_count = len(actual_refs)
             scoped = _source_scoped_control(
                 raw_control,
                 reconciled_count=len(failed_closed) + len(no_dispatch),
-                reconciliation_set_sha256=mixed_set_sha256,
+                reconciliation_set_sha256=scope_pin,
                 native_admission_set_sha256=native_set_sha256,
                 native_file_sha256=native_file_sha256,
                 wip_limit=wip_limit,
+                acknowledged_read_failure_count=acknowledged_count,
+                native_read_failure_ack_set_sha256=ack_pin,
             )
             yield scoped, native_set_sha256
             _assert_no_sqlite_sidecars(native_path)
@@ -2410,7 +2463,7 @@ def _fenced_source_reconciliation_control(
                 raise SourceDiscoveryControlError("CONTROL_RECONCILIATION_REQUIRED")
     except SourceDiscoveryControlError:
         raise
-    except (TenderPlanReadOnlyStoreError, TenderPlanNoDispatchEvidenceError,
+    except (TenderPlanReadOnlyStoreError, TenderPlanNoDispatchEvidenceError, SourceReadFailureContextError,
             OSError, sqlite3.Error, TypeError, ValueError, KeyError, AttributeError):
         raise SourceDiscoveryControlError("CONTROL_RECONCILIATION_REQUIRED") from None
     finally:
@@ -2927,6 +2980,10 @@ def check_source_discovery(
             {"expected_no_dispatch_admission_set_sha256": native_admission_set_sha256}
             if exact_source_reconciliation else {}
         )
+        if "tenderplan_read_failure_ack_set_sha256" in control:
+            native_options["expected_read_failure_ack_set_sha256"] = (
+                control["tenderplan_read_failure_ack_set_sha256"]
+            )
         native = check_tenderplan_read_only_intake(
             registration_path=tenderplan_registration_path,
             store_path=tenderplan_store_path,
@@ -2960,6 +3017,8 @@ def check_source_discovery(
             "controller_snapshot_sha256": _digest(control),
             "scope": "FRESH_PROPOSAL_ONLY",
         })
+        if "tenderplan_read_failure_ack_set_sha256" in control:
+            report["tenderplan_read_failure_ack_set_sha256"] = control["tenderplan_read_failure_ack_set_sha256"]
     return report
 
 
@@ -4493,6 +4552,10 @@ def _run_source_discovery_once_core(
                 tenderplan_options["expected_no_dispatch_admission_set_sha256"] = (
                     check["tenderplan_no_dispatch_admission_set_sha256"]
                 )
+                if "tenderplan_read_failure_ack_set_sha256" in check:
+                    tenderplan_options["expected_read_failure_ack_set_sha256"] = (
+                        check["tenderplan_read_failure_ack_set_sha256"]
+                    )
             tenderplan_options.update(
                 {
                     "expected_account_transition_sha256": (expected_account_transition_sha256),
