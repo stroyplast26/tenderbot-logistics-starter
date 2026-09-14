@@ -278,6 +278,7 @@ def check_tenderplan_read_only_intake(
     registration_path: str | Path | None = None,
     store_path: str | Path | None = None,
     expected_no_dispatch_admission_set_sha256: str | None = None,
+    expected_read_failure_ack_set_sha256: str | None = None,
 ) -> dict[str, object]:
     """Inspect existing local readiness without credentials, writes, or repair.
 
@@ -325,6 +326,8 @@ def check_tenderplan_read_only_intake(
             {"expected_no_dispatch_admission_set_sha256": expected_no_dispatch_admission_set_sha256}
             if expected_no_dispatch_admission_set_sha256 is not None else {}
         )
+        if expected_read_failure_ack_set_sha256 is not None:
+            validation_options["expected_read_failure_ack_set_sha256"] = expected_read_failure_ack_set_sha256
         validated = validate_tenderplan_read_only_store(path, **validation_options)
     except TenderPlanReadOnlyStoreError:
         return report
@@ -343,6 +346,13 @@ def check_tenderplan_read_only_intake(
         states = validated["no_dispatch_admission_states"]
         report["no_dispatch_admission_states"] = states
         report["no_dispatch_admission_set_sha256"] = expected_no_dispatch_admission_set_sha256
+    if expected_read_failure_ack_set_sha256 is not None:
+        if (validated.get("read_failure_ack_set_sha256") != expected_read_failure_ack_set_sha256
+                or "read_failure_ack_states" not in validated):
+            return report
+        states = validated["read_failure_ack_states"]
+        report["read_failure_ack_states"] = states
+        report["read_failure_ack_set_sha256"] = expected_read_failure_ack_set_sha256
     if states[TenderPlanReadOnlyRunState.UNCERTAIN.value]:
         report["state"] = "BLOCKED_TENDERPLAN_UNCERTAIN"
     elif (
@@ -430,6 +440,7 @@ def run_tenderplan_read_only_intake(
     expected_credential_target_sha256: str | None = None,
     tenderplan_sealed_worker: TenderPlanSealedWorker | None = None,
     expected_no_dispatch_admission_set_sha256: str | None = None,
+    expected_read_failure_ack_set_sha256: str | None = None,
 ) -> TenderPlanReadOnlyIntakeResult:
     """Perform exactly one explicit read and queue only encrypted cards."""
 
@@ -523,6 +534,8 @@ def run_tenderplan_read_only_intake(
             {"expected_no_dispatch_admission_set_sha256": expected_no_dispatch_admission_set_sha256}
             if expected_no_dispatch_admission_set_sha256 is not None else {}
         )
+        if expected_read_failure_ack_set_sha256 is not None:
+            admission_options["expected_read_failure_ack_set_sha256"] = expected_read_failure_ack_set_sha256
         reservation = store.reserve_intent(
             intent,
             expected_account_transition_sha256=transition_pin,

@@ -15,7 +15,7 @@ append-only and current state is derived from their immutable history.
 from __future__ import annotations
 
 from collections.abc import Callable, Iterator, Mapping, Sequence
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from enum import Enum
@@ -42,6 +42,7 @@ from lead_factory.tenderplan_no_dispatch_evidence import (
     validate_no_dispatch_admission,
     verify_accepted_execution_provenance,
 )
+from lead_factory.tenderplan_read_failure_ack import fence_read_failure_ack_set
 
 
 TENDERPLAN_READ_ONLY_STORE_SCHEMA_VERSION: Final = 1
@@ -1716,6 +1717,7 @@ class TenderPlanReadOnlyStore:
         expected_connection_profile_record_sha256: str | None = None,
         expected_credential_target_sha256: str | None = None,
         expected_no_dispatch_admission_set_sha256: str | None = None,
+        expected_read_failure_ack_set_sha256: str | None = None,
     ) -> TenderPlanReadOnlyOperationReceipt:
         exact_account_pins = (
             expected_account_transition_sha256,
@@ -1737,7 +1739,9 @@ class TenderPlanReadOnlyStore:
             raise TenderPlanReadOnlyStoreValidationError
         intent_json = _canonical_json(intent)
         run_id = str(intent["run_id"])
-        with self._transaction(write=True) as connection:
+        transaction = (_existing_no_dispatch_transaction(self)
+                       if expected_read_failure_ack_set_sha256 is not None else self._transaction(write=True))
+        with ExitStack() as acknowledgement_fences, transaction as connection:
             # The long-standing transition-only pin remains supported.  Once
             # any exact active-account field is requested, the complete bundle
             # is required and checked under the same writer fence.
@@ -1768,6 +1772,12 @@ class TenderPlanReadOnlyStore:
             )
             admitted = _pinned_no_dispatch_runs_locked(
                 connection, self, expected_no_dispatch_admission_set_sha256)
+            acknowledgements = acknowledgement_fences.enter_context(
+                fence_read_failure_ack_set(connection, self, expected_read_failure_ack_set_sha256))
+            acknowledged = frozenset(record["run_id"] for record in acknowledgements)
+            if admitted.intersection(acknowledged):
+                raise TenderPlanReadOnlyStoreReconciliationRequired
+            admitted = admitted | acknowledged
             if run_id in admitted:
                 raise TenderPlanReadOnlyStoreReconciliationRequired
             unresolved = connection.execute(
@@ -1784,6 +1794,9 @@ class TenderPlanReadOnlyStore:
                 "SELECT * FROM tenderplan_read_only_operations WHERE run_id=?",
                 (run_id,),
             ).fetchone()
+            if expected_read_failure_ack_set_sha256 is not None and existing is not None:
+                # An acknowledgement admits a fresh manual intent, never replay.
+                raise TenderPlanReadOnlyStoreReconciliationRequired
             if any(str(row["run_id"]) not in admitted for row in unresolved):
                 raise TenderPlanReadOnlyStoreReconciliationRequired
             if existing:
@@ -1881,11 +1894,13 @@ class TenderPlanReadOnlyStore:
         *,
         expected_file_sha256: str,
         expected_no_dispatch_admission_set_sha256: str | None = None,
+        expected_read_failure_ack_set_sha256: str | None = None,
     ) -> Iterator[tuple[TenderPlanReadOnlyFailedClosedBinding, ...]]:
         """Hold one native fence while proving an exact set of stopped runs."""
 
         if (type(run_ids) is not tuple or len(set(run_ids)) != len(run_ids)
-                or (not run_ids and expected_no_dispatch_admission_set_sha256 is None)):
+                or (not run_ids and expected_no_dispatch_admission_set_sha256 is None
+                    and expected_read_failure_ack_set_sha256 is None)):
             raise TenderPlanReadOnlyStoreValidationError
         runs = tuple(_safe_id(run_id) for run_id in run_ids)
         if (
@@ -1899,7 +1914,9 @@ class TenderPlanReadOnlyStore:
             before = self.path.lstat()
         except OSError:
             raise TenderPlanReadOnlyStoreIntegrityError from None
-        with self._transaction(write=True) as connection:
+        transaction = (_existing_no_dispatch_transaction(self)
+                       if expected_read_failure_ack_set_sha256 is not None else self._transaction(write=True))
+        with ExitStack() as acknowledgement_fences, transaction as connection:
             _transition_plain_file(self.path)
             _assert_transition_no_sidecars(self.path)
             try:
@@ -1931,6 +1948,12 @@ class TenderPlanReadOnlyStore:
             ).fetchall()
             admitted = _pinned_no_dispatch_runs_locked(
                 connection, self, expected_no_dispatch_admission_set_sha256)
+            acknowledgements = acknowledgement_fences.enter_context(
+                fence_read_failure_ack_set(connection, self, expected_read_failure_ack_set_sha256))
+            acknowledged = frozenset(record["run_id"] for record in acknowledgements)
+            if admitted.intersection(acknowledged):
+                raise TenderPlanReadOnlyStoreReconciliationRequired
+            admitted = admitted | acknowledged
             active_unresolved = [row for row in unresolved
                                  if str(row["run_id"]) != legacy_run
                                  and str(row["run_id"]) not in admitted]
@@ -2631,6 +2654,7 @@ def verify_worker_intent(
 
 def validate_tenderplan_read_only_store(
     path: str | Path, *, expected_no_dispatch_admission_set_sha256: str | None = None,
+    expected_read_failure_ack_set_sha256: str | None = None,
 ) -> dict[str, object]:
     """Validate the complete store without writing or repairing it."""
 
@@ -2690,6 +2714,16 @@ def validate_tenderplan_read_only_store(
                 raise TenderPlanReadOnlyStoreIntegrityError
             result["no_dispatch_admission_states"] = scoped_states
             result["no_dispatch_admission_set_sha256"] = expected_no_dispatch_admission_set_sha256
+        if expected_read_failure_ack_set_sha256 is not None:
+            with fence_read_failure_ack_set(connection, store, expected_read_failure_ack_set_sha256) as acknowledgements:
+                scoped_states = dict(result.get("no_dispatch_admission_states", result.get("active_states", states)))
+                scoped_states[TenderPlanReadOnlyRunState.UNCERTAIN.value] -= len(acknowledgements)
+                if scoped_states[TenderPlanReadOnlyRunState.UNCERTAIN.value] < 0:
+                    raise TenderPlanReadOnlyStoreIntegrityError
+                result["read_failure_ack_states"] = scoped_states
+                result["read_failure_acknowledgements"] = acknowledgements
+                result["read_failure_ack_set_sha256"] = expected_read_failure_ack_set_sha256
+                result["acknowledged_read_failure_count"] = len(acknowledgements)
         return result
 
 
@@ -2979,20 +3013,26 @@ def read_tenderplan_no_dispatch_admissions(path: str | Path) -> dict[str, object
 def fence_tenderplan_reconciled_bindings(
     path: str | Path, *, failed_closed_run_ids: tuple[str, ...],
     expected_no_dispatch_admission_set_sha256: str, expected_file_sha256: str,
+    expected_read_failure_ack_set_sha256: str | None = None,
 ) -> Iterator[dict[str, object]]:
     store = _existing_store(path)
     with store.fence_failed_closed_bindings(
         failed_closed_run_ids, expected_file_sha256=expected_file_sha256,
         expected_no_dispatch_admission_set_sha256=expected_no_dispatch_admission_set_sha256,
+        expected_read_failure_ack_set_sha256=expected_read_failure_ack_set_sha256,
     ) as failed_closed:
         # The outer BEGIN IMMEDIATE prevents all writers throughout this read and yield.
-        with store._transaction(write=False) as connection:
+        with store._transaction(write=False) as connection, fence_read_failure_ack_set(
+            connection, store, expected_read_failure_ack_set_sha256,
+        ) as acknowledgements:
             admissions = _validated_no_dispatch_admissions_locked(connection, store)
             yield {
                 "failed_closed_bindings": failed_closed,
                 "no_dispatch_admissions": admissions,
                 "no_dispatch_admission_set_sha256": no_dispatch_admission_set_sha256(admissions),
                 "native_file_sha256": expected_file_sha256,
+                "read_failure_acknowledgements": acknowledgements,
+                "read_failure_ack_set_sha256": expected_read_failure_ack_set_sha256,
             }
 
 
