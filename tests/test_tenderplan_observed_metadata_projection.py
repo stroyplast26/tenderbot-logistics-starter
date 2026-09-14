@@ -17,7 +17,7 @@ from tests.test_lead_factory_tenderplan_read_only_transport import _TestProtecto
 from tests.test_tenderplan_response_failure_projection import _project
 
 
-OBSERVED = ("biddingDateTime", "guaranteeApp", "guaranteeContract")
+OBSERVED = ("biddingDateTime", "guaranteeApp", "guaranteeContract", "relation")
 PRIVATE = "PRIVATE_METADATA_VALUE_https://private.invalid/token_contact_query"
 
 

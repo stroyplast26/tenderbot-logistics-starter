@@ -98,10 +98,12 @@ TENDERPLAN_READ_ONLY_OFFICIAL_TENDER_FIELDS: Final = frozenset(
 
 # Observed on 2026-09-14 in verified run tpri_2014e56cb54f1b42d40ebc325cd6cf5e;
 # evidence SHA256 7b460cc5812d74a93e86cf46cf4f5faac31192a8ba3fc1401d13a2d680d45763.
+# Additional "relation" observed in run tpri_154feb2deeb2f3b76d6fa3085ec1f186;
+# evidence SHA256 d0774d456818fdae9cb5df86564a19b6eeb892ae3357c2a32194d6b77c8f13c5.
 # These are not claimed as documented short-tender fields. Their values remain
 # unprojected and must still pass the complete bounded JSON validation.
 _OBSERVED_IGNORED_TENDER_FIELDS: Final = frozenset(
-    {"biddingDateTime", "guaranteeApp", "guaranteeContract"}
+    {"biddingDateTime", "guaranteeApp", "guaranteeContract", "relation"}
 )
 
 _CUSTOMER_FIELDS = frozenset({"guid", "name", "region"})
