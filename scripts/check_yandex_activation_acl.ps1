@@ -452,7 +452,10 @@ try {
     if ($StageEntries.Count -ne 0) {
         throw 'root stage residue is forbidden'
     }
-    if ($Phase -ceq 'Active') {
+    # Local evidence publication may precede the separately verified archive of
+    # an older root. It neither consumes nor replaces that root's authority.
+    # Activation phases still require its absence until the new root is active.
+    if ($Phase -ceq 'Active' -or ($Phase -ceq 'Evidence' -and $RootEntries.Count -ne 0)) {
         if ($RootEntries.Count -ne 1 -or $RootEntries[0].Name -cne 'request-activation.json') {
             throw 'root activation layout mismatch'
         }

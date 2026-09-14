@@ -375,7 +375,7 @@ def test_existing_phases_still_require_the_selected_evidence(
     (
         "missing-candidate", "missing-inbox", "missing-candidate-root",
         "candidate-directory", "inbox-file", "candidate-root-file",
-        "extra-inbox-entry", "inbox-stage", "active-root", "active-job",
+        "extra-inbox-entry", "inbox-stage", "active-job",
         "nonempty-claims", "job-stage", "preparing-residue", "activating-residue",
         "root-stage", "invalid-evidence-name", "uppercase-evidence-name",
         "evidence-stage", "evidence-root-file", "evidence-job-file",
@@ -403,8 +403,6 @@ def test_evidence_phase_rejects_unsafe_inbox_destination_and_job_layouts(
     elif mutation in {"extra-inbox-entry", "inbox-stage"}:
         name = "extra.json" if mutation == "extra-inbox-entry" else ".candidate.json.stage-x"
         (fixture["candidate_job"] / name).write_bytes(b"untrusted")
-    elif mutation == "active-root":
-        (fixture["state_root"] / "request-activation.json").write_bytes(b"pin")
     elif mutation == "active-job":
         (fixture["job"] / "request.json").write_bytes(b"active")
     elif mutation == "nonempty-claims":
@@ -439,6 +437,116 @@ def test_evidence_phase_rejects_unsafe_inbox_destination_and_job_layouts(
     assert checked.returncode == 2
     assert checked.stdout.strip() == "YANDEX_ACTIVATION_ACL_REJECTED"
     assert checked.stderr == ""
+    assert str(tmp_path) not in checked.stdout
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows ACL helper contract")
+@pytest.mark.parametrize("phase", ("Evidence", "Active"))
+def test_publication_and_active_accept_exact_existing_root_without_changes(
+    tmp_path: Path, phase: str
+) -> None:
+    fixture = _synthetic_phase(tmp_path, phase)
+    root_pin = fixture["state_root"] / "request-activation.json"
+    root_bytes = b"synthetic existing root authority; preserve exactly\r\n"
+    root_pin.write_bytes(root_bytes)
+    before_stat = root_pin.stat()
+    before_files = {
+        path.relative_to(fixture["state_root"]): path.read_bytes()
+        for path in fixture["state_root"].rglob("*")
+        if path.is_file()
+    }
+
+    checked = _run_synthetic_helper(fixture, phase)
+
+    assert checked.returncode == 0, checked.stdout + checked.stderr
+    assert checked.stdout.strip() == "YANDEX_ACTIVATION_ACL_READY"
+    assert checked.stderr == ""
+    assert root_pin.read_bytes() == root_bytes
+    assert root_pin.stat().st_mtime_ns == before_stat.st_mtime_ns
+    assert root_pin.stat().st_ino == before_stat.st_ino
+    assert {
+        path.relative_to(fixture["state_root"]): path.read_bytes()
+        for path in fixture["state_root"].rglob("*")
+        if path.is_file()
+    } == before_files
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows ACL helper contract")
+@pytest.mark.parametrize("phase", ("Draft", "Request", "Retention"))
+def test_activation_prepublication_phases_still_reject_existing_root(
+    tmp_path: Path, phase: str
+) -> None:
+    fixture = _synthetic_phase(tmp_path, phase)
+    root_pin = fixture["state_root"] / "request-activation.json"
+    root_bytes = b"synthetic older activation requiring separate archival"
+    root_pin.write_bytes(root_bytes)
+
+    checked = _run_synthetic_helper(fixture, phase)
+
+    assert checked.returncode == 2
+    assert checked.stdout.strip() == "YANDEX_ACTIVATION_ACL_REJECTED"
+    assert checked.stderr == ""
+    assert root_pin.read_bytes() == root_bytes
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows ACL helper contract")
+@pytest.mark.parametrize("phase", ("Evidence", "Active"))
+@pytest.mark.parametrize(
+    "mutation",
+    ("wrong-case", "directory", "extra-ace", "protected-file", "junction", "dangling", "stage"),
+)
+def test_publication_and_active_reject_the_same_unsafe_existing_roots(
+    tmp_path: Path, phase: str, mutation: str
+) -> None:
+    fixture = _synthetic_phase(tmp_path, phase)
+    root_pin = fixture["state_root"] / "request-activation.json"
+    if root_pin.exists():
+        root_pin.unlink()
+    if mutation == "wrong-case":
+        root_pin = fixture["state_root"] / "Request-Activation.json"
+    if mutation == "directory":
+        root_pin.mkdir()
+    elif mutation in {"junction", "dangling"}:
+        target = tmp_path / "synthetic-root-junction-target"
+        target.mkdir()
+        quoted_root = str(root_pin).replace("'", "''")
+        quoted_target = str(target).replace("'", "''")
+        created = subprocess.run(
+            [str(_windows_powershell()), "-NoLogo", "-NoProfile", "-NonInteractive",
+             "-Command", f"New-Item -ItemType Junction -Path '{quoted_root}' "
+             f"-Value '{quoted_target}' | Out-Null"],
+            check=False, capture_output=True, text=True, timeout=20,
+        )
+        assert created.returncode == 0, created.stdout + created.stderr
+        if mutation == "dangling":
+            target.rmdir()
+    else:
+        root_pin.write_bytes(b"synthetic older root")
+    if mutation in {"extra-ace", "protected-file"}:
+        arguments = (
+            ["/grant", "*S-1-5-32-544:R"]
+            if mutation == "extra-ace" else ["/inheritance:d"]
+        )
+        changed = subprocess.run(
+            [str(Path(os.environ["SystemRoot"]) / "System32" / "icacls.exe"),
+             str(root_pin), *arguments],
+            check=False, capture_output=True, text=True, timeout=20,
+        )
+        assert changed.returncode == 0, changed.stdout + changed.stderr
+    elif mutation == "stage":
+        (fixture["state_root"] / ".request-activation.json.stage-synthetic").write_bytes(b"stage")
+
+    try:
+        checked = _run_synthetic_helper(fixture, phase)
+        assert checked.returncode == 2
+        assert checked.stdout.strip() == "YANDEX_ACTIVATION_ACL_REJECTED"
+        assert checked.stderr == ""
+        if mutation not in {"directory", "junction", "dangling"}:
+            assert root_pin.read_bytes() == b"synthetic older root"
+    finally:
+        if mutation in {"junction", "dangling"}:
+            # Remove just this synthetic junction, never recurse into its target.
+            root_pin.rmdir()
     assert str(tmp_path) not in checked.stdout
 
 

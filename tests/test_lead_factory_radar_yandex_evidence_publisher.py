@@ -20,13 +20,23 @@ from lead_factory import radar_yandex_connection_authority as authority
 from lead_factory import radar_yandex_evidence_publisher as publisher
 from lead_factory import radar_yandex_job_activator as activator
 from lead_factory import radar_yandex_pilot_authority as common
+from lead_factory import radar_yandex_root_rotation as rotation
 from lead_factory.radar_yandex_journal import YandexPilotJournal
+from tests.test_lead_factory_radar_yandex_activation_acl import (
+    HELPER,
+    _set_exact_root_acl,
+    _windows_powershell,
+)
 from tests.test_lead_factory_radar_yandex_job_activator import (
     FOLDER,
     KEY,
     QUERY,
     REGION,
     prepared_job,
+)
+from tests.test_lead_factory_radar_yandex_root_rotation import (
+    approval as rotation_approval,
+    fixture as rotation_fixture,
 )
 
 
@@ -126,6 +136,106 @@ def test_publication_is_canonical_replayable_and_never_activates_or_changes_acco
         )
         for private in (QUERY, REGION, FOLDER, KEY, "synthetic-owner", "synthetic-reviewer"):
             assert private not in repr(first)
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows full-helper and root rotation contract")
+def test_real_acl_publication_then_rotation_then_activation_preserves_old_root_until_rotation(
+    tmp_path: Path,
+) -> None:
+    """Synthetic paths and receipts only; full PowerShell phase/ACL logic is unchanged."""
+    with rotation_fixture(tmp_path) as fixture:
+        root = fixture["root"]
+        _set_exact_root_acl(root)
+        inputs = fixture["inputs"]
+        job_id = inputs["new_job_id"]
+        evidence_sha = fixture["evidence_sha"]
+        target = root / "activation-evidence" / job_id / f"{evidence_sha}.json"
+        assert target.read_bytes() == common._canonical(fixture["evidence"])
+        target.unlink()
+        candidate = root / "activation-candidates" / job_id / "candidate.json"
+        candidate.parent.mkdir(parents=True)
+        candidate.write_bytes(common._canonical(fixture["evidence"]))
+        root_pin = root / "request-activation.json"
+        root_bytes = root_pin.read_bytes()
+        protected = [
+            root / "connection.json", fixture["new_dir"] / "request.draft.json",
+            fixture["new_dir"] / "request.sqlite",
+            *(path for path in fixture["old_path"].parent.iterdir() if path.is_file()),
+        ]
+        before = {path: path.read_bytes() for path in protected}
+        grants_before = tuple(authority._GRANTS)
+        # The existing rotation fixture uses tmp_path/state. Only the two path
+        # bindings change; the complete real helper, including all ACL/phase
+        # validators, executes under Windows PowerShell against the fixture.
+        helper_source = HELPER.read_text(encoding="utf-8")
+        profile_lookup = "[Environment]::GetFolderPath('UserProfile')"
+        state_suffix = "'.codex\\local_state\\TenderBot\\yandex-search'"
+        assert helper_source.count(profile_lookup) == helper_source.count(state_suffix) == 1
+        quoted_profile = str(tmp_path).replace("'", "''")
+        helper = tmp_path / "lifecycle.synthetic.ps1"
+        helper.write_text(
+            helper_source.replace(profile_lookup, f"'{quoted_profile}'")
+            .replace(state_suffix, "'state'"), encoding="utf-8",
+        )
+        phases = []
+
+        def phase_acl(job: str, evidence: str, phase: str) -> None:
+            assert job == job_id
+            checked = subprocess.run(
+                [str(_windows_powershell()), "-NoLogo", "-NoProfile", "-NonInteractive",
+                 "-ExecutionPolicy", "Bypass", "-File", str(helper),
+                 "-JobId", job, "-EvidenceSha256", evidence, "-Phase", phase],
+                capture_output=True, text=True, check=False, timeout=20,
+            )
+            phases.append((phase, checked.returncode))
+            if (checked.returncode != 0 or checked.stdout.strip() != "YANDEX_ACTIVATION_ACL_READY"
+                    or checked.stderr):
+                raise activator.YandexJobActivationError("YANDEX_ACTIVATION_ACL_REJECTED")
+
+        def evidence_acl(job: str, evidence: str) -> None:
+            phase_acl(job, evidence, "Evidence")
+
+        publish_args = (job_id, inputs["expected_new_draft_sha256"],
+                        inputs["expected_new_scope_sha256"], evidence_sha)
+        activate_args = {"confirmation": activator.YANDEX_JOB_ACTIVATION_CONFIRMATION}
+        with (
+            patch.object(publisher, "_check_evidence_acl", side_effect=evidence_acl),
+            patch.object(activator, "_check_acl", side_effect=phase_acl),
+            patch("lead_factory.radar_yandex_credential_broker.load_yandex_api_key",
+                  side_effect=AssertionError("synthetic lifecycle must not read credentials")) as credential,
+            patch("lead_factory.radar_yandex_connection.run_manual_yandex_search_accounted",
+                  side_effect=AssertionError("synthetic lifecycle must not call provider")) as provider,
+        ):
+            first = publisher.publish_yandex_activation_evidence(
+                *publish_args, confirmation=publisher.YANDEX_EVIDENCE_PUBLICATION_CONFIRMATION)
+            replay = publisher.publish_yandex_activation_evidence(
+                *publish_args, confirmation=publisher.YANDEX_EVIDENCE_PUBLICATION_CONFIRMATION)
+            assert first["created"] is True and replay["replayed"] is True
+            assert not any(first["effects"].values()) and first["authority_verified"] is False
+            assert root_pin.read_bytes() == root_bytes
+            assert before == {path: path.read_bytes() for path in protected}
+            assert not (fixture["new_dir"] / "request.json").exists()
+            with pytest.raises(activator.YandexJobActivationError):
+                activator.activate_prepared_yandex_job(*publish_args, **activate_args)
+            assert root_pin.read_bytes() == root_bytes
+            rotated = rotation.apply_yandex_root_rotation(**inputs, **rotation_approval(fixture))
+            assert rotated["state"] == "OLD_ROOT_ARCHIVED_AWAITING_SEPARATE_ACTIVATION"
+            assert not root_pin.exists()
+            archived = root / f"request-activation.expired-{inputs['expected_old_root_sha256']}.json"
+            assert archived.read_bytes() == root_bytes
+            activated = activator.activate_prepared_yandex_job(*publish_args, **activate_args)
+            assert activated["state"] == "ACTIVATED_AWAITING_EXPLICIT_RUN_ONE"
+            assert activated["launch_allowed"] is False
+            assert activated["effects"]["external_requests_this_run"] == 0
+            assert activated["effects"]["credential_read"] is False
+            assert root_pin.read_bytes() == (fixture["new_dir"] / "retention-activation.json").read_bytes()
+            assert before == {path: path.read_bytes() for path in protected}
+            assert tuple(authority._GRANTS) == grants_before
+            credential.assert_not_called()
+            provider.assert_not_called()
+        assert {phase for phase, code in phases if code == 0} >= {
+            "Evidence", "Draft", "Retention", "Active",
+        }
 
 
 @pytest.mark.parametrize("field,value", [
@@ -350,6 +460,8 @@ def test_publication_io_failure_leaves_no_stable_evidence_and_cleans_owned_stage
 def test_late_failure_preserves_published_evidence_for_reconciliation(late: str) -> None:
     with publication_job() as fixture:
         original_publish = activator._publish_exact
+        if late == "acl":
+            fixture["acl"].side_effect = [None, None, OSError("PRIVATE-ACL")]
 
         def publish_then_fail(path: Path, payload: bytes, expected: dict) -> bool:
             result = original_publish(path, payload, expected)
@@ -363,7 +475,6 @@ def test_late_failure_preserves_published_evidence_for_reconciliation(late: str)
 
         with (
             patch.object(activator, "_publish_exact", side_effect=publish_then_fail),
-            patch.object(activator, "_check_acl", side_effect=(OSError("PRIVATE-ACL") if late == "acl" else None)),
             pytest.raises(publisher.YandexEvidencePublicationError, match="RECONCILIATION_REQUIRED"),
         ):
             _publish(fixture)
@@ -386,7 +497,7 @@ def test_existing_conflicting_target_is_preserved() -> None:
 def test_late_inbox_acl_denial_preserves_stable_evidence() -> None:
     with publication_job() as fixture:
         fixture["acl"].side_effect = [
-            None, None,
+            None, None, None,
             publisher.YandexEvidencePublicationError("YANDEX_ACTIVATION_ACL_REJECTED"),
         ]
         with pytest.raises(publisher.YandexEvidencePublicationError, match="RECONCILIATION_REQUIRED"):
@@ -397,7 +508,9 @@ def test_late_inbox_acl_denial_preserves_stable_evidence() -> None:
         assert not (fixture["root"] / "request-activation.json").exists()
 
 
-@pytest.mark.parametrize("boundary", ["final-evidence-acl", "final-validation"])
+@pytest.mark.parametrize("boundary", [
+    "post-publication-acl", "final-evidence-acl", "final-validation",
+])
 @pytest.mark.parametrize("mutation", ["remove", "replace"])
 @pytest.mark.parametrize("replay", [False, True], ids=["new-publication", "exact-replay"])
 def test_late_output_changes_never_report_publication_success(
@@ -421,7 +534,8 @@ def test_late_output_changes_never_report_publication_success(
 
         def acl_boundary(*_args) -> None:
             calls["acl"] += 1
-            if boundary == "final-evidence-acl" and calls["acl"] == 3:
+            acl_call = {"post-publication-acl": 3, "final-evidence-acl": 4}.get(boundary)
+            if calls["acl"] == acl_call:
                 mutate_output()
 
         def validation_boundary(**kwargs):

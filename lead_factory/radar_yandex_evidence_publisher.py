@@ -310,7 +310,9 @@ def _publish_core(
     try:
         created = activator._publish_exact(target, payload, evidence)
         publication_completed = True
-        activator._check_acl(job_id, evidence_sha256, "Draft")
+        # Publishing evidence must also work before a separately authorized old
+        # root rotation. The next exact read still requires the selected output.
+        _check_evidence_acl(job_id, evidence_sha256)
         if activator._existing_exact(target, payload, evidence) != evidence_sha256:
             _fail("YANDEX_EVIDENCE_PUBLICATION_RECONCILIATION_REQUIRED")
         _check_evidence_acl(job_id, evidence_sha256)
