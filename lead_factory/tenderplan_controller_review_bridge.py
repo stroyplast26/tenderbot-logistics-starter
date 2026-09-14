@@ -30,6 +30,7 @@ from .source_discovery_control import (
 )
 from .tenderplan_read_only_store import (
     TENDERPLAN_ACCOUNT_TRANSITION_SCHEMA_FINGERPRINT_SHA256,
+    TENDERPLAN_NO_DISPATCH_SCHEMA_FINGERPRINT_SHA256,
     TENDERPLAN_READ_ONLY_QUEUE_PATH,
     TENDERPLAN_READ_ONLY_STORE_SCHEMA_FINGERPRINT_SHA256,
     TenderPlanReadOnlyStoreError,
@@ -442,6 +443,7 @@ def _ready_preview(
         native_schema_fingerprint_sha256 = {
             1: TENDERPLAN_READ_ONLY_STORE_SCHEMA_FINGERPRINT_SHA256,
             2: TENDERPLAN_ACCOUNT_TRANSITION_SCHEMA_FINGERPRINT_SHA256,
+            3: TENDERPLAN_NO_DISPATCH_SCHEMA_FINGERPRINT_SHA256,
         }.get(int(connection.execute("PRAGMA user_version").fetchone()[0]))
         rows = connection.execute(
             """SELECT c.item_id,c.run_id,c.ordinal,c.encrypted_card_sha256,
