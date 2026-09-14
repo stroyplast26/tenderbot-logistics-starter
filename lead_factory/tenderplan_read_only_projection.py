@@ -20,6 +20,13 @@ import json
 import re
 from typing import Final
 
+from lead_factory.tenderplan_response_failure_detail import (
+    ProjectionFailureContext,
+    ResponseFailureDetailValidationError,
+    ResponseFailureField as FailureField,
+    ResponseFailureRule as FailureRule,
+)
+
 
 TENDERPLAN_READ_ONLY_PROJECTION_VERSION: Final = "tenderplan-read-only-projection-v1"
 TENDERPLAN_READ_ONLY_SEMANTIC_STATUS: Final = "UNVERIFIED_PROVIDER_SEMANTICS"
@@ -101,13 +108,32 @@ _REQUIRED_TENDER_FIELDS = frozenset(
     }
 )
 
+_JSON_FIELD_CODES = {
+    "count": FailureField.COUNT, "tenders": FailureField.TENDERS,
+    "_id": FailureField.TENDER_ID, "orderName": FailureField.ORDER_NAME,
+    "publicationDateTime": FailureField.PUBLICATION_DATETIME,
+    "receiveDateTime": FailureField.RECEIVE_DATETIME, "region": FailureField.REGION,
+    "status": FailureField.STATUS, "maxPrice": FailureField.MAX_PRICE,
+    "submissionCloseDateTime": FailureField.SUBMISSION_CLOSE_DATETIME,
+    "number": FailureField.NUMBER, "currency": FailureField.CURRENCY,
+    "customers": FailureField.CUSTOMERS, "name": FailureField.CUSTOMER_NAME,
+    "guid": FailureField.CUSTOMER_GUID,
+}
+
 
 class TenderPlanReadOnlyProjectionError(RuntimeError):
     """Base error with a fixed public message and no provider material."""
 
     code = "tenderplan_read_only_projection_failed"
 
-    def __init__(self) -> None:
+    def __init__(
+        self, *, rule: FailureRule = FailureRule.UNCLASSIFIED_INTERNAL_FAILURE,
+        field: FailureField = FailureField.NONE,
+    ) -> None:
+        if type(rule) is not FailureRule or type(field) is not FailureField:
+            raise ResponseFailureDetailValidationError
+        self.rule = rule
+        self.field = field
         super().__init__(self.code)
 
 
@@ -199,6 +225,7 @@ def _validated_text(
     *,
     maximum: int,
     optional: bool,
+    field: FailureField = FailureField.NONE,
 ) -> str | None:
     if value is None and optional:
         return None
@@ -209,32 +236,32 @@ def _validated_text(
         or len(value) > maximum
         or _CONTROL.search(value)
     ):
-        raise TenderPlanReadOnlyProjectionValidationError
+        raise TenderPlanReadOnlyProjectionValidationError(rule=FailureRule.TEXT_INVALID, field=field)
     try:
         value.encode("utf-8", "strict")
     except UnicodeEncodeError:
-        raise TenderPlanReadOnlyProjectionValidationError from None
+        raise TenderPlanReadOnlyProjectionValidationError(rule=FailureRule.TEXT_ENCODING_INVALID, field=field) from None
     return value
 
 
-def _canonical_decimal(value: object) -> str:
+def _canonical_decimal(value: object, *, field: FailureField = FailureField.NONE) -> str:
     if type(value) is not Decimal or not value.is_finite() or value.is_signed():
-        raise TenderPlanReadOnlyProjectionValidationError
+        raise TenderPlanReadOnlyProjectionValidationError(rule=FailureRule.NUMBER_INVALID, field=field)
     decimal_tuple = value.as_tuple()
     if (
         len(decimal_tuple.digits) > _MAX_NUMERIC_DIGITS
         or not -_MAX_NUMERIC_EXPONENT <= decimal_tuple.exponent <= _MAX_NUMERIC_EXPONENT
     ):
-        raise TenderPlanReadOnlyProjectionQuotaExceeded
+        raise TenderPlanReadOnlyProjectionQuotaExceeded(rule=FailureRule.NUMBER_PRECISION_LIMIT, field=field)
     if value.is_zero():
         return "0"
     if not -_MAX_NUMERIC_EXPONENT <= value.adjusted() <= _MAX_NUMERIC_EXPONENT:
-        raise TenderPlanReadOnlyProjectionQuotaExceeded
+        raise TenderPlanReadOnlyProjectionQuotaExceeded(rule=FailureRule.NUMBER_MAGNITUDE_LIMIT, field=field)
     rendered = format(value, "f")
     if "." in rendered:
         rendered = rendered.rstrip("0").rstrip(".")
     if not rendered or len(rendered) > _MAX_NUMERIC_TEXT_CHARS:
-        raise TenderPlanReadOnlyProjectionQuotaExceeded
+        raise TenderPlanReadOnlyProjectionQuotaExceeded(rule=FailureRule.NUMBER_TEXT_LIMIT, field=field)
     return rendered
 
 
@@ -250,10 +277,10 @@ def _validated_canonical_decimal_text(value: object) -> str:
     return value
 
 
-def _optional_decimal(value: object) -> str | None:
+def _optional_decimal(value: object, *, field: FailureField = FailureField.NONE) -> str | None:
     if value is None:
         return None
-    return _canonical_decimal(value)
+    return _canonical_decimal(value, field=field)
 
 
 def _card_identity_material(
@@ -465,9 +492,12 @@ def _strict_json(body: bytes) -> dict[str, object]:
         result: dict[str, object] = {}
         for key, value in items:
             if key in result:
-                raise ValueError("duplicate field")
+                raise TenderPlanReadOnlyProjectionValidationError(rule=FailureRule.JSON_DUPLICATE_KEY, field=FailureField.JSON_TREE)
             result[key] = value
         return result
+
+    def reject_constant(_value: str) -> None:
+        raise TenderPlanReadOnlyProjectionValidationError(rule=FailureRule.JSON_NON_FINITE, field=FailureField.JSON_TREE)
 
     try:
         value = json.loads(
@@ -475,14 +505,12 @@ def _strict_json(body: bytes) -> dict[str, object]:
             object_pairs_hook=pairs,
             parse_int=Decimal,
             parse_float=Decimal,
-            parse_constant=lambda _value: (_ for _ in ()).throw(
-                ValueError("non-finite number")
-            ),
+            parse_constant=reject_constant,
         )
     except (UnicodeDecodeError, ValueError, RecursionError, InvalidOperation):
-        raise TenderPlanReadOnlyProjectionValidationError from None
+        raise TenderPlanReadOnlyProjectionValidationError(rule=FailureRule.JSON_PARSE_INVALID, field=FailureField.BODY) from None
     if type(value) is not dict:
-        raise TenderPlanReadOnlyProjectionValidationError
+        raise TenderPlanReadOnlyProjectionValidationError(rule=FailureRule.JSON_ROOT_TYPE_INVALID, field=FailureField.ROOT)
     return value
 
 
@@ -491,29 +519,29 @@ def _validate_json_tree(
     limits: TenderPlanReadOnlyProjectionLimits,
 ) -> None:
     item_count = 0
-    stack: list[tuple[object, int]] = [(value, 0)]
+    stack: list[tuple[object, int, FailureField]] = [(value, 0, FailureField.ROOT)]
     while stack:
-        current, depth = stack.pop()
+        current, depth, field = stack.pop()
         item_count += 1
         if item_count > limits.maximum_json_items or depth > limits.maximum_json_depth:
-            raise TenderPlanReadOnlyProjectionQuotaExceeded
+            raise TenderPlanReadOnlyProjectionQuotaExceeded(rule=FailureRule.JSON_TREE_LIMIT, field=FailureField.JSON_TREE)
         if current is None or type(current) is bool:
             continue
         if type(current) is Decimal:
-            _canonical_decimal(current)
+            _canonical_decimal(current, field=field)
             continue
         if type(current) is str:
             if len(current) > limits.maximum_json_string_chars or _CONTROL.search(
                 current
             ):
-                raise TenderPlanReadOnlyProjectionQuotaExceeded
+                raise TenderPlanReadOnlyProjectionQuotaExceeded(rule=FailureRule.JSON_STRING_INVALID, field=field)
             try:
                 current.encode("utf-8", "strict")
             except UnicodeEncodeError:
-                raise TenderPlanReadOnlyProjectionValidationError from None
+                raise TenderPlanReadOnlyProjectionValidationError(rule=FailureRule.JSON_ENCODING_INVALID, field=field) from None
             continue
         if type(current) is list:
-            stack.extend((item, depth + 1) for item in current)
+            stack.extend((item, depth + 1, field) for item in current)
             continue
         if type(current) is dict:
             for key, item in current.items():
@@ -523,10 +551,13 @@ def _validate_json_tree(
                     or len(key) > _MAX_KEY_CHARS
                     or _CONTROL.search(key)
                 ):
-                    raise TenderPlanReadOnlyProjectionValidationError
-                stack.append((item, depth + 1))
+                    raise TenderPlanReadOnlyProjectionValidationError(rule=FailureRule.JSON_KEY_INVALID, field=FailureField.JSON_TREE)
+                child_field = _JSON_FIELD_CODES.get(key, FailureField.JSON_TREE)
+                if field is FailureField.CUSTOMERS and key == "region":
+                    child_field = FailureField.CUSTOMER_REGION
+                stack.append((item, depth + 1, child_field))
             continue
-        raise TenderPlanReadOnlyProjectionValidationError
+        raise TenderPlanReadOnlyProjectionValidationError(rule=FailureRule.JSON_TYPE_INVALID, field=field)
 
 
 def _provider_count(value: object) -> int:
@@ -537,7 +568,7 @@ def _provider_count(value: object) -> int:
         or value != value.to_integral_value()
         or value > 1_000_000_000
     ):
-        raise TenderPlanReadOnlyProjectionValidationError
+        raise TenderPlanReadOnlyProjectionValidationError(rule=FailureRule.PROVIDER_COUNT_INVALID, field=FailureField.COUNT)
     return int(value)
 
 
@@ -545,19 +576,20 @@ def _customer_names(value: object) -> tuple[str, ...]:
     if value is None:
         return ()
     if type(value) is not list:
-        raise TenderPlanReadOnlyProjectionValidationError
+        raise TenderPlanReadOnlyProjectionValidationError(rule=FailureRule.CUSTOMERS_TYPE_INVALID, field=FailureField.CUSTOMERS)
     names: list[str] = []
     for customer in value:
-        if (
-            type(customer) is not dict
-            or not set(customer) <= _CUSTOMER_FIELDS
-            or "name" not in customer
-        ):
-            raise TenderPlanReadOnlyProjectionValidationError
+        if type(customer) is not dict:
+            raise TenderPlanReadOnlyProjectionValidationError(rule=FailureRule.CUSTOMER_TYPE_INVALID, field=FailureField.CUSTOMERS)
+        if not set(customer) <= _CUSTOMER_FIELDS:
+            raise TenderPlanReadOnlyProjectionValidationError(rule=FailureRule.CUSTOMER_FIELD_UNSUPPORTED, field=FailureField.CUSTOMERS)
+        if "name" not in customer:
+            raise TenderPlanReadOnlyProjectionValidationError(rule=FailureRule.CUSTOMER_NAME_MISSING, field=FailureField.CUSTOMER_NAME)
         name = _validated_text(
             customer["name"],
             maximum=_MAX_CUSTOMER_NAME_CHARS,
             optional=False,
+            field=FailureField.CUSTOMER_NAME,
         )
         guid = customer.get("guid")
         if guid is not None:
@@ -565,6 +597,7 @@ def _customer_names(value: object) -> tuple[str, ...]:
                 guid,
                 maximum=_MAX_CUSTOMER_GUID_CHARS,
                 optional=False,
+                field=FailureField.CUSTOMER_GUID,
             )
         region = customer.get("region")
         if region is not None:
@@ -573,11 +606,12 @@ def _customer_names(value: object) -> tuple[str, ...]:
                     region,
                     maximum=_MAX_CUSTOMER_REGION_CHARS,
                     optional=False,
+                    field=FailureField.CUSTOMER_REGION,
                 )
             elif type(region) is Decimal:
-                _canonical_decimal(region)
+                _canonical_decimal(region, field=FailureField.CUSTOMER_REGION)
             else:
-                raise TenderPlanReadOnlyProjectionValidationError
+                raise TenderPlanReadOnlyProjectionValidationError(rule=FailureRule.CUSTOMER_REGION_INVALID, field=FailureField.CUSTOMER_REGION)
         if len(names) < 5:
             if name is None:
                 raise TenderPlanReadOnlyProjectionValidationError
@@ -586,38 +620,40 @@ def _customer_names(value: object) -> tuple[str, ...]:
 
 
 def _build_card(tender: dict[str, object]) -> TenderPlanReadOnlyCard:
-    if (
-        not _REQUIRED_TENDER_FIELDS <= set(tender)
-        or not set(tender) <= TENDERPLAN_READ_ONLY_OFFICIAL_TENDER_FIELDS
-    ):
-        raise TenderPlanReadOnlyProjectionValidationError
+    if not _REQUIRED_TENDER_FIELDS <= set(tender):
+        raise TenderPlanReadOnlyProjectionValidationError(rule=FailureRule.TENDER_REQUIRED_FIELD_MISSING, field=FailureField.TENDERS)
+    if not set(tender) <= TENDERPLAN_READ_ONLY_OFFICIAL_TENDER_FIELDS:
+        raise TenderPlanReadOnlyProjectionValidationError(rule=FailureRule.TENDER_FIELD_UNSUPPORTED, field=FailureField.TENDERS)
     tender_id_value = tender["_id"]
     if (
         type(tender_id_value) is not str
         or _OBJECT_ID.fullmatch(tender_id_value) is None
     ):
-        raise TenderPlanReadOnlyProjectionValidationError
+        raise TenderPlanReadOnlyProjectionValidationError(rule=FailureRule.TENDER_ID_INVALID, field=FailureField.TENDER_ID)
     tender_id = tender_id_value.lower()
-    revision = _canonical_decimal(tender["receiveDateTime"])
-    publication_datetime = _canonical_decimal(tender["publicationDateTime"])
-    submission_close_datetime = _optional_decimal(tender.get("submissionCloseDateTime"))
-    max_price = _optional_decimal(tender.get("maxPrice"))
-    region = _canonical_decimal(tender["region"])
-    status = _canonical_decimal(tender["status"])
+    revision = _canonical_decimal(tender["receiveDateTime"], field=FailureField.RECEIVE_DATETIME)
+    publication_datetime = _canonical_decimal(tender["publicationDateTime"], field=FailureField.PUBLICATION_DATETIME)
+    submission_close_datetime = _optional_decimal(tender.get("submissionCloseDateTime"), field=FailureField.SUBMISSION_CLOSE_DATETIME)
+    max_price = _optional_decimal(tender.get("maxPrice"), field=FailureField.MAX_PRICE)
+    region = _canonical_decimal(tender["region"], field=FailureField.REGION)
+    status = _canonical_decimal(tender["status"], field=FailureField.STATUS)
     number = _validated_text(
         tender.get("number"),
         maximum=_MAX_NUMBER_CHARS,
         optional=True,
+        field=FailureField.NUMBER,
     )
     title = _validated_text(
         tender["orderName"],
         maximum=_MAX_TITLE_CHARS,
         optional=False,
+        field=FailureField.ORDER_NAME,
     )
     currency = _validated_text(
         tender.get("currency"),
         maximum=_MAX_CURRENCY_CHARS,
         optional=True,
+        field=FailureField.CURRENCY,
     )
     customer_legal_names = _customer_names(tender.get("customers"))
     if title is None:
@@ -669,8 +705,14 @@ def project_tenderplan_read_only_response(
     limits: TenderPlanReadOnlyProjectionLimits = (
         DEFAULT_TENDERPLAN_READ_ONLY_PROJECTION_LIMITS
     ),
+    diagnostic_context: ProjectionFailureContext | None = None,
 ) -> TenderPlanReadOnlyProjection:
     """Validate one complete page and return at most five sealed cards."""
+
+    if diagnostic_context is not None:
+        if type(diagnostic_context) is not ProjectionFailureContext:
+            raise TenderPlanReadOnlyProjectionValidationError(rule=FailureRule.LIMITS_INVALID, field=FailureField.LIMITS)
+        diagnostic_context.reset()
 
     request = _validated_digest(request_sha256)
     query_policy = _validated_digest(query_policy_sha256)
@@ -678,9 +720,9 @@ def project_tenderplan_read_only_response(
     nonce = _validated_digest(nonce_sha256)
     intent_record = _validated_digest(intent_record_sha256)
     if type(limits) is not TenderPlanReadOnlyProjectionLimits:
-        raise TenderPlanReadOnlyProjectionValidationError
+        raise TenderPlanReadOnlyProjectionValidationError(rule=FailureRule.LIMITS_INVALID, field=FailureField.LIMITS)
     if type(status_code) is not int or status_code != 200:
-        raise TenderPlanReadOnlyProjectionStatusError
+        raise TenderPlanReadOnlyProjectionStatusError(rule=FailureRule.HTTP_STATUS_INVALID)
     if (
         type(content_type) is not str
         or not content_type
@@ -688,37 +730,50 @@ def project_tenderplan_read_only_response(
         or _CONTROL.search(content_type)
         or content_type.split(";", 1)[0].strip().casefold() != "application/json"
     ):
-        raise TenderPlanReadOnlyProjectionStatusError
+        raise TenderPlanReadOnlyProjectionStatusError(rule=FailureRule.CONTENT_TYPE_INVALID, field=FailureField.CONTENT_TYPE)
     if type(body) is not bytes or not body:
-        raise TenderPlanReadOnlyProjectionValidationError
+        raise TenderPlanReadOnlyProjectionValidationError(rule=FailureRule.BODY_INVALID, field=FailureField.BODY)
     if (
         len(body) > limits.maximum_response_bytes
         or len(body) > _ABSOLUTE_MAX_RESPONSE_BYTES
     ):
-        raise TenderPlanReadOnlyProjectionQuotaExceeded
+        raise TenderPlanReadOnlyProjectionQuotaExceeded(rule=FailureRule.BODY_SIZE_LIMIT, field=FailureField.BODY)
     payload = _strict_json(body)
+    if diagnostic_context is not None:
+        # Observations cannot change validation order or promote an invalid
+        # provider count. Only a successful existing count guard is recorded.
+        if type(payload.get("tenders")) is list:
+            diagnostic_context.observe_returned_count(len(payload["tenders"]))
+        try:
+            observed_count = _provider_count(payload.get("count"))
+        except TenderPlanReadOnlyProjectionError:
+            pass
+        else:
+            diagnostic_context.observe_provider_count(observed_count)
     _validate_json_tree(payload, limits)
-    if set(payload) != {"count", "tenders"}:
-        raise TenderPlanReadOnlyProjectionValidationError
+    if not {"count", "tenders"} <= set(payload):
+        raise TenderPlanReadOnlyProjectionValidationError(rule=FailureRule.ROOT_REQUIRED_FIELD_MISSING, field=FailureField.ROOT)
+    if not set(payload) <= {"count", "tenders"}:
+        raise TenderPlanReadOnlyProjectionValidationError(rule=FailureRule.ROOT_FIELD_UNSUPPORTED, field=FailureField.ROOT)
     provider_reported_count = _provider_count(payload["count"])
     tenders = payload["tenders"]
     if type(tenders) is not list:
-        raise TenderPlanReadOnlyProjectionValidationError
+        raise TenderPlanReadOnlyProjectionValidationError(rule=FailureRule.TENDERS_TYPE_INVALID, field=FailureField.TENDERS)
     if (
         len(tenders) > limits.maximum_returned_records
         or len(tenders) > _ABSOLUTE_MAX_RETURNED_RECORDS
     ):
-        raise TenderPlanReadOnlyProjectionQuotaExceeded
+        raise TenderPlanReadOnlyProjectionQuotaExceeded(rule=FailureRule.RETURNED_COUNT_LIMIT, field=FailureField.TENDERS)
     if provider_reported_count < len(tenders):
-        raise TenderPlanReadOnlyProjectionValidationError
+        raise TenderPlanReadOnlyProjectionValidationError(rule=FailureRule.PROVIDER_COUNT_INCONSISTENT, field=FailureField.COUNT)
     cards: list[TenderPlanReadOnlyCard] = []
     identities: set[str] = set()
     for tender in tenders:
         if type(tender) is not dict:
-            raise TenderPlanReadOnlyProjectionValidationError
+            raise TenderPlanReadOnlyProjectionValidationError(rule=FailureRule.TENDER_TYPE_INVALID, field=FailureField.TENDERS)
         card = _build_card(tender)
         if card.identity_sha256 in identities:
-            raise TenderPlanReadOnlyProjectionValidationError
+            raise TenderPlanReadOnlyProjectionValidationError(rule=FailureRule.DUPLICATE_IDENTITY, field=FailureField.TENDERS)
         identities.add(card.identity_sha256)
         if len(cards) < limits.maximum_projected_records:
             cards.append(card)
@@ -742,7 +797,7 @@ def project_tenderplan_read_only_response(
         "spend_minor": 0,
         "write_count": 0,
     }
-    return TenderPlanReadOnlyProjection(
+    projection = TenderPlanReadOnlyProjection(
         request_sha256=request,
         query_policy_sha256=query_policy,
         auth_reference_id_sha256=auth_reference,
@@ -762,6 +817,9 @@ def project_tenderplan_read_only_response(
         automatic_schedule_eligible=False,
         live_release_eligible=False,
     )
+    if diagnostic_context is not None:
+        diagnostic_context.observe_projected_count(len(cards))
+    return projection
 
 
 __all__ = [

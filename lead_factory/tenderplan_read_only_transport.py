@@ -86,6 +86,14 @@ from lead_factory.tenderplan_read_only_projection import (  # noqa: E402
     TenderPlanReadOnlyProjectionLimits,
     project_tenderplan_read_only_response,
 )
+from lead_factory.tenderplan_response_failure_detail import (  # noqa: E402
+    ProjectionFailureContext,
+    ResponseFailureDetailV1,
+    ResponseFailureDetailValidationError,
+    ResponseFailureField,
+    ResponseFailureRule,
+    ResponseFailureStage,
+)
 from lead_factory.tenderplan_read_only_store import (  # noqa: E402
     TENDERPLAN_READ_ONLY_QUEUE_PATH,
     verify_worker_intent,
@@ -96,6 +104,9 @@ from lead_factory.tenderplan_windows_credential import (  # noqa: E402
 
 
 TENDERPLAN_READ_ONLY_WORKER_PROTOCOL_V1: Final = "tenderplan-read-only-worker-v1"
+TENDERPLAN_READ_ONLY_WORKER_ERROR_PROTOCOL_V2: Final = (
+    "tenderplan-read-only-worker-error-v2"
+)
 TENDERPLAN_READ_ONLY_PROFILE_WORKER_PROTOCOL_V1: Final = (
     "tenderplan-profile-read-only-worker-v1"
 )
@@ -171,12 +182,20 @@ class TenderPlanSealedWorker:
 class _WorkerDiagnosticFailure(TenderPlanIsolatedValidationError):
     """Internal strict-enum signal; never carries provider or secret text."""
 
-    def __init__(self, worker_code: str) -> None:
+    def __init__(
+        self, worker_code: str,
+        *, response_failure_detail: ResponseFailureDetailV1 | None = None,
+    ) -> None:
         if type(worker_code) is not str or worker_code not in _WORKER_ERROR_CODES:
             raise TenderPlanIsolatedValidationError(
                 "TenderPlan read-only worker diagnostic is invalid"
             )
         self.worker_code = worker_code
+        if response_failure_detail is not None:
+            if worker_code != "response_validation" or type(response_failure_detail) is not ResponseFailureDetailV1:
+                raise TenderPlanIsolatedValidationError("TenderPlan worker detail is invalid")
+            response_failure_detail.to_mapping()
+        self.response_failure_detail = response_failure_detail
         super().__init__("tenderplan_read_only_worker_diagnostic")
 
 
@@ -187,6 +206,7 @@ class TenderPlanReadOnlyDiagnosticUncertain(TenderPlanIsolatedUncertain):
         self,
         diagnostic_code: TenderPlanReadOnlyDiagnosticCode,
         observation_stage: TenderPlanReadOnlyObservationStage,
+        *, response_failure_detail: ResponseFailureDetailV1 | None = None,
     ) -> None:
         if type(diagnostic_code) is not TenderPlanReadOnlyDiagnosticCode:
             raise TenderPlanIsolatedValidationError(
@@ -198,6 +218,15 @@ class TenderPlanReadOnlyDiagnosticUncertain(TenderPlanIsolatedUncertain):
             )
         self.diagnostic_code = diagnostic_code
         self.observation_stage = observation_stage
+        if response_failure_detail is not None:
+            if (
+                type(response_failure_detail) is not ResponseFailureDetailV1
+                or diagnostic_code is not TenderPlanReadOnlyDiagnosticCode.WORKER_RESPONSE_VALIDATION
+                or observation_stage is not TenderPlanReadOnlyObservationStage.WORKER_POST_RESPONSE
+            ):
+                raise TenderPlanIsolatedValidationError("TenderPlan response detail is invalid")
+            response_failure_detail.to_mapping()
+        self.response_failure_detail = response_failure_detail
         super().__init__("TenderPlan read-only request outcome requires reconciliation")
 
     def __repr__(self) -> str:
@@ -703,11 +732,21 @@ def _strict_object(raw: bytes) -> dict[str, object]:
     return value
 
 
-def _worker_error(code: str) -> bytes:
+def _worker_error(
+    code: str, *, response_failure_detail: ResponseFailureDetailV1 | None = None,
+) -> bytes:
     if type(code) is not str or code not in _WORKER_ERROR_CODES:
         raise TenderPlanIsolatedValidationError(
             "TenderPlan read-only worker diagnostic is invalid"
         )
+    if response_failure_detail is not None:
+        if code != "response_validation" or type(response_failure_detail) is not ResponseFailureDetailV1:
+            raise TenderPlanIsolatedValidationError("TenderPlan worker detail is invalid")
+        return _canonical_bytes({
+            "error": code, "ok": False,
+            "protocol": TENDERPLAN_READ_ONLY_WORKER_ERROR_PROTOCOL_V2,
+            "detail": response_failure_detail.to_mapping(),
+        })
     return _canonical_bytes(
         {
             "error": code,
@@ -1038,6 +1077,33 @@ def _perform_sealed_worker_post(
                 pass
 
 
+def _response_failure_detail(
+    values: dict[str, object],
+    response: object,
+    context: ProjectionFailureContext,
+    *,
+    stage: ResponseFailureStage,
+    rule: ResponseFailureRule,
+    field: ResponseFailureField = ResponseFailureField.NONE,
+) -> ResponseFailureDetailV1 | None:
+    # Evidence collection must never replace the original coarse uncertainty.
+    # Do not inspect arbitrary objects, exception text, headers, or body content.
+    try:
+        status = response.status_code if type(response) is TenderPlanIsolatedResponse else None
+        body = response.body if type(response) is TenderPlanIsolatedResponse else None
+        return ResponseFailureDetailV1(
+            run_id=values["run_id"],
+            intent_record_sha256=values["intent_record_sha256"],
+            request_sha256=values["request_sha256"],
+            stage=stage, rule=rule, field=field,
+            http_status=status if type(status) is int and 100 <= status <= 599 else None,
+            body_bytes=len(body) if type(body) is bytes and len(body) <= TENDERPLAN_READ_ONLY_MAX_RESPONSE_BYTES else None,
+            **context.snapshot(),
+        )
+    except BaseException:
+        return None
+
+
 def _execute_worker(request: dict[str, object]) -> TenderPlanReadOnlyEncryptedBatch:
     try:
         values = _validate_request(request)
@@ -1123,6 +1189,7 @@ def _execute_worker(request: dict[str, object]) -> TenderPlanReadOnlyEncryptedBa
         # Provider entry may already have occurred.  This deliberately says
         # only "uncertain" and never infers whether the POST was received.
         raise _WorkerDiagnosticFailure("provider_entry_uncertain") from None
+    diagnostic_context = ProjectionFailureContext()
     try:
         status_code = response.status_code
         if status_code in {401, 403}:
@@ -1146,11 +1213,27 @@ def _execute_worker(request: dict[str, object]) -> TenderPlanReadOnlyEncryptedBa
             nonce_sha256=str(values["nonce_sha256"]),
             intent_record_sha256=str(values["intent_record_sha256"]),
             limits=limits,
+            diagnostic_context=diagnostic_context,
         )
     except _WorkerDiagnosticFailure:
         raise
+    except TenderPlanReadOnlyProjectionError as error:
+        raise _WorkerDiagnosticFailure(
+            "response_validation",
+            response_failure_detail=_response_failure_detail(
+                values, response, diagnostic_context,
+                stage=ResponseFailureStage.PROJECTION, rule=error.rule, field=error.field,
+            ),
+        ) from None
     except BaseException:
-        raise _WorkerDiagnosticFailure("response_validation") from None
+        raise _WorkerDiagnosticFailure(
+            "response_validation",
+            response_failure_detail=_response_failure_detail(
+                values, response, diagnostic_context,
+                stage=ResponseFailureStage.PROJECTION,
+                rule=ResponseFailureRule.UNCLASSIFIED_INTERNAL_FAILURE,
+            ),
+        ) from None
     try:
         cards = tuple(
             encrypt_tenderplan_card(
@@ -1184,8 +1267,19 @@ def _execute_worker(request: dict[str, object]) -> TenderPlanReadOnlyEncryptedBa
             returned_count=projection.returned_count,
             encrypted_cards=cards,
         )
-    except BaseException:
-        raise _WorkerDiagnosticFailure("response_validation") from None
+    except BaseException as error:
+        raise _WorkerDiagnosticFailure(
+            "response_validation",
+            response_failure_detail=_response_failure_detail(
+                values, response, diagnostic_context,
+                stage=ResponseFailureStage.BATCH,
+                rule=(
+                    ResponseFailureRule.BATCH_ASSEMBLY_INVALID
+                    if isinstance(error, TenderPlanIsolatedValidationError)
+                    else ResponseFailureRule.UNCLASSIFIED_INTERNAL_FAILURE
+                ),
+            ),
+        ) from None
 
 
 def _worker_main() -> int:
@@ -1200,7 +1294,9 @@ def _worker_main() -> int:
             request = _strict_object(raw)
             output = _worker_success(_execute_worker(request))
     except _WorkerDiagnosticFailure as error:
-        output = _worker_error(error.worker_code)
+        output = _worker_error(
+            error.worker_code, response_failure_detail=error.response_failure_detail,
+        )
     except TenderPlanIsolatedAuthorizationError:
         output = _worker_error("authorization")
     except (TenderPlanIsolatedQuotaExceeded,):
@@ -1306,6 +1402,29 @@ def _decode_worker_response(
     expected: dict[str, object],
 ) -> TenderPlanReadOnlyEncryptedBatch:
     envelope = _strict_object(raw)
+    if envelope.get("protocol") == TENDERPLAN_READ_ONLY_WORKER_ERROR_PROTOCOL_V2:
+        try:
+            if (
+                set(envelope) != {"error", "ok", "protocol", "detail"}
+                or envelope["ok"] is not False
+                or envelope["error"] != "response_validation"
+            ):
+                raise ResponseFailureDetailValidationError
+            detail = ResponseFailureDetailV1.from_mapping(envelope["detail"])
+            if any(
+                getattr(detail, name) != expected.get(name)
+                for name in ("run_id", "intent_record_sha256", "request_sha256")
+            ):
+                raise ResponseFailureDetailValidationError
+        except ResponseFailureDetailValidationError:
+            raise TenderPlanIsolatedValidationError(
+                "TenderPlan read-only worker result is invalid"
+            ) from None
+        raise TenderPlanReadOnlyDiagnosticUncertain(
+            TenderPlanReadOnlyDiagnosticCode.WORKER_RESPONSE_VALIDATION,
+            TenderPlanReadOnlyObservationStage.WORKER_POST_RESPONSE,
+            response_failure_detail=detail,
+        )
     if envelope.get("protocol") != TENDERPLAN_READ_ONLY_WORKER_PROTOCOL_V1:
         raise TenderPlanIsolatedValidationError(
             "TenderPlan read-only worker result is invalid"
@@ -2816,6 +2935,7 @@ __all__ = [
     "TENDERPLAN_SEALED_WORKER_PROTOCOL_V1",
     "TenderPlanSealedWorker",
     "TENDERPLAN_READ_ONLY_WORKER_PROTOCOL_V1",
+    "TENDERPLAN_READ_ONLY_WORKER_ERROR_PROTOCOL_V2",
     "TenderPlanReadOnlyDiagnosticUncertain",
     "TenderPlanReadOnlyEncryptedBatch",
     "TenderPlanReadOnlyTransport",

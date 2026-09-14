@@ -49,6 +49,10 @@ from lead_factory.tenderplan_read_only_diagnostics import (
     TenderPlanReadOnlyObservationStage,
     append_tenderplan_read_only_diagnostic_best_effort,
 )
+from lead_factory.tenderplan_response_failure_detail import ResponseFailureDetailV1
+from lead_factory.tenderplan_response_failure_store import (
+    append_tenderplan_response_failure_best_effort,
+)
 from lead_factory.tenderplan_read_only_store import (
     TENDERPLAN_READ_ONLY_INTENT_VERSION,
     TENDERPLAN_READ_ONLY_QUEUE_PATH,
@@ -370,6 +374,7 @@ def _record_uncertain_diagnostic_best_effort(
     observation_stage: TenderPlanReadOnlyObservationStage,
     enabled: bool,
     clock: Callable[[], datetime],
+    response_failure_detail: ResponseFailureDetailV1 | None = None,
 ) -> None:
     # The main queue must commit UNCERTAIN first.  This separate sidecar is
     # best-effort evidence only and can never change the public outcome or
@@ -392,7 +397,20 @@ def _record_uncertain_diagnostic_best_effort(
     except BaseException:
         # Even a hostile replacement or interpreter-level sidecar failure
         # cannot replace the already committed main UNCERTAIN outcome.
-        return
+        pass
+    if response_failure_detail is not None:
+        try:
+            if (
+                type(response_failure_detail) is ResponseFailureDetailV1
+                and response_failure_detail.run_id == run_id
+                and diagnostic_code is TenderPlanReadOnlyDiagnosticCode.WORKER_RESPONSE_VALIDATION
+                and observation_stage is TenderPlanReadOnlyObservationStage.WORKER_POST_RESPONSE
+            ):
+                append_tenderplan_response_failure_best_effort(
+                    detail=response_failure_detail, main_store_path=store.path, clock=clock,
+                )
+        except BaseException:
+            pass
 
 
 def run_tenderplan_read_only_intake(
@@ -577,6 +595,7 @@ def run_tenderplan_read_only_intake(
             run_id=run_id,
             diagnostic_code=error.diagnostic_code,
             observation_stage=error.observation_stage,
+            response_failure_detail=error.response_failure_detail,
             enabled=uses_production_transport,
             clock=now_clock,
         )
