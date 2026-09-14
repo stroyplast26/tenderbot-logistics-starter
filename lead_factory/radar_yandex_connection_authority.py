@@ -199,14 +199,27 @@ def _verify_request_against_pin(
     actual = _source_hashes()
     if code != actual or actual != _IMPORTED_CODE_HASHES:
         common._fail("CODE_HASH_MISMATCH")
-    owner = common._object(job["owner_receipt"], {"kind", "owner_id", "source_thread_id", "instruction_sha256",
-                                                "captured_at_utc", "scope_sha256"})
+    from . import radar_yandex_owner_delegation as delegation
+
+    delegated_owner = (type(job["owner_receipt"]) is dict
+                       and job["owner_receipt"].get("kind") == delegation.OWNER_KIND)
     review = common._object(job["independent_acceptance"], {"kind", "reviewer_id", "reviewed_at_utc", "verdict",
                                                            "code_sha256", "evidence_sha256", "implementation_author_ids"})
     ready = common._object(job["readiness"], {"kind", "observed_at_utc", "billing_status", "search_api_status",
                                             "credential_status", "folder_id_sha256", "connection_sha256", "evidence_sha256"})
     scope = {"policy_sha256": policy.sha256, "journal_path": str(journal_path), "journal_identity": identity,
              "claims_identity": claims, "workspace_root": str(_WORKSPACE_ROOT), "connection_sha256": connection_sha}
+    if delegated_owner:
+        try:
+            owner = delegation.validate_yandex_owner_delegation(
+                job["owner_receipt"], job=job, scope_sha256=common._digest(scope),
+                activated_at_utc=pin["activated_at_utc"],
+            )
+        except delegation.YandexOwnerDelegationError:
+            common._fail("ACCEPTANCE_REQUIRED")
+    else:
+        owner = common._object(job["owner_receipt"], {"kind", "owner_id", "source_thread_id", "instruction_sha256",
+                                                    "captured_at_utc", "scope_sha256"})
     for identifier in (owner["owner_id"], owner["source_thread_id"], review["reviewer_id"]):
         common._identity_text(identifier)
     authors = review["implementation_author_ids"]
@@ -216,7 +229,7 @@ def _verify_request_against_pin(
         common._identity_text(author)
     for digest in (owner["instruction_sha256"], review["evidence_sha256"], ready["evidence_sha256"]):
         common._sha(digest)
-    if (owner["kind"] != "CAPTURED_OWNER_INSTRUCTION" or owner["scope_sha256"] != common._digest(scope)
+    if ((not delegated_owner and owner["kind"] != "CAPTURED_OWNER_INSTRUCTION") or owner["scope_sha256"] != common._digest(scope)
             or review["kind"] != "INDEPENDENT_CODE_ACCEPTANCE" or review["verdict"] != "ACCEPT"
             or review["reviewer_id"] in [owner["owner_id"], *authors] or len(set(authors)) != len(authors)
             or review["code_sha256"] != code
@@ -224,7 +237,8 @@ def _verify_request_against_pin(
             or ready["search_api_status"] != "CONFIGURATION_VERIFIED" or ready["credential_status"] != "AVAILABLE"
             or ready["folder_id_sha256"] != folder_sha or ready["connection_sha256"] != connection_sha):
         common._fail("ACCEPTANCE_REQUIRED")
-    for when in (owner["captured_at_utc"], review["reviewed_at_utc"], ready["observed_at_utc"]):
+    owner_time = owner["issued_at_utc"] if delegated_owner else owner["captured_at_utc"]
+    for when in (owner_time, review["reviewed_at_utc"], ready["observed_at_utc"]):
         if not created - timedelta(hours=24) <= common._utc(when) <= activated:
             common._fail("RECEIPT_EXPIRED")
     bound = common._VerifiedData(exact_job, job_sha, pin_sha, policy, journal_path, identity, claims, now)

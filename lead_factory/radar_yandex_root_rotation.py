@@ -20,6 +20,7 @@ from . import radar_yandex_job_activator as activator
 from . import radar_yandex_job_preparer as preparer
 from . import radar_yandex_pilot_authority as common
 from . import radar_yandex_journal as journal
+from . import radar_yandex_owner_delegation as delegation
 from .radar_yandex_search import SearchRequest
 
 
@@ -296,17 +297,28 @@ def _apply(inputs: dict, expected_preview_sha256: str, evidence_sha256: str,
         _require(evidence["owner_receipt"]["instruction_sha256"] != old_job["owner_receipt"]["instruction_sha256"]
                  and evidence["readiness"]["evidence_sha256"] != old_job["readiness"]["evidence_sha256"])
         approval = _pinned(approval_path, expected_approval_sha256)
-        common._object(approval, {"version", "kind", "owner_id", "source_thread_id", "instruction_sha256",
-                                 "captured_at_utc", "old_root_sha256", "new_draft_sha256", "new_scope_sha256",
-                                 "activation_evidence_sha256", "preview_sha256"})
-        _require(approval["version"] == _VERSION and approval["kind"] == "CAPTURED_ROOT_ROTATION_APPROVAL")
-        for name in ("old_root_sha256", "new_draft_sha256", "new_scope_sha256", "preview_sha256"):
-            _require(approval[name] == preview[name])
-        _require(approval["activation_evidence_sha256"] == evidence_sha256
-                 and approval["owner_id"] == evidence["owner_receipt"]["owner_id"]
-                 and approval["source_thread_id"] == evidence["owner_receipt"]["source_thread_id"]
-                 and approval["instruction_sha256"] == evidence["owner_receipt"]["instruction_sha256"]
-                 and common._utc(draft["created_at_utc"]) <= common._utc(approval["captured_at_utc"]) <= common._utc(now))
+        if approval.get("kind") == delegation.ROTATION_KIND:
+            try:
+                delegation.validate_yandex_rotation_delegation(
+                    approval, owner_receipt=evidence["owner_receipt"], draft=draft, preview=preview,
+                    activation_evidence_sha256=evidence_sha256, now=now,
+                )
+            except delegation.YandexOwnerDelegationError:
+                _require(False)
+        else:
+            # A captured V1 approval remains a captured instruction, never a delegation.
+            _require(evidence["owner_receipt"]["kind"] == "CAPTURED_OWNER_INSTRUCTION")
+            common._object(approval, {"version", "kind", "owner_id", "source_thread_id", "instruction_sha256",
+                                     "captured_at_utc", "old_root_sha256", "new_draft_sha256", "new_scope_sha256",
+                                     "activation_evidence_sha256", "preview_sha256"})
+            _require(approval["version"] == _VERSION and approval["kind"] == "CAPTURED_ROOT_ROTATION_APPROVAL")
+            for name in ("old_root_sha256", "new_draft_sha256", "new_scope_sha256", "preview_sha256"):
+                _require(approval[name] == preview[name])
+            _require(approval["activation_evidence_sha256"] == evidence_sha256
+                     and approval["owner_id"] == evidence["owner_receipt"]["owner_id"]
+                     and approval["source_thread_id"] == evidence["owner_receipt"]["source_thread_id"]
+                     and approval["instruction_sha256"] == evidence["owner_receipt"]["instruction_sha256"]
+                     and common._utc(draft["created_at_utc"]) <= common._utc(approval["captured_at_utc"]) <= common._utc(now))
         _require(_preview(inputs, locked_pin)[0] == preview)
         receipt = {"version": _VERSION, "preview": preview, "approval_sha256": expected_approval_sha256,
                    "activation_evidence_sha256": evidence_sha256, "prepared_at_utc": now}
