@@ -83,7 +83,7 @@ def validate_no_dispatch_reconciliations(
     """Verify canonical typed records; native truth is checked separately fenced."""
     control = _control()
     try:
-        if control._control_schema_version(connection) != 8:
+        if control._control_schema_version(connection) not in {8, 9}:
             raise ValueError
         attempts = {
             str(row["attempt_id"]): dict(row)
