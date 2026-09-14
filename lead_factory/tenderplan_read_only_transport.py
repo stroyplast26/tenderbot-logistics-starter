@@ -2514,11 +2514,14 @@ def _sealed_worker_material(
         worker_python.relative_to(base_runtime)
         path_configuration.relative_to(base_runtime)
         queue_path.relative_to(logical_root)
-        connection_profile.relative_to(logical_root)
     except ValueError:
         raise TenderPlanIsolatedAuthorizationError(
             "TenderPlan sealed worker path binding differs"
         ) from None
+    # The account profile lives in the OS-local application data store rather
+    # than the source tree. It is still bound by its exact resolved path and
+    # digest, held by the parent lease, and is the worker audit hook's sole
+    # readable file. Only the mutable queue must remain below logical_root.
 
     def stable_read(path: Path, maximum: int) -> bytes:
         try:

@@ -910,6 +910,61 @@ def test_sealed_worker_pins_verified_bundle_without_live_python_entrypoint(
     assert payload == b"{}"
 
 
+def test_sealed_worker_accepts_exact_pinned_profile_outside_logical_root(
+    tmp_path: Path,
+    sealed_python_runtime: _SealedPythonRuntime,
+) -> None:
+    root = Path(transport._ROOT)  # noqa: SLF001
+    queue_path, _connection_profile_path = _sealed_operational_paths(root)
+    connection_profile_path = tmp_path / "account-profile.json"
+    connection_profile_path.write_bytes(b"exact-pinned-profile")
+    bundle = b"sealed-worker-test-bundle"
+    bundle_path = tmp_path / "worker.pyz"
+    bundle_path.write_bytes(bundle)
+    sealed = _sealed_worker(
+        bundle_path=bundle_path,
+        expected_bundle=bundle,
+        logical_root=root,
+        runtime=sealed_python_runtime,
+        queue_path=queue_path,
+        connection_profile_path=connection_profile_path,
+    )
+
+    command, payload = transport._sealed_worker_material(sealed, b"{}")  # noqa: SLF001
+
+    assert command[-4] == str(queue_path.resolve(strict=True))
+    assert command[-3] == str(connection_profile_path.resolve(strict=True))
+    assert command[-2] == hashlib.sha256(b"exact-pinned-profile").hexdigest()
+    assert payload == b"{}"
+
+
+def test_sealed_worker_still_rejects_queue_outside_logical_root(
+    tmp_path: Path,
+    sealed_python_runtime: _SealedPythonRuntime,
+) -> None:
+    root = Path(transport._ROOT)  # noqa: SLF001
+    _queue_path, connection_profile_path = _sealed_operational_paths(root)
+    queue_path = tmp_path / "queue.sqlite3"
+    queue_path.write_bytes(b"exact-pinned-queue")
+    bundle = b"sealed-worker-test-bundle"
+    bundle_path = tmp_path / "worker.pyz"
+    bundle_path.write_bytes(bundle)
+    sealed = _sealed_worker(
+        bundle_path=bundle_path,
+        expected_bundle=bundle,
+        logical_root=root,
+        runtime=sealed_python_runtime,
+        queue_path=queue_path,
+        connection_profile_path=connection_profile_path,
+    )
+
+    with pytest.raises(
+        TenderPlanIsolatedAuthorizationError,
+        match="TenderPlan sealed worker path binding differs",
+    ):
+        transport._sealed_worker_material(sealed, b"{}")  # noqa: SLF001
+
+
 def test_sealed_worker_rejects_bundle_tamper_before_supervisor(
     tmp_path: Path,
     sealed_python_runtime: _SealedPythonRuntime,
